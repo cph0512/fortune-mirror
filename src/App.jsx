@@ -448,6 +448,7 @@ export default function App() {
   const [tab, setTab] = useState("analyze"); // analyze | kb | settings
   const [images, setImages] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -557,9 +558,10 @@ export default function App() {
       const systemPrompt = buildSystemPrompt(kbEntries);
       const SYS_NAMES = { bazi: "八字", astro: "西洋占星", ziwei: "紫微斗數" };
       const systems = selectedSystems.map(s => SYS_NAMES[s]).join("＋");
+      // Phase 1: Quick chart reading only
       let userPrompt = selectedSystems.length > 0
-        ? `這些是【${systems}】的命盤圖片，共 ${images.length} 張。不需要辨識命盤類型，直接提取關鍵資訊進行${systems}分析。${selectedSystems.length > 1 ? "並進行交叉分析。" : ""}今年是2026丙午年。`
-        : `請分析以上 ${images.length} 張命盤圖片。請辨識每張圖屬於哪個命理系統（八字、西洋占星、紫微斗數），提取所有關鍵資訊，然後進行完整的交叉分析。今年是2026丙午年。`;
+        ? `這些是【${systems}】的命盤圖片，共 ${images.length} 張。\n\n**只做第一步：排盤與資料提取。**\n不需要辨識命盤類型。逐格判讀命盤，列出完整的十二宮表格（宮位、主星、其他星曜、四化），以及基本資料（命主、身主、五行局等）。\n\n⚠️ 這個階段只需要排盤，不需要分析運勢。簡短列出重點格局即可。`
+        : `請分析以上 ${images.length} 張命盤圖片。\n\n**只做第一步：排盤與資料提取。**\n辨識命盤類型，逐格判讀，列出完整資料表格。不需要詳細分析，簡短列出重點格局即可。`;
       if (correction.trim()) {
         userPrompt += `\n\n⚠️ 用戶補充/修正資訊（以此為準，優先於圖片判讀）：\n${correction.trim()}`;
       }
@@ -755,10 +757,42 @@ export default function App() {
                   <div className="result-content">{renderMarkdown(result)}</div>
                 )}
 
-                {/* Add more charts or cross-analyze */}
+                {/* Actions */}
                 <div className="action-row">
+                  <button className="detail-btn" disabled={detailLoading} onClick={async () => {
+                    setDetailLoading(true);
+                    try {
+                      const lastResult = allResults[allResults.length - 1];
+                      const submitRes = await fetch(API_BACKEND, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          images: [],
+                          system: buildSystemPrompt(kbEntries),
+                          prompt: `以下是命盤排盤資料：\n\n${lastResult.result}\n\n請根據以上排盤資料進行【完整詳細分析】，包含：\n1. 格局分析（命格、主星特質）\n2. 各宮位詳解（重點宮位深入分析）\n3. 四化影響\n4. 今年流年運勢（2026丙午年）含流年斗君排月\n5. 大限走勢\n6. 綜合建議\n\n要深入、專業、具體，不要泛泛而談。`,
+                        }),
+                      });
+                      const { job_id } = await submitRes.json();
+                      for (let i = 0; i < 100; i++) {
+                        await new Promise(r => setTimeout(r, 3000));
+                        try {
+                          const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+                          if (!pollRes.ok) continue;
+                          const pd = await pollRes.json();
+                          if (pd.status === "done") {
+                            const sys = lastResult.system + "（詳細）";
+                            setAllResults(prev => [...prev, { system: sys, result: pd.result }]);
+                            setResult(pd.result);
+                            break;
+                          }
+                        } catch { continue; }
+                      }
+                    } finally { setDetailLoading(false); }
+                  }}>
+                    {detailLoading ? "⏳ 分析中..." : "🔍 詳細分析"}
+                  </button>
                   <button className="add-chart-btn" onClick={() => { setResult(""); setImages([]); setSelectedSystems([]); setCorrection(""); }}>
-                    ➕ 追加其他命盤
+                    ➕ 追加命盤
                   </button>
                   {allResults.length > 1 && (
                     <button className="cross-btn" onClick={async () => {

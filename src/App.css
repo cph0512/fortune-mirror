@@ -454,7 +454,7 @@
   margin: 16px 0;
 }
 
-.add-chart-btn, .cross-btn {
+.detail-btn, .add-chart-btn, .cross-btn {
   flex: 1;
   padding: 12px;
   border: 2px solid var(--border);
@@ -465,6 +465,21 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.detail-btn {
+  border-color: var(--purple, #9b59b6);
+  color: var(--purple, #9b59b6);
+  background: rgba(155, 89, 182, 0.08);
+}
+
+.detail-btn:hover {
+  background: rgba(155, 89, 182, 0.15);
+}
+
+.detail-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .add-chart-btn:hover {
