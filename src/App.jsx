@@ -560,8 +560,8 @@ export default function App() {
       const systems = selectedSystems.map(s => SYS_NAMES[s]).join("＋");
       // Phase 1: Quick chart reading only
       let userPrompt = selectedSystems.length > 0
-        ? `這些是【${systems}】的命盤圖片，共 ${images.length} 張。\n\n**只做第一步：排盤與資料提取。**\n不需要辨識命盤類型。逐格判讀命盤，列出完整的十二宮表格（宮位、主星、其他星曜、四化），以及基本資料（命主、身主、五行局等）。\n\n⚠️ 這個階段只需要排盤，不需要分析運勢。簡短列出重點格局即可。`
-        : `請分析以上 ${images.length} 張命盤圖片。\n\n**只做第一步：排盤與資料提取。**\n辨識命盤類型，逐格判讀，列出完整資料表格。不需要詳細分析，簡短列出重點格局即可。`;
+        ? `這些是【${systems}】的命盤圖片，共 ${images.length} 張。\n\n**只做第一步：排盤與資料提取。**\n不需要辨識命盤類型。逐格判讀命盤，列出完整資料表格及基本資料。\n\n⚠️ 只排盤＋列出重點格局，不需要詳細分析運勢。\n⚠️ 嚴格只用【${systems}】的術語和框架，不要混入其他命理系統的概念（例如八字不要提星座，紫微不要提五行喜用神）。`
+        : `請分析以上 ${images.length} 張命盤圖片。\n\n**只做第一步：排盤與資料提取。**\n辨識命盤類型，逐格判讀，列出完整資料表格。不需要詳細分析，簡短列出重點格局即可。\n⚠️ 每個系統只用該系統的術語，不要混入其他系統的概念。`;
       if (correction.trim()) {
         userPrompt += `\n\n⚠️ 用戶補充/修正資訊（以此為準，優先於圖片判讀）：\n${correction.trim()}`;
       }
@@ -757,7 +757,7 @@ export default function App() {
                   <div className="result-content">{renderMarkdown(result)}</div>
                 )}
 
-                {/* Actions */}
+                {/* Detail analysis button */}
                 <div className="action-row">
                   <button className="detail-btn" disabled={detailLoading} onClick={async () => {
                     setDetailLoading(true);
@@ -769,7 +769,7 @@ export default function App() {
                         body: JSON.stringify({
                           images: [],
                           system: buildSystemPrompt(kbEntries),
-                          prompt: `以下是命盤排盤資料：\n\n${lastResult.result}\n\n請根據以上排盤資料進行【完整詳細分析】，包含：\n1. 格局分析（命格、主星特質）\n2. 各宮位詳解（重點宮位深入分析）\n3. 四化影響\n4. 今年流年運勢（2026丙午年）含流年斗君排月\n5. 大限走勢\n6. 綜合建議\n\n要深入、專業、具體，不要泛泛而談。`,
+                          prompt: `以下是命盤排盤資料：\n\n${lastResult.result}\n\n請根據以上排盤資料進行【完整詳細分析】，包含：\n1. 格局分析（命格、主星特質）\n2. 各宮位詳解（重點宮位深入分析）\n3. 四化影響\n4. 今年流年運勢（2026丙午年）含流年斗君排月\n5. 大限走勢\n6. 綜合建議\n\n要深入、專業、具體，不要泛泛而談。\n⚠️ 嚴格只用該系統的術語，不要混入其他命理系統概念。`,
                         }),
                       });
                       const { job_id } = await submitRes.json();
@@ -791,39 +791,6 @@ export default function App() {
                   }}>
                     {detailLoading ? "⏳ 分析中..." : "🔍 詳細分析"}
                   </button>
-                  <button className="add-chart-btn" onClick={() => { setResult(""); setImages([]); setSelectedSystems([]); setCorrection(""); }}>
-                    ➕ 追加命盤
-                  </button>
-                  {allResults.length > 1 && (
-                    <button className="cross-btn" onClick={async () => {
-                      setChatLoading(true);
-                      try {
-                        const allText = allResults.map(r => `【${r.system}】\n${r.result}`).join("\n\n---\n\n");
-                        const submitRes = await fetch(API_BACKEND, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            images: [],
-                            system: "你是命理交叉分析專家。用繁體中文回答。",
-                            prompt: `以下是同一個人的多個命盤分析結果，請進行交叉比對，找出共鳴點和矛盾點，給出綜合結論。\n\n${allText}`,
-                          }),
-                        });
-                        const { job_id } = await submitRes.json();
-                        while (true) {
-                          await new Promise(r => setTimeout(r, 3000));
-                          const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
-                          const pd = await pollRes.json();
-                          if (pd.status === "done") {
-                            setAllResults(prev => [...prev, { system: "⟐ 交叉分析", result: pd.result }]);
-                            setResult(pd.result);
-                            break;
-                          }
-                        }
-                      } finally { setChatLoading(false); }
-                    }}>
-                      ⟐ 交叉分析
-                    </button>
-                  )}
                 </div>
 
                 {/* Follow-up chat */}
@@ -857,6 +824,46 @@ export default function App() {
                       {chatLoading ? "⏳" : "➤"}
                     </button>
                   </div>
+                </div>
+
+                {/* Add more charts / cross-analyze — always at bottom */}
+                <div className="action-row bottom-actions">
+                  <button className="add-chart-btn" onClick={() => { setResult(""); setImages([]); setSelectedSystems([]); setCorrection(""); }}>
+                    ➕ 追加其他命盤
+                  </button>
+                  {allResults.length > 1 && (
+                    <button className="cross-btn" onClick={async () => {
+                      setChatLoading(true);
+                      try {
+                        const allText = allResults.map(r => `【${r.system}】\n${r.result}`).join("\n\n---\n\n");
+                        const submitRes = await fetch(API_BACKEND, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            images: [],
+                            system: "你是命理交叉分析專家。用繁體中文回答。",
+                            prompt: `以下是同一個人的多個命盤分析結果，請進行交叉比對，找出共鳴點和矛盾點，給出綜合結論。\n\n${allText}`,
+                          }),
+                        });
+                        const { job_id } = await submitRes.json();
+                        for (let i = 0; i < 100; i++) {
+                          await new Promise(r => setTimeout(r, 3000));
+                          try {
+                            const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+                            if (!pollRes.ok) continue;
+                            const pd = await pollRes.json();
+                            if (pd.status === "done") {
+                              setAllResults(prev => [...prev, { system: "⟐ 交叉分析", result: pd.result }]);
+                              setResult(pd.result);
+                              break;
+                            }
+                          } catch { continue; }
+                        }
+                      } finally { setChatLoading(false); }
+                    }}>
+                      ⟐ 交叉分析
+                    </button>
+                  )}
                 </div>
 
                 <button className="reset-btn" onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); }}>
