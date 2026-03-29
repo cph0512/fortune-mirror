@@ -485,7 +485,8 @@ export default function App() {
         ? `這些是【${systems}】的命盤圖片，共 ${images.length} 張。不需要辨識命盤類型，直接提取關鍵資訊進行${systems}分析。${selectedSystems.length > 1 ? "並進行交叉分析。" : ""}今年是2026丙午年。`
         : `請分析以上 ${images.length} 張命盤圖片。請辨識每張圖屬於哪個命理系統（八字、西洋占星、紫微斗數），提取所有關鍵資訊，然後進行完整的交叉分析。今年是2026丙午年。`;
 
-      const response = await fetch(API_BACKEND, {
+      // Submit job
+      const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -494,14 +495,23 @@ export default function App() {
           prompt: userPrompt,
         }),
       });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `API 錯誤 ${response.status}`);
+      if (!submitRes.ok) {
+        const errData = await submitRes.json().catch(() => ({}));
+        throw new Error(errData.error || `提交失敗 ${submitRes.status}`);
       }
+      const { job_id } = await submitRes.json();
 
-      const data = await response.json();
-      setResult(data.result);
+      // Poll for result
+      while (true) {
+        await new Promise(r => setTimeout(r, 3000));
+        const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+        const pollData = await pollRes.json();
+        if (pollData.status === "done") {
+          setResult(pollData.result);
+          break;
+        }
+        if (pollData.error) throw new Error(pollData.error);
+      }
     } catch (err) {
       setError("分析過程發生錯誤：" + err.message);
     } finally {
