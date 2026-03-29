@@ -84,13 +84,13 @@ function saveKB(entries) {
   localStorage.setItem(STORAGE_KEY_KB, JSON.stringify(entries));
 }
 
+const API_BACKEND = "https://bot.velopulse.io/api/fortune";
+
 function loadApiKey() {
-  return localStorage.getItem(STORAGE_KEY_API) || "";
+  return "server"; // API key managed server-side
 }
 
-function saveApiKey(key) {
-  localStorage.setItem(STORAGE_KEY_API, key);
-}
+function saveApiKey() {}
 
 function loadModel() {
   return localStorage.getItem(STORAGE_KEY_MODEL) || "claude-sonnet-4-20250514";
@@ -374,42 +374,19 @@ function EditorModal({ mode, category, entry, onSave, onCancel }) {
 }
 
 function Settings({ apiKey, setApiKey, model, setModel }) {
-  const [showKey, setShowKey] = useState(false);
-
   return (
     <div className="settings-section">
       <div className="setting-card">
-        <div className="setting-title">Anthropic API Key</div>
+        <div className="setting-title">AI 引擎</div>
         <div className="setting-desc">
-          用於呼叫 Claude API 進行命盤分析。你的 API Key 只儲存在瀏覽器本地。
+          由伺服器端 Claude 引擎驅動，無需設定 API Key。
         </div>
-        <div style={{ position: "relative" }}>
-          <input
-            type={showKey ? "text" : "password"}
-            value={apiKey}
-            onChange={e => { setApiKey(e.target.value); saveApiKey(e.target.value); }}
-            placeholder="sk-ant-..."
-          />
-          <button
-            onClick={() => setShowKey(!showKey)}
-            style={{
-              position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-              border: "none", background: "transparent", color: "var(--text-muted)", fontSize: 16, cursor: "pointer"
-            }}
-          >
-            {showKey ? "🙈" : "👁️"}
-          </button>
-        </div>
-        {apiKey ? (
-          <div className="status ok">✓ 已設定 API Key</div>
-        ) : (
-          <div className="status warn">✗ 尚未設定 API Key</div>
-        )}
+        <div className="status ok">✓ 伺服器端 AI 已連線</div>
       </div>
 
       <div className="setting-card">
         <div className="setting-title">AI 模型</div>
-        <div className="setting-desc">選擇用於分析的 Claude 模型。Sonnet 速度快；Opus 更精確但較慢。</div>
+        <div className="setting-desc">伺服器端自動選擇最佳模型進行分析。</div>
         <select
           value={model}
           onChange={e => { setModel(e.target.value); saveModel(e.target.value); }}
@@ -481,7 +458,7 @@ export default function App() {
   const removeImage = (id) => setImages(prev => prev.filter(img => img.id !== id));
 
   const analyze = async () => {
-    if (images.length === 0 || !apiKey) return;
+    if (images.length === 0) return;
     setAnalyzing(true);
     setError("");
     setResult("");
@@ -494,47 +471,26 @@ export default function App() {
     }, 3000);
 
     try {
-      const content = [];
-      images.forEach(img => {
-        content.push({
-          type: "image",
-          source: { type: "base64", media_type: img.type, data: img.data },
-        });
-      });
-      content.push({
-        type: "text",
-        text: `請分析以上 ${images.length} 張命盤圖片。請辨識每張圖屬於哪個命理系統（八字、西洋占星、紫微斗數），提取所有關鍵資訊，然後進行完整的三系統交叉分析。今年是2026丙午年。`,
-      });
-
       const systemPrompt = buildSystemPrompt(kbEntries);
+      const userPrompt = `請分析以上 ${images.length} 張命盤圖片。請辨識每張圖屬於哪個命理系統（八字、西洋占星、紫微斗數），提取所有關鍵資訊，然後進行完整的三系統交叉分析。今年是2026丙午年。`;
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch(API_BACKEND, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model,
-          max_tokens: 8000,
+          images: images.map(img => ({ data: img.data, media_type: img.type })),
           system: systemPrompt,
-          messages: [{ role: "user", content }],
+          prompt: userPrompt,
         }),
       });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error?.message || `API 錯誤 ${response.status}`);
+        throw new Error(errData.error || `API 錯誤 ${response.status}`);
       }
 
       const data = await response.json();
-      const text = data.content
-        .filter(b => b.type === "text")
-        .map(b => b.text)
-        .join("\n");
-      setResult(text);
+      setResult(data.result);
     } catch (err) {
       setError("分析過程發生錯誤：" + err.message);
     } finally {
@@ -584,15 +540,7 @@ export default function App() {
                   )}
                 </p>
 
-                {!apiKey && (
-                  <div className="error-card" style={{ marginBottom: 16 }}>
-                    請先到「設定」頁面填入 Anthropic API Key
-                    <br />
-                    <button className="retry-btn" onClick={() => setTab("settings")} style={{ marginTop: 8 }}>
-                      前往設定
-                    </button>
-                  </div>
-                )}
+                {/* API 由伺服器端處理，無需設定 Key */}
 
                 <div
                   className={`drop-zone ${dragOver ? "active" : ""}`}
@@ -628,7 +576,7 @@ export default function App() {
                   </div>
                 )}
 
-                {images.length > 0 && apiKey && (
+                {images.length > 0 && (
                   <button className="analyze-btn" onClick={analyze}>
                     <span style={{ fontSize: 18 }}>⟐</span>
                     開始解盤（{images.length} 張命盤）
