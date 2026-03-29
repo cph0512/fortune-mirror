@@ -104,8 +104,16 @@ const STORAGE_KEY_MODEL = "fortune-app-model";
 function loadKB() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_KB);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  // Load default KB on first visit
+  fetch("./default-kb.json").then(r => r.json()).then(data => {
+    if (data?.length && !localStorage.getItem(STORAGE_KEY_KB)) {
+      localStorage.setItem(STORAGE_KEY_KB, JSON.stringify(data));
+      window.location.reload();
+    }
+  }).catch(() => {});
+  return [];
 }
 
 function saveKB(entries) {
