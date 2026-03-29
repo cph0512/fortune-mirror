@@ -483,17 +483,21 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images: [], system: "你是命理分析師，根據命盤分析結果回答追問。用繁體中文，簡潔專業。", prompt: context }),
       });
+      if (!submitRes.ok) throw new Error(`提交失敗 ${submitRes.status}`);
       const { job_id } = await submitRes.json();
-      while (true) {
+      for (let i = 0; i < 100; i++) {
         await new Promise(r => setTimeout(r, 3000));
-        const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
-        const pollData = await pollRes.json();
-        if (pollData.status === "done") {
-          setChatHistory(prev => [...prev, { role: "assistant", text: pollData.result }]);
-          break;
-        }
-        if (pollData.error) throw new Error(pollData.error);
+        try {
+          const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+          if (!pollRes.ok) continue;
+          const pollData = await pollRes.json();
+          if (pollData.status === "done") {
+            setChatHistory(prev => [...prev, { role: "assistant", text: pollData.result }]);
+            return;
+          }
+        } catch { continue; }
       }
+      throw new Error("回覆逾時");
     } catch (err) {
       setChatHistory(prev => [...prev, { role: "assistant", text: `錯誤：${err.message}` }]);
     } finally {
@@ -577,10 +581,13 @@ export default function App() {
       const { job_id } = await submitRes.json();
 
       // Poll for result
-      while (true) {
+      for (let i = 0; i < 100; i++) {
         await new Promise(r => setTimeout(r, 3000));
-        const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
-        const pollData = await pollRes.json();
+        try {
+          const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+          if (!pollRes.ok) continue;
+          var pollData = await pollRes.json();
+        } catch { continue; }
         if (pollData.status === "done") {
           const SYS_NAMES = { bazi: "八字", astro: "西洋占星", ziwei: "紫微斗數" };
           const sysLabel = selectedSystems.map(s => SYS_NAMES[s]).join("＋") || "自動辨識";
