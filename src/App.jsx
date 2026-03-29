@@ -471,9 +471,12 @@ export default function App() {
     setChatHistory(prev => [...prev, { role: "user", text: question }]);
     setChatLoading(true);
     try {
-      // Build concise context: only last 3 chat exchanges + result summary
+      // Build concise context from all analyses
+      const allText = allResults.length > 0
+        ? allResults.map(r => `【${r.system}】${r.result.slice(0, 800)}`).join("\n\n")
+        : result.slice(0, 2000);
       const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
-      const context = `命盤分析摘要：\n${result.slice(0, 2000)}\n\n${recentChat ? `近期對話：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n簡潔回答，保持專業。`;
+      const context = `命盤分析摘要：\n${allText}\n\n${recentChat ? `近期對話：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n簡潔回答，保持專業。`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
