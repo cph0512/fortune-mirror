@@ -444,8 +444,73 @@ function Settings({ apiKey, setApiKey, model, setModel }) {
 // MAIN APP
 // ============================================================
 
+function LoginPage({ onLogin }) {
+  const [mode, setMode] = useState("login"); // login | register
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!username || !password) return;
+    setLoading(true); setErr("");
+    try {
+      const endpoint = mode === "login" ? "fortune-login" : "fortune-register";
+      const body = mode === "login" ? { username, password } : { username, password, name: name || username };
+      const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/")}${endpoint}`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error || "失敗"); return; }
+      localStorage.setItem("fortune_auth", JSON.stringify(data));
+      onLogin(data);
+    } catch (e) { setErr("連線失敗"); } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="app">
+      <div className="bg-pattern" />
+      <div className="header">
+        <div className="header-icon">✦</div>
+        <h1>命理三鏡</h1>
+        <p className="tagline">八字 · 占星 · 紫微｜AI 交叉解盤</p>
+      </div>
+      <div className="content">
+        <div className="login-card">
+          <div className="login-tabs">
+            <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>登入</button>
+            <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>註冊</button>
+          </div>
+          {mode === "register" && (
+            <input placeholder="顯示名稱" value={name} onChange={e => setName(e.target.value)} />
+          )}
+          <input placeholder="帳號" value={username} onChange={e => setUsername(e.target.value)} />
+          <input placeholder="密碼" type="password" value={password} onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && submit()} />
+          {err && <div className="login-err">{err}</div>}
+          <button className="login-btn" onClick={submit} disabled={loading}>
+            {loading ? "⏳" : mode === "login" ? "登入" : "註冊"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [tab, setTab] = useState("analyze"); // analyze | kb | settings
+  const [auth, setAuth] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("fortune_auth")); } catch { return null; }
+  });
+  const isAdmin = auth?.role === "admin";
+
+  if (!auth) return <LoginPage onLogin={setAuth} />;
+
+  return <MainApp auth={auth} isAdmin={isAdmin} onLogout={() => { localStorage.removeItem("fortune_auth"); setAuth(null); }} />;
+}
+
+function MainApp({ auth, isAdmin, onLogout }) {
+  const [tab, setTab] = useState("analyze"); // analyze | kb | saves | settings | users
   const [images, setImages] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -463,28 +528,21 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [composing, setComposing] = useState(false);
-  const [userName, setUserName] = useState(() => localStorage.getItem("fortune_user") || "");
   const [savedList, setSavedList] = useState([]);
-  const [showSaves, setShowSaves] = useState(false);
+  const [usersList, setUsersList] = useState({});
   const chatEndRef = useRef(null);
 
-  const saveReading = async (name) => {
-    if (!name || allResults.length === 0) return;
-    localStorage.setItem("fortune_user", name);
-    setUserName(name);
-    const payload = { user: name, systems: allResults.map(r => r.system), results: allResults, chat: chatHistory, time: new Date().toISOString() };
+  const saveReading = async () => {
+    if (allResults.length === 0) return;
+    const payload = { user: auth.username, systems: allResults.map(r => r.system), results: allResults, chat: chatHistory, time: new Date().toISOString() };
     await fetch(`${API_BACKEND}-save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   };
 
-  const loadSaves = async (name) => {
-    if (!name) return;
-    localStorage.setItem("fortune_user", name);
-    setUserName(name);
+  const loadSaves = async () => {
     try {
-      const res = await fetch(`${API_BACKEND}-save?user=${encodeURIComponent(name)}`);
+      const res = await fetch(`${API_BACKEND}-save?user=${encodeURIComponent(auth.username)}`);
       const data = await res.json();
       setSavedList(data || []);
-      setShowSaves(true);
     } catch { setSavedList([]); }
   };
 
@@ -492,7 +550,15 @@ export default function App() {
     setAllResults(save.results || []);
     setChatHistory(save.chat || []);
     setResult(save.results?.length ? save.results[save.results.length - 1].result : "");
-    setShowSaves(false);
+    setTab("analyze");
+  };
+
+  const loadUsersList = async () => {
+    try {
+      const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`);
+      const data = await res.json();
+      setUsersList(data || {});
+    } catch {}
   };
   const fileInputRef = useRef(null);
 
@@ -655,15 +721,22 @@ export default function App() {
           <button className={`nav-tab ${tab === "analyze" ? "active" : ""}`} onClick={() => setTab("analyze")}>
             <span className="tab-icon">⟐</span> 解盤
           </button>
-          <button className={`nav-tab ${tab === "kb" ? "active" : ""}`} onClick={() => setTab("kb")}>
-            <span className="tab-icon">📚</span> 知識庫
-            {kbEntries.length > 0 && <span className="badge">{kbEntries.length}</span>}
-          </button>
-          <button className={`nav-tab ${tab === "saves" ? "active" : ""}`} onClick={() => { setTab("saves"); if (userName) loadSaves(userName); }}>
+          <button className={`nav-tab ${tab === "saves" ? "active" : ""}`} onClick={() => { setTab("saves"); loadSaves(); }}>
             <span className="tab-icon">💾</span> 存檔
           </button>
-          <button className={`nav-tab ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>
-            <span className="tab-icon">⚙️</span> 設定
+          {isAdmin && (
+            <button className={`nav-tab ${tab === "kb" ? "active" : ""}`} onClick={() => setTab("kb")}>
+              <span className="tab-icon">📚</span> 知識庫
+              {kbEntries.length > 0 && <span className="badge">{kbEntries.length}</span>}
+            </button>
+          )}
+          {isAdmin && (
+            <button className={`nav-tab ${tab === "users" ? "active" : ""}`} onClick={() => { setTab("users"); loadUsersList(); }}>
+              <span className="tab-icon">👥</span> 用戶
+            </button>
+          )}
+          <button className="nav-tab logout-tab" onClick={onLogout}>
+            <span className="tab-icon">👤</span> {auth.name || auth.username}
           </button>
         </div>
 
@@ -903,10 +976,7 @@ export default function App() {
                 </div>
 
                 <div className="action-row">
-                  <button className="save-btn" onClick={() => {
-                    const name = userName || prompt("輸入暱稱（用於存取紀錄）：");
-                    if (name) saveReading(name);
-                  }}>
+                  <button className="save-btn" onClick={saveReading}>
                     💾 存檔
                   </button>
                   <button className="reset-btn" style={{ flex: 1 }} onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); }}>
@@ -927,21 +997,12 @@ export default function App() {
         {tab === "saves" && (
           <div className="saves-section">
             <div className="setting-card">
-              <div className="setting-title">我的命盤紀錄</div>
-              <div className="save-user-row">
-                <input
-                  type="text"
-                  placeholder="輸入暱稱"
-                  value={userName}
-                  onChange={e => setUserName(e.target.value)}
-                />
-                <button className="save-load-btn" onClick={() => loadSaves(userName)}>載入紀錄</button>
-              </div>
+              <div className="setting-title">📂 {auth.name || auth.username} 的命盤紀錄</div>
             </div>
             {savedList.length > 0 ? (
               <div className="save-list">
                 {savedList.map((s, i) => (
-                  <div key={i} className="save-card" onClick={() => { loadReading(s); setTab("analyze"); }}>
+                  <div key={i} className="save-card" onClick={() => loadReading(s)}>
                     <div className="save-card-title">{s.systems?.join(" + ") || "命盤分析"}</div>
                     <div className="save-card-time">{new Date(s.time).toLocaleString("zh-TW")}</div>
                     <div className="save-card-preview">{s.results?.[0]?.result?.slice(0, 80)}...</div>
@@ -949,16 +1010,55 @@ export default function App() {
                 ))}
               </div>
             ) : (
-              <div className="save-empty">
-                {userName ? "尚無存檔紀錄" : "請先輸入暱稱"}
-              </div>
+              <div className="save-empty">尚無存檔紀錄，解盤後按「💾 存檔」即可保存</div>
             )}
           </div>
         )}
 
-        {/* ===== Settings Tab ===== */}
-        {tab === "settings" && (
-          <Settings apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />
+        {/* ===== Users Tab (admin) ===== */}
+        {tab === "users" && isAdmin && (
+          <div className="saves-section">
+            <div className="setting-card">
+              <div className="setting-title">👥 用戶管理</div>
+            </div>
+            <div className="save-list">
+              {Object.entries(usersList).map(([uname, u]) => (
+                <div key={uname} className="save-card user-card">
+                  <div className="save-card-title">
+                    {u.name || uname}
+                    <span className={`role-badge ${u.role}`}>{u.role === "admin" ? "管理員" : "用戶"}</span>
+                  </div>
+                  <div className="save-card-time">帳號：{uname}</div>
+                  {uname !== "admin" && (
+                    <div className="user-actions">
+                      <button onClick={async () => {
+                        await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "set_role", username: uname, role: u.role === "admin" ? "user" : "admin" }),
+                        });
+                        loadUsersList();
+                      }}>{u.role === "admin" ? "降為用戶" : "升為管理員"}</button>
+                      <button onClick={async () => {
+                        await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "reset_password", username: uname, password: "123456" }),
+                        });
+                        alert(`已重設 ${uname} 密碼為 123456`);
+                      }}>重設密碼</button>
+                      <button className="danger" onClick={async () => {
+                        if (!confirm(`確定刪除 ${uname}？`)) return;
+                        await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "delete", username: uname }),
+                        });
+                        loadUsersList();
+                      }}>刪除</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 
