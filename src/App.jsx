@@ -735,8 +735,8 @@ function MainApp({ auth, isAdmin, onLogout }) {
               <span className="tab-icon">👥</span> 用戶
             </button>
           )}
-          <button className="nav-tab logout-tab" onClick={onLogout}>
-            <span className="tab-icon">👤</span> {auth.name || auth.username}
+          <button className="nav-tab logout-tab" onClick={() => { if (confirm("確定登出？")) onLogout(); }}>
+            👤 {auth.name || auth.username} ✕
           </button>
         </div>
 
