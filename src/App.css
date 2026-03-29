@@ -447,6 +447,54 @@
   margin: 20px 0;
 }
 
+/* Action buttons */
+.action-row {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.add-chart-btn, .cross-btn {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-chart-btn:hover {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.cross-btn {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(201, 168, 76, 0.08);
+}
+
+.cross-btn:hover {
+  background: rgba(201, 168, 76, 0.15);
+}
+
+.result-block {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-block-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--teal);
+  margin-bottom: 8px;
+}
+
 /* Chat follow-up */
 .chat-section {
   margin-top: 24px;

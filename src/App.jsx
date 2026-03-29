@@ -457,6 +457,7 @@ export default function App() {
   const [model, setModel] = useState(loadModel);
   const [selectedSystems, setSelectedSystems] = useState([]); // ["bazi", "astro", "ziwei"]
   const [correction, setCorrection] = useState(""); // user correction text
+  const [allResults, setAllResults] = useState([]); // [{system, result}] — accumulated analyses
   const [chatHistory, setChatHistory] = useState([]); // [{role, text}]
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -470,15 +471,14 @@ export default function App() {
     setChatHistory(prev => [...prev, { role: "user", text: question }]);
     setChatLoading(true);
     try {
-      // Build context: original result + chat history
-      const context = `以下是之前的命盤分析結果：\n\n${result}\n\n` +
-        chatHistory.map(m => `${m.role === "user" ? "用戶問" : "回答"}：${m.text}`).join("\n\n") +
-        `\n\n用戶追問：${question}\n\n請根據上述命盤分析結果回答，保持專業但易懂。`;
+      // Build concise context: only last 3 chat exchanges + result summary
+      const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
+      const context = `命盤分析摘要：\n${result.slice(0, 2000)}\n\n${recentChat ? `近期對話：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n簡潔回答，保持專業。`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: buildSystemPrompt(kbEntries), prompt: context }),
+        body: JSON.stringify({ images: [], system: "你是命理分析師，根據命盤分析結果回答追問。用繁體中文，簡潔專業。", prompt: context }),
       });
       const { job_id } = await submitRes.json();
       while (true) {
@@ -579,6 +579,9 @@ export default function App() {
         const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
         const pollData = await pollRes.json();
         if (pollData.status === "done") {
+          const SYS_NAMES = { bazi: "八字", astro: "西洋占星", ziwei: "紫微斗數" };
+          const sysLabel = selectedSystems.map(s => SYS_NAMES[s]).join("＋") || "自動辨識";
+          setAllResults(prev => [...prev, { system: sysLabel, result: pollData.result }]);
           setResult(pollData.result);
           break;
         }
@@ -722,14 +725,62 @@ export default function App() {
             {result && (
               <div className="result-section">
                 <div style={{ textAlign: "center" }}>
-                  <span className="result-badge">✓ 分析完成</span>
-                  {kbEntries.length > 0 && (
-                    <span className="result-badge" style={{ marginLeft: 8, background: "rgba(201,168,76,0.12)", color: "var(--gold)" }}>
-                      📚 參考了 {kbEntries.length} 筆知識
+                  <span className="result-badge">✓ {allResults.length > 1 ? `已完成 ${allResults.length} 項分析` : "分析完成"}</span>
+                  {allResults.length > 1 && (
+                    <span className="result-badge" style={{ marginLeft: 8, background: "rgba(76,201,176,0.12)", color: "var(--teal)" }}>
+                      {allResults.map(r => r.system).join(" + ")}
                     </span>
                   )}
                 </div>
-                <div className="result-content">{renderMarkdown(result)}</div>
+
+                {/* Show all accumulated results */}
+                {allResults.length > 1 ? (
+                  allResults.map((r, i) => (
+                    <div key={i} className="result-block">
+                      <div className="result-block-title">{r.system} 分析</div>
+                      <div className="result-content">{renderMarkdown(r.result)}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="result-content">{renderMarkdown(result)}</div>
+                )}
+
+                {/* Add more charts or cross-analyze */}
+                <div className="action-row">
+                  <button className="add-chart-btn" onClick={() => { setResult(""); setImages([]); setSelectedSystems([]); setCorrection(""); }}>
+                    ➕ 追加其他命盤
+                  </button>
+                  {allResults.length > 1 && (
+                    <button className="cross-btn" onClick={async () => {
+                      setChatLoading(true);
+                      try {
+                        const allText = allResults.map(r => `【${r.system}】\n${r.result}`).join("\n\n---\n\n");
+                        const submitRes = await fetch(API_BACKEND, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            images: [],
+                            system: "你是命理交叉分析專家。用繁體中文回答。",
+                            prompt: `以下是同一個人的多個命盤分析結果，請進行交叉比對，找出共鳴點和矛盾點，給出綜合結論。\n\n${allText}`,
+                          }),
+                        });
+                        const { job_id } = await submitRes.json();
+                        while (true) {
+                          await new Promise(r => setTimeout(r, 3000));
+                          const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+                          const pd = await pollRes.json();
+                          if (pd.status === "done") {
+                            setAllResults(prev => [...prev, { system: "⟐ 交叉分析", result: pd.result }]);
+                            setResult(pd.result);
+                            break;
+                          }
+                        }
+                      } finally { setChatLoading(false); }
+                    }}>
+                      ⟐ 交叉分析
+                    </button>
+                  )}
+                </div>
 
                 {/* Follow-up chat */}
                 <div className="chat-section">
@@ -764,8 +815,8 @@ export default function App() {
                   </div>
                 </div>
 
-                <button className="reset-btn" onClick={() => { setResult(""); setImages([]); setChatHistory([]); }}>
-                  重新解盤
+                <button className="reset-btn" onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); }}>
+                  全部重來
                 </button>
               </div>
             )}
