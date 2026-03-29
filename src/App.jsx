@@ -457,7 +457,47 @@ export default function App() {
   const [model, setModel] = useState(loadModel);
   const [selectedSystems, setSelectedSystems] = useState([]); // ["bazi", "astro", "ziwei"]
   const [correction, setCorrection] = useState(""); // user correction text
+  const [chatHistory, setChatHistory] = useState([]); // [{role, text}]
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const askFollowUp = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const question = chatInput.trim();
+    setChatInput("");
+    setChatHistory(prev => [...prev, { role: "user", text: question }]);
+    setChatLoading(true);
+    try {
+      // Build context: original result + chat history
+      const context = `以下是之前的命盤分析結果：\n\n${result}\n\n` +
+        chatHistory.map(m => `${m.role === "user" ? "用戶問" : "回答"}：${m.text}`).join("\n\n") +
+        `\n\n用戶追問：${question}\n\n請根據上述命盤分析結果回答，保持專業但易懂。`;
+
+      const submitRes = await fetch(API_BACKEND, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: [], system: buildSystemPrompt(kbEntries), prompt: context }),
+      });
+      const { job_id } = await submitRes.json();
+      while (true) {
+        await new Promise(r => setTimeout(r, 3000));
+        const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+        const pollData = await pollRes.json();
+        if (pollData.status === "done") {
+          setChatHistory(prev => [...prev, { role: "assistant", text: pollData.result }]);
+          break;
+        }
+        if (pollData.error) throw new Error(pollData.error);
+      }
+    } catch (err) {
+      setChatHistory(prev => [...prev, { role: "assistant", text: `錯誤：${err.message}` }]);
+    } finally {
+      setChatLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  };
 
   const toggleSystem = (sys) => setSelectedSystems(prev =>
     prev.includes(sys) ? prev.filter(s => s !== sys) : [...prev, sys]
@@ -690,7 +730,41 @@ export default function App() {
                   )}
                 </div>
                 <div className="result-content">{renderMarkdown(result)}</div>
-                <button className="reset-btn" onClick={() => { setResult(""); setImages([]); }}>
+
+                {/* Follow-up chat */}
+                <div className="chat-section">
+                  <div className="chat-divider">💬 追問命盤問題</div>
+                  {chatHistory.map((msg, i) => (
+                    <div key={i} className={`chat-msg ${msg.role}`}>
+                      <div className="chat-label">{msg.role === "user" ? "你" : "命理師"}</div>
+                      <div className="chat-bubble">
+                        {msg.role === "assistant" ? renderMarkdown(msg.text) : msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div className="chat-msg assistant">
+                      <div className="chat-label">命理師</div>
+                      <div className="chat-bubble typing">思考中...</div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                  <div className="chat-input-row">
+                    <input
+                      className="chat-input"
+                      placeholder="針對這個命盤提問，例如：今年感情運如何？"
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && !e.shiftKey && askFollowUp()}
+                      disabled={chatLoading}
+                    />
+                    <button className="chat-send" onClick={askFollowUp} disabled={chatLoading || !chatInput.trim()}>
+                      {chatLoading ? "⏳" : "➤"}
+                    </button>
+                  </div>
+                </div>
+
+                <button className="reset-btn" onClick={() => { setResult(""); setImages([]); setChatHistory([]); }}>
                   重新解盤
                 </button>
               </div>
