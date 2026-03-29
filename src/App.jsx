@@ -110,18 +110,19 @@ function buildSystemPrompt(kbEntries) {
     grouped[entry.category].push(entry);
   }
 
-  prompt += "\n\n---\n\n以下是使用者提供的額外命理知識庫，請在分析時參考這些資料：\n";
+  prompt += "\n\n---\n\n## 補充知識庫（僅供參考）\n";
+  prompt += "以下是使用者匯入的命理筆記與觀點，作為額外參考。你仍應以自身的命理專業知識為主進行完整分析，這些筆記僅作為輔助視角，若其中觀點與你的專業判斷有出入，以你的分析為準。\n";
 
   for (const cat of CATEGORIES) {
     const entries = grouped[cat.id];
     if (!entries || entries.length === 0) continue;
-    prompt += `\n### ${cat.icon} ${cat.name} 知識\n`;
+    prompt += `\n### ${cat.icon} ${cat.name}\n`;
     for (const e of entries) {
       prompt += `\n**${e.title}**\n${e.content}\n`;
     }
   }
 
-  prompt += "\n---\n請在分析中適當引用上述知識庫的內容，將理論與命盤實際資訊結合。";
+  prompt += "\n---\n如果上述知識庫中有與命盤分析相關的觀點，可以適度融入你的分析中作為補充，但不需要刻意逐條引用。";
   return prompt;
 }
 
