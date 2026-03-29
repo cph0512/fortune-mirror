@@ -510,6 +510,98 @@
   margin-bottom: 8px;
 }
 
+/* Save button */
+.save-btn {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  background: rgba(201, 168, 76, 0.08);
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-btn:hover {
+  background: rgba(201, 168, 76, 0.15);
+}
+
+/* Saves tab */
+.saves-section {
+  padding: 16px 0;
+}
+
+.save-user-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.save-user-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.save-load-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.save-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.save-card:hover {
+  border-color: var(--teal);
+}
+
+.save-card-title {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.save-card-time {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0;
+}
+
+.save-card-preview {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.save-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 0;
+}
+
 /* Chat follow-up */
 .chat-section {
   margin-top: 24px;

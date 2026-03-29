@@ -463,7 +463,37 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [composing, setComposing] = useState(false);
+  const [userName, setUserName] = useState(() => localStorage.getItem("fortune_user") || "");
+  const [savedList, setSavedList] = useState([]);
+  const [showSaves, setShowSaves] = useState(false);
   const chatEndRef = useRef(null);
+
+  const saveReading = async (name) => {
+    if (!name || allResults.length === 0) return;
+    localStorage.setItem("fortune_user", name);
+    setUserName(name);
+    const payload = { user: name, systems: allResults.map(r => r.system), results: allResults, chat: chatHistory, time: new Date().toISOString() };
+    await fetch(`${API_BACKEND}-save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  };
+
+  const loadSaves = async (name) => {
+    if (!name) return;
+    localStorage.setItem("fortune_user", name);
+    setUserName(name);
+    try {
+      const res = await fetch(`${API_BACKEND}-save?user=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      setSavedList(data || []);
+      setShowSaves(true);
+    } catch { setSavedList([]); }
+  };
+
+  const loadReading = (save) => {
+    setAllResults(save.results || []);
+    setChatHistory(save.chat || []);
+    setResult(save.results?.length ? save.results[save.results.length - 1].result : "");
+    setShowSaves(false);
+  };
   const fileInputRef = useRef(null);
 
   const askFollowUp = async () => {
@@ -628,6 +658,9 @@ export default function App() {
           <button className={`nav-tab ${tab === "kb" ? "active" : ""}`} onClick={() => setTab("kb")}>
             <span className="tab-icon">📚</span> 知識庫
             {kbEntries.length > 0 && <span className="badge">{kbEntries.length}</span>}
+          </button>
+          <button className={`nav-tab ${tab === "saves" ? "active" : ""}`} onClick={() => { setTab("saves"); if (userName) loadSaves(userName); }}>
+            <span className="tab-icon">💾</span> 存檔
           </button>
           <button className={`nav-tab ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>
             <span className="tab-icon">⚙️</span> 設定
@@ -869,9 +902,17 @@ export default function App() {
                   )}
                 </div>
 
-                <button className="reset-btn" onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); }}>
-                  全部重來
-                </button>
+                <div className="action-row">
+                  <button className="save-btn" onClick={() => {
+                    const name = userName || prompt("輸入暱稱（用於存取紀錄）：");
+                    if (name) saveReading(name);
+                  }}>
+                    💾 存檔
+                  </button>
+                  <button className="reset-btn" style={{ flex: 1 }} onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); }}>
+                    全部重來
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -880,6 +921,39 @@ export default function App() {
         {/* ===== Knowledge Base Tab ===== */}
         {tab === "kb" && (
           <KnowledgeBase entries={kbEntries} setEntries={setKbEntries} />
+        )}
+
+        {/* ===== Saves Tab ===== */}
+        {tab === "saves" && (
+          <div className="saves-section">
+            <div className="setting-card">
+              <div className="setting-title">我的命盤紀錄</div>
+              <div className="save-user-row">
+                <input
+                  type="text"
+                  placeholder="輸入暱稱"
+                  value={userName}
+                  onChange={e => setUserName(e.target.value)}
+                />
+                <button className="save-load-btn" onClick={() => loadSaves(userName)}>載入紀錄</button>
+              </div>
+            </div>
+            {savedList.length > 0 ? (
+              <div className="save-list">
+                {savedList.map((s, i) => (
+                  <div key={i} className="save-card" onClick={() => { loadReading(s); setTab("analyze"); }}>
+                    <div className="save-card-title">{s.systems?.join(" + ") || "命盤分析"}</div>
+                    <div className="save-card-time">{new Date(s.time).toLocaleString("zh-TW")}</div>
+                    <div className="save-card-preview">{s.results?.[0]?.result?.slice(0, 80)}...</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="save-empty">
+                {userName ? "尚無存檔紀錄" : "請先輸入暱稱"}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ===== Settings Tab ===== */}
