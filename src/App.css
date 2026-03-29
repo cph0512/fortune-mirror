@@ -203,16 +203,34 @@
   text-overflow: ellipsis;
 }
 
-.preview-card .chart-type-select {
-  width: 100%;
-  padding: 3px 4px;
-  font-size: 10px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+.system-selector {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.system-btn {
+  padding: 10px 20px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
   background: var(--surface);
-  color: var(--text);
-  text-align: center;
+  color: var(--text-muted);
+  font-size: 15px;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.system-btn:hover {
+  border-color: var(--teal);
+  color: var(--text);
+}
+
+.system-btn.active {
+  border-color: var(--teal);
+  background: rgba(76, 201, 176, 0.12);
+  color: var(--teal);
+  font-weight: 600;
 }
 
 .preview-card .remove-btn {

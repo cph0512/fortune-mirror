@@ -427,7 +427,12 @@ export default function App() {
   const [kbEntries, setKbEntries] = useState(loadKB);
   const [apiKey, setApiKey] = useState(loadApiKey);
   const [model, setModel] = useState(loadModel);
+  const [selectedSystems, setSelectedSystems] = useState([]); // ["bazi", "astro", "ziwei"]
   const fileInputRef = useRef(null);
+
+  const toggleSystem = (sys) => setSelectedSystems(prev =>
+    prev.includes(sys) ? prev.filter(s => s !== sys) : [...prev, sys]
+  );
 
   const handleFiles = useCallback((files) => {
     const incoming = Array.from(files).filter(
@@ -458,7 +463,6 @@ export default function App() {
   }, []);
 
   const removeImage = (id) => setImages(prev => prev.filter(img => img.id !== id));
-  const setChartType = (id, chartType) => setImages(prev => prev.map(img => img.id === id ? { ...img, chartType } : img));
 
   const analyze = async () => {
     if (images.length === 0) return;
@@ -475,13 +479,11 @@ export default function App() {
 
     try {
       const systemPrompt = buildSystemPrompt(kbEntries);
-      const CHART_LABELS = { bazi: "八字命盤", astro: "西洋占星星盤", ziwei: "紫微斗數命盤" };
-      const labeled = images.map((img, i) => {
-        const label = CHART_LABELS[img.chartType];
-        return label ? `第${i + 1}張圖是【${label}】` : `第${i + 1}張圖請自動辨識`;
-      });
-      const hasAuto = images.some(img => img.chartType === "auto");
-      const userPrompt = `請分析以上 ${images.length} 張命盤圖片。\n${labeled.join("；")}。\n${hasAuto ? "未標註的圖片請辨識屬於哪個命理系統。" : ""}提取所有關鍵資訊，然後進行完整的交叉分析。今年是2026丙午年。`;
+      const SYS_NAMES = { bazi: "八字", astro: "西洋占星", ziwei: "紫微斗數" };
+      const systems = selectedSystems.map(s => SYS_NAMES[s]).join("＋");
+      const userPrompt = selectedSystems.length > 0
+        ? `這些是【${systems}】的命盤圖片，共 ${images.length} 張。不需要辨識命盤類型，直接提取關鍵資訊進行${systems}分析。${selectedSystems.length > 1 ? "並進行交叉分析。" : ""}今年是2026丙午年。`
+        : `請分析以上 ${images.length} 張命盤圖片。請辨識每張圖屬於哪個命理系統（八字、西洋占星、紫微斗數），提取所有關鍵資訊，然後進行完整的交叉分析。今年是2026丙午年。`;
 
       const response = await fetch(API_BACKEND, {
         method: "POST",
@@ -539,9 +541,24 @@ export default function App() {
           <>
             {!analyzing && !result && (
               <div className="upload-section">
-                <p className="instruction">上傳你的命盤截圖</p>
+                <p className="instruction">選擇命盤類型</p>
+                <div className="system-selector">
+                  {[
+                    { id: "ziwei", label: "紫微斗數", icon: "💜" },
+                    { id: "bazi", label: "八字", icon: "🔥" },
+                    { id: "astro", label: "西洋占星", icon: "♎" },
+                  ].map(sys => (
+                    <button
+                      key={sys.id}
+                      className={`system-btn ${selectedSystems.includes(sys.id) ? "active" : ""}`}
+                      onClick={() => toggleSystem(sys.id)}
+                    >
+                      <span>{sys.icon}</span> {sys.label}
+                    </button>
+                  ))}
+                </div>
                 <p className="sub-instruction">
-                  支援八字排盤、西洋星盤、紫微斗數命盤（最多 5 張）
+                  {selectedSystems.length === 0 ? "未選擇＝自動辨識（較慢）" : `已選：${selectedSystems.map(s => ({bazi:"八字",astro:"占星",ziwei:"紫微"})[s]).join("＋")}｜上傳對應命盤截圖`}
                   {kbEntries.length > 0 && (
                     <span style={{ color: "var(--teal)" }}>
                       {" "}· 已載入 {kbEntries.length} 筆知識
@@ -579,17 +596,7 @@ export default function App() {
                       <div className="preview-card" key={img.id}>
                         <img src={img.preview} alt={img.name} />
                         <button className="remove-btn" onClick={e => { e.stopPropagation(); removeImage(img.id); }}>✕</button>
-                        <select
-                          className="chart-type-select"
-                          value={img.chartType}
-                          onClick={e => e.stopPropagation()}
-                          onChange={e => setChartType(img.id, e.target.value)}
-                        >
-                          <option value="auto">自動辨識</option>
-                          <option value="bazi">八字</option>
-                          <option value="astro">西洋占星</option>
-                          <option value="ziwei">紫微斗數</option>
-                        </select>
+                        <div className="name">{img.name.length > 12 ? img.name.slice(0, 12) + "…" : img.name}</div>
                       </div>
                     ))}
                   </div>
