@@ -250,6 +250,33 @@
 }
 
 /* Analyze Button */
+.correction-section {
+  margin-top: 12px;
+}
+
+.correction-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.correction-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.correction-input:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
 .analyze-btn {
   display: flex;
   align-items: center;
