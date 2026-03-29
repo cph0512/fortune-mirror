@@ -462,6 +462,7 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState([]); // [{role, text}]
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [composing, setComposing] = useState(false);
   const chatEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -817,7 +818,9 @@ export default function App() {
                       placeholder="針對這個命盤提問，例如：今年感情運如何？"
                       value={chatInput}
                       onChange={e => setChatInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); askFollowUp(); } }}
+                      onCompositionStart={() => setComposing(true)}
+                      onCompositionEnd={() => setComposing(false)}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !composing) { e.preventDefault(); askFollowUp(); } }}
                       disabled={chatLoading}
                     />
                     <button className="chat-send" onClick={askFollowUp} disabled={chatLoading || !chatInput.trim()}>
