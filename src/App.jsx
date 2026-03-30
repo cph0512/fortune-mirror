@@ -590,7 +590,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
         ? allResults.map(r => `【${r.system}】${r.result.slice(0, 800)}`).join("\n\n")
         : result.slice(0, 2000);
       const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
-      const context = `命盤分析摘要：\n${allText}\n\n${recentChat ? `近期對話：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n簡潔回答，保持專業。`;
+      const context = `⚠️ 以下排盤資料已確認正確，不要重新排盤或修改任何星曜位置。\n\n命盤分析摘要：\n${allText}\n\n${recentChat ? `近期對話：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n基於已確認的排盤資料回答。若涉及流年且有紫微命盤，必須用紫微方法（斗君排月）。簡潔專業。`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
@@ -892,7 +892,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         body: JSON.stringify({
                           images: [],
                           system: buildSystemPrompt(kbEntries),
-                          prompt: `以下是命盤排盤資料：\n\n${lastResult.result}\n\n請根據以上排盤資料進行【完整詳細分析】，包含：\n1. 格局分析（命格、主星特質）\n2. 各宮位詳解（重點宮位深入分析）\n3. 四化影響\n4. 今年流年運勢（2026丙午年）含流年斗君排月\n5. 大限走勢\n6. 綜合建議\n\n要深入、專業、具體，不要泛泛而談。\n⚠️ 嚴格只用該系統的術語，不要混入其他命理系統概念。`,
+                          prompt: `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${lastResult.result}\n\n請根據以上【已確認的排盤資料】進行完整詳細分析：\n1. 格局分析（命格、主星特質）\n2. 各宮位詳解（重點宮位深入分析）\n3. 四化影響\n4. 今年流年運勢（2026丙午年）——若有紫微命盤，必須用流年斗君定位排月，不可用占星方法替代\n5. 大限走勢\n6. 綜合建議\n\n要深入、專業、具體，不要泛泛而談。\n⚠️ 嚴格只用該系統的術語，不要混入其他命理系統概念。`,
                         }),
                       });
                       const { job_id } = await submitRes.json();
