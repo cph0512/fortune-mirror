@@ -1,3 +1,13 @@
+/* ===== Global button feedback ===== */
+button {
+  transition: all 0.15s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
 /* ===== Layout ===== */
 .app {
   position: relative;
@@ -712,6 +722,31 @@
 .user-actions button.danger {
   color: var(--red);
   border-color: var(--red);
+}
+
+/* Report & Feedback */
+.report-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px dashed var(--red, #e74c3c);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--red, #e74c3c);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.report-btn:hover {
+  opacity: 1;
+}
+
+.feedback-issue {
+  font-size: 14px;
+  color: var(--red, #e74c3c);
+  margin-top: 6px;
+  line-height: 1.5;
 }
 
 /* Chat follow-up */

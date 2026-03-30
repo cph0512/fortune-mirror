@@ -546,6 +546,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [composing, setComposing] = useState(false);
   const [savedList, setSavedList] = useState([]);
   const [usersList, setUsersList] = useState({});
+  const [feedbackList, setFeedbackList] = useState([]);
   const chatEndRef = useRef(null);
 
   const saveReading = async () => {
@@ -751,6 +752,14 @@ function MainApp({ auth, isAdmin, onLogout }) {
               <span className="tab-icon">👥</span> 用戶
             </button>
           )}
+          {isAdmin && (
+            <button className={`nav-tab ${tab === "feedback" ? "active" : ""}`} onClick={() => {
+              setTab("feedback");
+              fetch(`${API_BACKEND}-feedback`).then(r => r.json()).then(d => setFeedbackList(d)).catch(() => {});
+            }}>
+              <span className="tab-icon">⚠️</span> 反饋
+            </button>
+          )}
           <button className="nav-tab logout-tab" onClick={() => { if (confirm("確定登出？")) onLogout(); }}>
             👤 {auth.name || auth.username} ✕
           </button>
@@ -949,6 +958,24 @@ function MainApp({ auth, isAdmin, onLogout }) {
                       {chatLoading ? "⏳" : "➤"}
                     </button>
                   </div>
+                  {/* Report issue */}
+                  <button className="report-btn" onClick={() => {
+                    const issue = prompt("描述分析錯誤的地方（例如：兄弟宮應該是廉貞不是貪狼、流年計算方式錯誤等）：");
+                    if (!issue) return;
+                    fetch(`${API_BACKEND}-feedback`, {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        user: auth.username,
+                        issue,
+                        context: allResults.map(r => r.system).join("+"),
+                        result_preview: result.slice(0, 500),
+                        chat: chatHistory.slice(-4),
+                        time: new Date().toISOString(),
+                      }),
+                    }).then(() => alert("已回報，感謝反饋！")).catch(() => alert("回報失敗"));
+                  }}>
+                    ⚠️ 回報分析錯誤
+                  </button>
                 </div>
 
                 {/* Add more charts / cross-analyze — always at bottom */}
@@ -1074,6 +1101,36 @@ function MainApp({ auth, isAdmin, onLogout }) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ===== Feedback Tab (admin) ===== */}
+        {tab === "feedback" && isAdmin && (
+          <div className="saves-section">
+            <div className="setting-card">
+              <div className="setting-title">⚠️ 用戶反饋（{feedbackList.length} 筆）</div>
+            </div>
+            {feedbackList.length > 0 ? (
+              <div className="save-list">
+                {feedbackList.map((f, i) => (
+                  <div key={i} className="save-card feedback-card">
+                    <div className="save-card-title">
+                      👤 {f.user || "匿名"} — {f.context || ""}
+                    </div>
+                    <div className="save-card-time">{f.time ? new Date(f.time).toLocaleString("zh-TW") : ""}</div>
+                    <div className="feedback-issue">❌ {f.issue}</div>
+                    {f.result_preview && (
+                      <details>
+                        <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>查看分析摘要</summary>
+                        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{f.result_preview}</div>
+                      </details>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="save-empty">尚無反饋</div>
+            )}
           </div>
         )}
       </div>
