@@ -422,15 +422,15 @@ function Settings({ apiKey, setApiKey, model, setModel }) {
   return (
     <div className="settings-section">
       <div className="setting-card">
-        <div className="setting-title">AI 引擎</div>
+        <div className="setting-title">解盤引擎</div>
         <div className="setting-desc">
-          由伺服器端 Claude 引擎驅動，無需設定 API Key。
+          由伺服器端引擎驅動，無需設定。
         </div>
-        <div className="status ok">✓ 伺服器端 AI 已連線</div>
+        <div className="status ok">✓ 已連線</div>
       </div>
 
       <div className="setting-card">
-        <div className="setting-title">AI 模型</div>
+        <div className="setting-title">分析模型</div>
         <div className="setting-desc">伺服器端自動選擇最佳模型進行分析。</div>
         <select
           value={model}
@@ -448,7 +448,7 @@ function Settings({ apiKey, setApiKey, model, setModel }) {
           1. 在「設定」頁面填入 Anthropic API Key<br />
           2. 在「知識庫」頁面新增命理知識（可選）<br />
           3. 在「解盤」頁面上傳命盤截圖<br />
-          4. AI 會結合你的知識庫 + 內建知識進行分析<br />
+          4. 系統會結合你的知識庫 + 內建知識進行分析<br />
           5. 知識庫越豐富，分析越精準！
         </div>
       </div>
@@ -490,7 +490,7 @@ function LoginPage({ onLogin }) {
       <div className="header">
         <div className="header-icon">✦</div>
         <h1>命理三鏡</h1>
-        <p className="tagline">八字 · 占星 · 紫微｜AI 交叉解盤</p>
+        <p className="tagline">八字 · 占星 · 紫微｜交叉解盤</p>
       </div>
       <div className="content">
         <div className="login-card">
@@ -729,7 +729,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       <div className="header">
         <div className="header-icon">✦</div>
         <h1>命理三鏡</h1>
-        <p className="tagline">八字 · 占星 · 紫微｜AI 交叉解盤</p>
+        <p className="tagline">八字 · 占星 · 紫微｜交叉解盤</p>
       </div>
 
       {/* Nav */}
