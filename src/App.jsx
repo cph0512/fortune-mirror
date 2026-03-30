@@ -530,6 +530,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [images, setImages] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [addingChart, setAddingChart] = useState(false);
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -718,6 +719,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
     } finally {
       clearInterval(interval);
       setAnalyzing(false);
+      setAddingChart(false);
     }
   };
 
@@ -768,7 +770,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
         {/* ===== Analyze Tab ===== */}
         {tab === "analyze" && (
           <>
-            {!analyzing && !result && (
+            {!analyzing && (!result || addingChart) && (
               <div className="upload-section">
                 <p className="instruction">選擇命盤類型</p>
                 <div className="system-selector">
@@ -983,7 +985,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
 
                 {/* Add more charts / cross-analyze — always at bottom */}
                 <div className="action-row bottom-actions">
-                  <button className="add-chart-btn" onClick={() => { setResult(""); setImages([]); setSelectedSystems([]); setCorrection(""); }}>
+                  <button className="add-chart-btn" onClick={() => { setAddingChart(true); setImages([]); setSelectedSystems([]); setCorrection(""); }}>
                     ➕ 追加其他命盤
                   </button>
                   {allResults.length > 1 && (
