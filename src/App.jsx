@@ -877,16 +877,19 @@ function MainApp({ auth, isAdmin, onLogout }) {
                   )}
                 </div>
 
-                {/* Show all accumulated results */}
+                {/* Show all accumulated results — collapsible */}
                 {allResults.length > 1 ? (
                   allResults.map((r, i) => (
-                    <div key={i} className="result-block">
-                      <div className="result-block-title">{r.system} 分析</div>
+                    <details key={i} className="result-block" open={i === allResults.length - 1}>
+                      <summary className="result-block-title">{r.system} 分析 <span className="toggle-hint">{i === allResults.length - 1 ? "▼" : "▶"}</span></summary>
                       <div className="result-content">{renderMarkdown(r.result)}</div>
-                    </div>
+                    </details>
                   ))
                 ) : (
-                  <div className="result-content">{renderMarkdown(result)}</div>
+                  <details className="result-block" open>
+                    <summary className="result-block-title">{allResults[0]?.system || "分析結果"} <span className="toggle-hint">▼</span></summary>
+                    <div className="result-content">{renderMarkdown(result)}</div>
+                  </details>
                 )}
 
                 {/* Detail analysis button */}
