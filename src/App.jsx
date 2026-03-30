@@ -600,7 +600,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       });
       if (!submitRes.ok) throw new Error(`提交失敗 ${submitRes.status}`);
       const { job_id } = await submitRes.json();
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 300; i++) {
         await new Promise(r => setTimeout(r, 3000));
         try {
           const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
@@ -697,7 +697,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       const { job_id } = await submitRes.json();
 
       // Poll for result
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 300; i++) {
         await new Promise(r => setTimeout(r, 3000));
         try {
           const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
@@ -908,7 +908,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         }),
                       });
                       const { job_id } = await submitRes.json();
-                      for (let i = 0; i < 100; i++) {
+                      for (let i = 0; i < 300; i++) {
                         await new Promise(r => setTimeout(r, 3000));
                         try {
                           const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
@@ -1001,7 +1001,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                           }),
                         });
                         const { job_id } = await submitRes.json();
-                        for (let i = 0; i < 100; i++) {
+                        for (let i = 0; i < 300; i++) {
                           await new Promise(r => setTimeout(r, 3000));
                           try {
                             const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
