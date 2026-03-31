@@ -587,12 +587,10 @@ function MainApp({ auth, isAdmin, onLogout }) {
     setChatHistory(prev => [...prev, { role: "user", text: question }]);
     setChatLoading(true);
     try {
-      // Build concise context from all analyses
-      const allText = allResults.length > 0
-        ? allResults.map(r => `【${r.system}】${r.result.slice(0, 800)}`).join("\n\n")
-        : result.slice(0, 2000);
-      const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
-      const context = `⚠️ 以下排盤資料已確認正確，不要重新排盤或修改任何星曜位置。\n\n命盤分析摘要：\n${allText}\n\n${recentChat ? `近期對話：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n基於已確認的排盤資料回答。若涉及流年且有紫微命盤，必須用紫微方法（斗君排月）。簡潔專業。`;
+      // Build full context — include ALL chart data as persistent memory
+      const chartMemory = allResults.map(r => `【${r.system}】\n${r.result}`).join("\n\n===\n\n");
+      const recentChat = chatHistory.slice(-8).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n\n");
+      const context = `## 用戶的命盤資料（已確認，不可修改）\n\n${chartMemory}\n\n---\n\n${recentChat ? `## 對話紀錄\n${recentChat}\n\n---\n\n` : ""}## 用戶追問\n${question}\n\n請基於以上完整命盤資料回答。每次回答都要回去參考原始排盤資料，確保一致性。若涉及流年且有紫微命盤，必須用紫微方法（斗君排月）。`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
@@ -672,47 +670,56 @@ function MainApp({ auth, isAdmin, onLogout }) {
     try {
       const systemPrompt = buildSystemPrompt(kbEntries);
       const SYS_NAMES = { bazi: "八字", astro: "西洋占星", ziwei: "紫微斗數" };
-      const systems = selectedSystems.map(s => SYS_NAMES[s]).join("＋");
-      // Phase 1: Quick chart reading only
-      let userPrompt = selectedSystems.length > 0
-        ? `這些是【${systems}】的命盤圖片，共 ${images.length} 張。\n\n**只做第一步：排盤與資料提取。**\n不需要辨識命盤類型。逐格判讀命盤，列出完整資料表格及基本資料。\n\n⚠️ 只排盤＋列出重點格局，不需要詳細分析運勢。\n⚠️ 嚴格只用【${systems}】的術語和框架，不要混入其他命理系統的概念（例如八字不要提星座，紫微不要提五行喜用神）。`
-        : `請分析以上 ${images.length} 張命盤圖片。\n\n**只做第一步：排盤與資料提取。**\n辨識命盤類型，逐格判讀，列出完整資料表格。不需要詳細分析，簡短列出重點格局即可。\n⚠️ 每個系統只用該系統的術語，不要混入其他系統的概念。`;
-      if (correction.trim()) {
-        userPrompt += `\n\n⚠️ 用戶補充/修正資訊（以此為準，優先於圖片判讀）：\n${correction.trim()}`;
-      }
 
-      // Submit job
-      const submitRes = await fetch(API_BACKEND, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          images: images.map(img => ({ data: img.data, media_type: img.type })),
-          system: systemPrompt,
-          prompt: userPrompt,
-        }),
-      });
-      if (!submitRes.ok) {
-        const errData = await submitRes.json().catch(() => ({}));
-        throw new Error(errData.error || `提交失敗 ${submitRes.status}`);
-      }
-      const { job_id } = await submitRes.json();
-
-      // Poll for result
-      for (let i = 0; i < 300; i++) {
-        await new Promise(r => setTimeout(r, 3000));
-        try {
-          const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
-          if (!pollRes.ok) continue;
-          var pollData = await pollRes.json();
-        } catch { continue; }
-        if (pollData.status === "done") {
-          const SYS_NAMES = { bazi: "八字", astro: "西洋占星", ziwei: "紫微斗數" };
-          const sysLabel = selectedSystems.map(s => SYS_NAMES[s]).join("＋") || "自動辨識";
-          setAllResults(prev => [...prev, { system: sysLabel, result: pollData.result }]);
-          setResult(pollData.result);
-          break;
+      // Helper: submit one image and poll for result
+      const submitAndPoll = async (img, sysName, extraPrompt) => {
+        const submitRes = await fetch(API_BACKEND, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            images: [{ data: img.data, media_type: img.type }],
+            system: systemPrompt,
+            prompt: extraPrompt,
+          }),
+        });
+        if (!submitRes.ok) throw new Error(`提交失敗 ${submitRes.status}`);
+        const { job_id } = await submitRes.json();
+        for (let i = 0; i < 300; i++) {
+          await new Promise(r => setTimeout(r, 3000));
+          try {
+            const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+            if (!pollRes.ok) continue;
+            const pollData = await pollRes.json();
+            if (pollData.status === "done") {
+              setAllResults(prev => [...prev, { system: sysName, result: pollData.result }]);
+              setResult(pollData.result);
+              return pollData.result;
+            }
+          } catch { continue; }
         }
-        if (pollData.error) throw new Error(pollData.error);
+        throw new Error(`${sysName} 分析逾時`);
+      };
+
+      // Submit each image one by one, show result as each completes
+      if (selectedSystems.length > 0 && selectedSystems.length === images.length) {
+        // Each image maps to a system
+        for (let i = 0; i < images.length; i++) {
+          const sys = SYS_NAMES[selectedSystems[i]] || "自動辨識";
+          const prompt = `這是【${sys}】的命盤圖片。\n辨識並排盤 + 初步分析（格局、重點宮位）。\n⚠️ 嚴格只用【${sys}】的術語。${correction.trim() ? `\n用戶補充：${correction}` : ""}`;
+          setLoadingMsg(`正在分析第 ${i + 1} 張命盤（${sys}）...`);
+          await submitAndPoll(images[i], sys, prompt);
+        }
+      } else {
+        // All images as one batch or single system for all
+        const systems = selectedSystems.map(s => SYS_NAMES[s]).join("＋") || "";
+        for (let i = 0; i < images.length; i++) {
+          const sysLabel = systems || `命盤 ${i + 1}`;
+          const prompt = systems
+            ? `這是【${systems}】的命盤圖片（第 ${i + 1}/${images.length} 張）。\n辨識並排盤 + 初步分析。\n⚠️ 嚴格只用該系統的術語。${correction.trim() ? `\n用戶補充：${correction}` : ""}`
+            : `請辨識這張命盤圖片的類型，排盤 + 初步分析。${correction.trim() ? `\n用戶補充：${correction}` : ""}`;
+          setLoadingMsg(`正在分析第 ${i + 1}/${images.length} 張命盤...`);
+          await submitAndPoll(images[i], sysLabel, prompt);
+        }
       }
     } catch (err) {
       setError("分析過程發生錯誤：" + err.message);
