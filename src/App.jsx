@@ -658,16 +658,20 @@ function MainApp({ auth, isAdmin, onLogout }) {
     }
   };
 
-  // 共用：排盤後自動送 AI 分析
-  const autoAnalyze = async (systemName, chartText, systemPrompt) => {
+  // 共用：排盤後自動送 AI 分析（engine: "claude" or "manus"）
+  const autoAnalyze = async (systemName, chartText, systemPrompt, engine = "claude") => {
     try {
+      const prompt = engine === "manus"
+        ? chartText  // Manus gets raw chart text, backend adds format instructions
+        : `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${chartText}\n\n請根據以上【${systemName}】排盤進行分析：\n1. 格局分析\n2. 重點宮位/柱位深入分析\n3. 今年運勢（2026丙午年）\n4. 綜合建議\n\n要深入、專業、具體。\n⚠️ 嚴格只用【${systemName}】的術語。`;
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           images: [],
           system: systemPrompt,
-          prompt: `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${chartText}\n\n請根據以上【${systemName}】排盤進行分析：\n1. 格局分析\n2. 重點宮位/柱位深入分析\n3. 今年運勢（2026丙午年）\n4. 綜合建議\n\n要深入、專業、具體。\n⚠️ 嚴格只用【${systemName}】的術語。`,
+          prompt,
+          engine,
         }),
       });
       if (!submitRes.ok) return null;
@@ -948,24 +952,36 @@ function MainApp({ auth, isAdmin, onLogout }) {
                           astro: { system: "西洋占星", calc: () => formatAstro(calculateAstro(y, m, d, h, min, birthData.lat, birthData.lng)) },
                         };
 
-                        const charts = autoSystems.map(id => ({ system: calcMap[id].system, text: calcMap[id].calc() }));
+                        const engineMap = { "紫微斗數": "claude", "八字": "claude", "西洋占星": "manus" };
+                        const charts = autoSystems.map(id => ({ system: calcMap[id].system, text: calcMap[id].calc(), engine: engineMap[calcMap[id].system] || "claude" }));
                         setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system + "（排盤）", result: c.text }))]);
                         setResult(charts.map(c => c.text).join("\n\n---\n\n"));
                         setAddingChart(false);
 
                         setAnalyzing(true);
                         const sp = buildSystemPrompt(kbEntries);
-                        const total = charts.length + (charts.length > 1 ? 1 : 0);
-                        for (let i = 0; i < charts.length; i++) {
-                          setLoadingMsg(`正在分析 ${charts[i].system}（${i + 1}/${total}）...`);
-                          const r = await autoAnalyze(charts[i].system, charts[i].text, sp);
-                          if (r) { setAllResults(prev => [...prev, { system: charts[i].system + "（AI 分析）", result: r }]); setResult(r); }
-                        }
+                        setLoadingMsg(`正在並行分析 ${charts.length} 盤...`);
 
+                        // 並行送出所有分析
+                        const analyzePromises = charts.map(c =>
+                          autoAnalyze(c.system, c.text, sp, c.engine)
+                            .then(r => {
+                              if (r) {
+                                const label = c.engine === "manus" ? "Manus 分析" : "AI 分析";
+                                setAllResults(prev => [...prev, { system: `${c.system}（${label}）`, result: r }]);
+                                setResult(r);
+                                setLoadingMsg(prev => `${c.system} 分析完成！`);
+                              }
+                              return { system: c.system, result: r, text: c.text };
+                            })
+                        );
+                        const results = await Promise.all(analyzePromises);
+
+                        // 交叉分析（2盤以上，由 Claude 做）
                         if (charts.length > 1) {
                           setLoadingMsg(`交叉比對 ${charts.length} 大系統...`);
-                          const crossText = charts.map(c => `【${c.system}】\n${c.text}`).join("\n\n===\n\n");
-                          const crossResult = await autoAnalyze(`${charts.length}系統交叉`, crossText, sp);
+                          const crossInput = results.filter(r => r.result).map(r => `【${r.system}分析結果】\n${r.result}`).join("\n\n===\n\n");
+                          const crossResult = await autoAnalyze(`${charts.length}系統交叉`, crossInput, sp, "claude");
                           if (crossResult) { setAllResults(prev => [...prev, { system: "交叉分析", result: crossResult }]); setResult(crossResult); }
                         }
 
