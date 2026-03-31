@@ -629,7 +629,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       // Build full context — include ALL chart data as persistent memory
       const chartMemory = allResults.map(r => `【${r.system}】\n${r.result}`).join("\n\n===\n\n");
       const recentChat = chatHistory.slice(-8).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n\n");
-      const context = `## 用戶的命盤資料（已確認，不可修改）\n\n${chartMemory}\n\n---\n\n${recentChat ? `## 對話紀錄\n${recentChat}\n\n---\n\n` : ""}## 用戶追問\n${question}\n\n請基於以上完整命盤資料回答。每次回答都要回去參考原始排盤資料，確保一致性。若涉及流年且有紫微命盤，必須用紫微方法（斗君排月）。`;
+      const context = `## ⚠️ 用戶的命盤資料（已確認，不可修改，每次回答必須參照）\n\n${chartMemory}\n\n---\n\n${recentChat ? `## 對話紀錄\n${recentChat}\n\n---\n\n` : ""}## 用戶追問\n${question}\n\n## 回答規則（極重要）\n1. **必須回去查看上方的命盤排盤資料**，引用具體的星曜、宮位、四化作為依據\n2. 不可憑空回答，每個論點都要對應到命盤中的具體資料\n3. 若涉及流年，必須參考排盤中的流年四化和疊宮資料\n4. 若有紫微命盤，流年必須用紫微方法（斗君排月），不可用占星方法替代\n5. 若問財運相關，參考財帛宮、福德宮、田宅宮的星曜和飛化\n6. 回答要具體，例如「你的財帛宮天梁陷+陀羅，代表...」而非泛泛而談`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
@@ -1208,6 +1208,32 @@ ${chartText}
                     } finally { setDetailLoading(false); }
                   }}>
                     {detailLoading ? "⏳ 分析中..." : "🔍 詳細分析"}
+                  </button>
+                  <button className="detail-btn" disabled={detailLoading || analyzing} onClick={async () => {
+                    // Extract birth data from existing results to run finance calc
+                    const bd = birthData;
+                    const y = parseInt(bd.year), m = parseInt(bd.month), d = parseInt(bd.day), h = parseInt(bd.hour);
+                    if (!y || !m || !d) {
+                      setError("需要出生資料才能進行財運分析，請先用自動排盤輸入出生資料");
+                      return;
+                    }
+                    setAnalyzing(true);
+                    setLoadingMsg("正在計算財運排盤...");
+                    try {
+                      const finText = formatFinance(calculateFinance(y, m, d, h, bd.gender));
+                      setAllResults(prev => [...prev, { system: "紫微財運（排盤）", result: finText }]);
+                      setResult(finText);
+                      setLoadingMsg("正在進行財運深度分析...");
+                      const sp = buildSystemPrompt(kbEntries);
+                      const r = await autoAnalyze("紫微財運", finText, sp, "claude");
+                      if (r) {
+                        setAllResults(prev => [...prev, { system: "紫微財運（AI 分析）", result: r }]);
+                        setResult(r);
+                      }
+                    } catch (err) { setError("財運分析錯誤：" + err.message); }
+                    finally { setAnalyzing(false); setLoadingMsg(""); autoSaveRef.current?.(); }
+                  }}>
+                    {analyzing ? "⏳ 分析中..." : "💰 財運分析"}
                   </button>
                 </div>
 
