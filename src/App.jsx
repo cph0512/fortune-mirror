@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import './App.css';
+import { calculateChart, formatChart, SHI_CHEN_RANGE } from "./ziwei-calc.js";
 
 // ============================================================
 // CONSTANTS
@@ -531,6 +532,8 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [addingChart, setAddingChart] = useState(false);
+  const [inputMode, setInputMode] = useState("upload"); // "upload" | "auto"
+  const [birthData, setBirthData] = useState({ year: "", month: "", day: "", hour: "0", minute: "0", gender: "男" });
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -779,6 +782,72 @@ function MainApp({ auth, isAdmin, onLogout }) {
           <>
             {!analyzing && (!result || addingChart) && (
               <div className="upload-section">
+                {/* Mode toggle */}
+                <div className="mode-toggle">
+                  <button className={`mode-btn ${inputMode === "auto" ? "active" : ""}`} onClick={() => setInputMode("auto")}>
+                    🔮 自動排盤
+                  </button>
+                  <button className={`mode-btn ${inputMode === "upload" ? "active" : ""}`} onClick={() => setInputMode("upload")}>
+                    📷 上傳命盤圖
+                  </button>
+                </div>
+
+                {/* Auto calc mode */}
+                {inputMode === "auto" && (
+                  <div className="auto-calc-section">
+                    <p className="instruction">輸入出生資料（紫微斗數自動排盤）</p>
+                    <div className="birth-form">
+                      <div className="birth-row">
+                        <label>西元年</label>
+                        <input type="number" placeholder="1990" value={birthData.year}
+                          onChange={e => setBirthData(p => ({...p, year: e.target.value}))} />
+                      </div>
+                      <div className="birth-row">
+                        <label>月</label>
+                        <input type="number" placeholder="1" min="1" max="12" value={birthData.month}
+                          onChange={e => setBirthData(p => ({...p, month: e.target.value}))} />
+                      </div>
+                      <div className="birth-row">
+                        <label>日</label>
+                        <input type="number" placeholder="15" min="1" max="31" value={birthData.day}
+                          onChange={e => setBirthData(p => ({...p, day: e.target.value}))} />
+                      </div>
+                      <div className="birth-row">
+                        <label>出生時間</label>
+                        <select value={birthData.hour} onChange={e => setBirthData(p => ({...p, hour: e.target.value}))}>
+                          {SHI_CHEN_RANGE.map((s, i) => <option key={i} value={i * 2 + 23 > 23 ? (i * 2 + 23) % 24 : i * 2 + 1}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div className="birth-row">
+                        <label>性別</label>
+                        <select value={birthData.gender} onChange={e => setBirthData(p => ({...p, gender: e.target.value}))}>
+                          <option value="男">男</option>
+                          <option value="女">女</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button className="analyze-btn" onClick={() => {
+                      try {
+                        const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
+                        const h = parseInt(birthData.hour);
+                        if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+                        const chart = calculateChart(y, m, d, h, 0, birthData.gender);
+                        const text = formatChart(chart);
+                        setAllResults(prev => [...prev, { system: "紫微斗數（自動排盤）", result: text }]);
+                        setResult(text);
+                        setAddingChart(false);
+                      } catch (err) {
+                        setError("排盤計算錯誤：" + err.message);
+                      }
+                    }}>
+                      <span style={{ fontSize: 18 }}>⟐</span> 開始排盤
+                    </button>
+                  </div>
+                )}
+
+                {/* Upload mode */}
+                {inputMode === "upload" && (
+                  <>
                 <p className="instruction">選擇命盤類型</p>
                 <div className="system-selector">
                   {[
@@ -855,6 +924,8 @@ function MainApp({ auth, isAdmin, onLogout }) {
                       <span style={{ fontSize: 18 }}>⟐</span>
                       開始解盤（{images.length} 張命盤）
                     </button>
+                  </>
+                )}
                   </>
                 )}
               </div>
