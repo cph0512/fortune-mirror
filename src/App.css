@@ -376,6 +376,21 @@ button:active:not(:disabled) {
   transform: translateY(0);
 }
 
+.time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.time-inputs input {
+  width: 52px;
+  text-align: center;
+}
+.time-sep {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--gold);
+}
+
 .auto-system-selector {
   display: flex;
   gap: 8px;

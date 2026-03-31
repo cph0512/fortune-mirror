@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import './App.css';
-import { calculateChart, formatChart, SHI_CHEN_RANGE } from "./ziwei-calc.js";
+import { calculateChart, formatChart } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
 
@@ -850,19 +850,16 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         <input type="number" placeholder="15" min="1" max="31" value={birthData.day}
                           onChange={e => setBirthData(p => ({...p, day: e.target.value}))} />
                       </div>
-                      <div className="birth-row">
-                        <label>時辰</label>
-                        <select value={birthData.hour} onChange={e => setBirthData(p => ({...p, hour: e.target.value}))}>
-                          {SHI_CHEN_RANGE.map((s, i) => <option key={i} value={i * 2 + 23 > 23 ? (i * 2 + 23) % 24 : i * 2 + 1}>{s}</option>)}
-                        </select>
-                      </div>
-                      {autoSystems.includes("astro") && (
-                        <div className="birth-row">
-                          <label>精確分鐘</label>
-                          <input type="number" placeholder="0" min="0" max="59" value={birthData.minute}
+                      <div className="birth-row birth-time-row">
+                        <label>出生時間</label>
+                        <div className="time-inputs">
+                          <input type="number" placeholder="15" min="0" max="23" value={birthData.hour}
+                            onChange={e => setBirthData(p => ({...p, hour: e.target.value}))} />
+                          <span className="time-sep">:</span>
+                          <input type="number" placeholder="00" min="0" max="59" value={birthData.minute}
                             onChange={e => setBirthData(p => ({...p, minute: e.target.value}))} />
                         </div>
-                      )}
+                      </div>
                       <div className="birth-row">
                         <label>性別</label>
                         <select value={birthData.gender} onChange={e => setBirthData(p => ({...p, gender: e.target.value}))}>
