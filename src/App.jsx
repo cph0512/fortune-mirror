@@ -1210,17 +1210,32 @@ ${chartText}
                     {detailLoading ? "⏳ 分析中..." : "🔍 詳細分析"}
                   </button>
                   <button className="detail-btn" disabled={detailLoading || analyzing} onClick={async () => {
-                    // Extract birth data from existing results to run finance calc
-                    const bd = birthData;
-                    const y = parseInt(bd.year), m = parseInt(bd.month), d = parseInt(bd.day), h = parseInt(bd.hour);
+                    // Try birthData first, then extract from existing chart results
+                    let y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
+                    let h = parseInt(birthData.hour), gender = birthData.gender;
                     if (!y || !m || !d) {
-                      setError("需要出生資料才能進行財運分析，請先用自動排盤輸入出生資料");
+                      // Extract from allResults text
+                      const allText = allResults.map(r => r.result).join("\n");
+                      const dateMatch = allText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+                      const hourMatch = allText.match(/(\d{1,2})[：:](\d{2})/);
+                      const shiMatch = allText.match(/時辰[：:]?\s*([\u5b50\u4e11\u5bc5\u536f\u8fb0\u5df3\u5348\u672a\u7533\u9149\u620c\u4ea5])/);
+                      const genderMatch = allText.match(/(男|女)/);
+                      if (dateMatch) { y = parseInt(dateMatch[1]); m = parseInt(dateMatch[2]); d = parseInt(dateMatch[3]); }
+                      if (hourMatch) { h = parseInt(hourMatch[1]); }
+                      else if (shiMatch) {
+                        const shiMap = {"子":0,"丑":1,"寅":3,"卯":5,"辰":7,"巳":9,"午":11,"未":13,"申":15,"酉":17,"戌":19,"亥":21};
+                        h = shiMap[shiMatch[1]] ?? 12;
+                      }
+                      if (genderMatch) gender = genderMatch[1];
+                    }
+                    if (!y || !m || !d) {
+                      setError("無法從現有資料中提取出生資料，請在表單中填寫出生資料後再試");
                       return;
                     }
                     setAnalyzing(true);
                     setLoadingMsg("正在計算財運排盤...");
                     try {
-                      const finText = formatFinance(calculateFinance(y, m, d, h, bd.gender));
+                      const finText = formatFinance(calculateFinance(y, m, d, h, gender));
                       setAllResults(prev => [...prev, { system: "紫微財運（排盤）", result: finText }]);
                       setResult(finText);
                       setLoadingMsg("正在進行財運深度分析...");
