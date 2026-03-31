@@ -877,27 +877,99 @@ function MainApp({ auth, isAdmin, onLogout }) {
                       }}>
                         <span style={{ fontSize: 18 }}>♎</span> 占星排盤
                       </button>
-                      <button className="analyze-btn auto-all-btn" onClick={() => {
+                      <button className="analyze-btn auto-all-btn" onClick={async () => {
                         try {
                           const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
                           const h = parseInt(birthData.hour);
                           if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                          const ziwei = formatChart(calculateChart(y, m, d, h, 0, birthData.gender));
-                          const bazi = formatBazi(calculateBazi(y, m, d, h, birthData.gender));
-                          const astroChart = formatAstro(calculateAstro(y, m, d, h, 0));
-                          setAllResults(prev => [
-                            ...prev,
-                            { system: "紫微斗數（自動排盤）", result: ziwei },
-                            { system: "八字（自動排盤）", result: bazi },
-                            { system: "西洋占星（自動排盤）", result: astroChart },
-                          ]);
-                          setResult(ziwei + "\n\n---\n\n" + bazi + "\n\n---\n\n" + astroChart);
+
+                          // 1. 瞬間排三盤
+                          const charts = [
+                            { system: "紫微斗數", text: formatChart(calculateChart(y, m, d, h, 0, birthData.gender)) },
+                            { system: "八字", text: formatBazi(calculateBazi(y, m, d, h, birthData.gender)) },
+                            { system: "西洋占星", text: formatAstro(calculateAstro(y, m, d, h, 0)) },
+                          ];
+                          const chartResults = charts.map(c => ({ system: c.system + "（自動排盤）", result: c.text }));
+                          setAllResults(prev => [...prev, ...chartResults]);
+                          setResult(charts.map(c => c.text).join("\n\n---\n\n"));
                           setAddingChart(false);
+
+                          // 2. 逐盤送 AI 分析
+                          setAnalyzing(true);
+                          const systemPrompt = buildSystemPrompt(kbEntries);
+                          for (let i = 0; i < charts.length; i++) {
+                            const c = charts[i];
+                            setLoadingMsg(`正在分析 ${c.system}（${i + 1}/3）...`);
+                            try {
+                              const submitRes = await fetch(API_BACKEND, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  images: [],
+                                  system: systemPrompt,
+                                  prompt: `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${c.text}\n\n請根據以上【${c.system}】排盤進行分析：\n1. 格局分析\n2. 重點宮位/柱位深入分析\n3. 今年運勢（2026丙午年）\n4. 綜合建議\n\n要深入、專業、具體。\n⚠️ 嚴格只用【${c.system}】的術語。`,
+                                }),
+                              });
+                              if (!submitRes.ok) continue;
+                              const { job_id } = await submitRes.json();
+                              for (let j = 0; j < 200; j++) {
+                                await new Promise(r => setTimeout(r, 3000));
+                                try {
+                                  const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+                                  if (!pollRes.ok) continue;
+                                  const pd = await pollRes.json();
+                                  if (pd.status === "done") {
+                                    const sys = c.system + "（AI 分析）";
+                                    setAllResults(prev => [...prev, { system: sys, result: pd.result }]);
+                                    setResult(pd.result);
+                                    break;
+                                  }
+                                } catch { continue; }
+                              }
+                            } catch (err) {
+                              console.error(`${c.system} 分析失敗:`, err);
+                            }
+                          }
+
+                          // 3. 交叉分析
+                          setLoadingMsg("交叉比對三大系統...");
+                          try {
+                            const allChartText = charts.map(c => `【${c.system}】\n${c.text}`).join("\n\n===\n\n");
+                            const submitRes = await fetch(API_BACKEND, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                images: [],
+                                system: systemPrompt,
+                                prompt: `以下是同一個人的三種命理排盤結果：\n\n${allChartText}\n\n請進行【三系統交叉分析】：\n1. 三個系統的共同指向（性格、天賦、挑戰）\n2. 矛盾之處與解讀\n3. 2026年綜合運勢\n4. 具體建議\n\n用繁體中文，深入專業。`,
+                              }),
+                            });
+                            if (submitRes.ok) {
+                              const { job_id } = await submitRes.json();
+                              for (let j = 0; j < 200; j++) {
+                                await new Promise(r => setTimeout(r, 3000));
+                                try {
+                                  const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+                                  if (!pollRes.ok) continue;
+                                  const pd = await pollRes.json();
+                                  if (pd.status === "done") {
+                                    setAllResults(prev => [...prev, { system: "三系統交叉分析", result: pd.result }]);
+                                    setResult(pd.result);
+                                    break;
+                                  }
+                                } catch { continue; }
+                              }
+                            }
+                          } catch {}
+
+                          setAnalyzing(false);
+                          setLoadingMsg("");
                         } catch (err) {
                           setError("排盤錯誤：" + err.message);
+                          setAnalyzing(false);
                         }
                       }}>
-                        <span style={{ fontSize: 18 }}>✦</span> 三盤齊排
+                        <span style={{ fontSize: 18 }}>✦</span> 三盤齊排 + AI 分析
                       </button>
                     </div>
                   </div>
@@ -989,7 +1061,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
               </div>
             )}
 
-            {analyzing && (
+            {analyzing && !result && (
               <div className="loading-section">
                 <div className="spinner" />
                 <p className="loading-text">{loadingMsg}</p>
@@ -1007,7 +1079,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
             {result && (
               <div className="result-section">
                 <div style={{ textAlign: "center" }}>
-                  <span className="result-badge">✓ {allResults.length > 1 ? `已完成 ${allResults.length} 項分析` : "分析完成"}</span>
+                  <span className="result-badge">{analyzing ? `⏳ 分析中（${allResults.length} 項完成）` : `✓ ${allResults.length > 1 ? `已完成 ${allResults.length} 項分析` : "分析完成"}`}</span>
                   {allResults.length > 1 && (
                     <span className="result-badge" style={{ marginLeft: 8, background: "rgba(76,201,176,0.12)", color: "var(--teal)" }}>
                       {allResults.map(r => r.system).join(" + ")}
@@ -1028,6 +1100,14 @@ function MainApp({ auth, isAdmin, onLogout }) {
                     <summary className="result-block-title">{allResults[0]?.system || "分析結果"} <span className="toggle-hint">▼</span></summary>
                     <div className="result-content">{renderMarkdown(result)}</div>
                   </details>
+                )}
+
+                {/* Inline loading while AI analysis in progress */}
+                {analyzing && (
+                  <div className="inline-loading">
+                    <div className="spinner-small" />
+                    <span className="loading-text-small">{loadingMsg}</span>
+                  </div>
                 )}
 
                 {/* Detail analysis button */}

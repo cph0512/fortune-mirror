@@ -416,6 +416,32 @@ button:active:not(:disabled) {
   margin-bottom: 16px;
 }
 
+.inline-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: 12px;
+}
+.spinner-small {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(201, 168, 76, 0.15);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+.loading-text-small {
+  font-size: 14px;
+  color: var(--gold);
+  animation: pulse 2s ease-in-out infinite;
+}
+
 .loading-bar {
   width: 180px;
   height: 3px;
