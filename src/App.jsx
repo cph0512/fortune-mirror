@@ -535,8 +535,16 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [addingChart, setAddingChart] = useState(false);
   const [inputMode, setInputMode] = useState("upload"); // "upload" | "auto"
-  const [birthData, setBirthData] = useState({ year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 });
-  const [autoSystems, setAutoSystems] = useState(["ziwei", "bazi", "astro"]); // 自動排盤選擇
+  const [birthData, setBirthData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("fortune-birth-data")) || { year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 }; }
+    catch { return { year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 }; }
+  });
+  const [autoSystems, setAutoSystems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("fortune-auto-systems")) || ["ziwei", "bazi", "astro"]; }
+    catch { return ["ziwei", "bazi", "astro"]; }
+  });
+  useEffect(() => { localStorage.setItem("fortune-birth-data", JSON.stringify(birthData)); }, [birthData]);
+  useEffect(() => { localStorage.setItem("fortune-auto-systems", JSON.stringify(autoSystems)); }, [autoSystems]);
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
