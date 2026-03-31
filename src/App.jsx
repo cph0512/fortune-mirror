@@ -948,7 +948,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                       } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
                     }}>
                       <span style={{ fontSize: 18 }}>⟐</span>
-                      {autoSystems.length > 1 ? `排盤 + AI 分析（${autoSystems.length} 盤）` : "排盤 + AI 分析"}
+                      {autoSystems.length > 1 ? `排盤 + 命運分析（${autoSystems.length} 盤）` : "排盤 + 命運分析"}
                     </button>
                   </div>
                 )}
