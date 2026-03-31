@@ -536,6 +536,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [addingChart, setAddingChart] = useState(false);
   const [inputMode, setInputMode] = useState("upload"); // "upload" | "auto"
   const [birthData, setBirthData] = useState({ year: "", month: "", day: "", hour: "0", minute: "0", gender: "男" });
+  const [autoSystems, setAutoSystems] = useState(["ziwei", "bazi", "astro"]); // 自動排盤選擇
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -855,95 +856,59 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         </select>
                       </div>
                     </div>
-                    <div className="auto-calc-buttons">
-                      <button className="analyze-btn" onClick={async () => {
-                        try {
-                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
-                          const h = parseInt(birthData.hour);
-                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                          const text = formatChart(calculateChart(y, m, d, h, 0, birthData.gender));
-                          setAllResults(prev => [...prev, { system: "紫微斗數（自動排盤）", result: text }]);
-                          setResult(text);
-                          setAddingChart(false);
-                          setAnalyzing(true); setLoadingMsg("正在分析 紫微斗數...");
-                          try {
-                            const r = await autoAnalyze("紫微斗數", text, buildSystemPrompt(kbEntries));
-                            if (r) { setAllResults(prev => [...prev, { system: "紫微斗數（AI 分析）", result: r }]); setResult(r); }
-                          } finally { setAnalyzing(false); setLoadingMsg(""); }
-                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
-                      }}>
-                        <span style={{ fontSize: 18 }}>💜</span> 紫微排盤
-                      </button>
-                      <button className="analyze-btn" onClick={async () => {
-                        try {
-                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
-                          const h = parseInt(birthData.hour);
-                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                          const text = formatBazi(calculateBazi(y, m, d, h, birthData.gender));
-                          setAllResults(prev => [...prev, { system: "八字（自動排盤）", result: text }]);
-                          setResult(text);
-                          setAddingChart(false);
-                          setAnalyzing(true); setLoadingMsg("正在分析 八字...");
-                          try {
-                            const r = await autoAnalyze("八字", text, buildSystemPrompt(kbEntries));
-                            if (r) { setAllResults(prev => [...prev, { system: "八字（AI 分析）", result: r }]); setResult(r); }
-                          } finally { setAnalyzing(false); setLoadingMsg(""); }
-                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
-                      }}>
-                        <span style={{ fontSize: 18 }}>🔥</span> 八字排盤
-                      </button>
-                      <button className="analyze-btn" onClick={async () => {
-                        try {
-                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
-                          const h = parseInt(birthData.hour);
-                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                          const text = formatAstro(calculateAstro(y, m, d, h, 0));
-                          setAllResults(prev => [...prev, { system: "西洋占星（自動排盤）", result: text }]);
-                          setResult(text);
-                          setAddingChart(false);
-                          setAnalyzing(true); setLoadingMsg("正在分析 西洋占星...");
-                          try {
-                            const r = await autoAnalyze("西洋占星", text, buildSystemPrompt(kbEntries));
-                            if (r) { setAllResults(prev => [...prev, { system: "西洋占星（AI 分析）", result: r }]); setResult(r); }
-                          } finally { setAnalyzing(false); setLoadingMsg(""); }
-                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
-                      }}>
-                        <span style={{ fontSize: 18 }}>♎</span> 占星排盤
-                      </button>
-                      <button className="analyze-btn auto-all-btn" onClick={async () => {
-                        try {
-                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
-                          const h = parseInt(birthData.hour);
-                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-
-                          const charts = [
-                            { system: "紫微斗數", text: formatChart(calculateChart(y, m, d, h, 0, birthData.gender)) },
-                            { system: "八字", text: formatBazi(calculateBazi(y, m, d, h, birthData.gender)) },
-                            { system: "西洋占星", text: formatAstro(calculateAstro(y, m, d, h, 0)) },
-                          ];
-                          setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system + "（自動排盤）", result: c.text }))]);
-                          setResult(charts.map(c => c.text).join("\n\n---\n\n"));
-                          setAddingChart(false);
-
-                          setAnalyzing(true);
-                          const sp = buildSystemPrompt(kbEntries);
-                          for (let i = 0; i < charts.length; i++) {
-                            setLoadingMsg(`正在分析 ${charts[i].system}（${i + 1}/3）...`);
-                            const r = await autoAnalyze(charts[i].system, charts[i].text, sp);
-                            if (r) { setAllResults(prev => [...prev, { system: charts[i].system + "（AI 分析）", result: r }]); setResult(r); }
-                          }
-
-                          setLoadingMsg("交叉比對三大系統...");
-                          const crossText = charts.map(c => `【${c.system}】\n${c.text}`).join("\n\n===\n\n");
-                          const crossResult = await autoAnalyze("三系統交叉", crossText, sp);
-                          if (crossResult) { setAllResults(prev => [...prev, { system: "三系統交叉分析", result: crossResult }]); setResult(crossResult); }
-
-                          setAnalyzing(false); setLoadingMsg("");
-                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
-                      }}>
-                        <span style={{ fontSize: 18 }}>✦</span> 三盤齊排 + AI 分析
-                      </button>
+                    <div className="auto-system-selector">
+                      {[
+                        { id: "ziwei", label: "紫微斗數", icon: "💜" },
+                        { id: "bazi", label: "八字", icon: "🔥" },
+                        { id: "astro", label: "西洋占星", icon: "♎" },
+                      ].map(sys => (
+                        <button key={sys.id}
+                          className={`system-btn ${autoSystems.includes(sys.id) ? "active" : ""}`}
+                          onClick={() => setAutoSystems(prev => prev.includes(sys.id) ? prev.filter(s => s !== sys.id) : [...prev, sys.id])}
+                        >
+                          <span>{sys.icon}</span> {sys.label}
+                        </button>
+                      ))}
                     </div>
+                    <button className="analyze-btn" disabled={autoSystems.length === 0 || analyzing} onClick={async () => {
+                      try {
+                        const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
+                        const h = parseInt(birthData.hour);
+                        if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+
+                        const calcMap = {
+                          ziwei: { system: "紫微斗數", calc: () => formatChart(calculateChart(y, m, d, h, 0, birthData.gender)) },
+                          bazi: { system: "八字", calc: () => formatBazi(calculateBazi(y, m, d, h, birthData.gender)) },
+                          astro: { system: "西洋占星", calc: () => formatAstro(calculateAstro(y, m, d, h, 0)) },
+                        };
+
+                        const charts = autoSystems.map(id => ({ system: calcMap[id].system, text: calcMap[id].calc() }));
+                        setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system + "（排盤）", result: c.text }))]);
+                        setResult(charts.map(c => c.text).join("\n\n---\n\n"));
+                        setAddingChart(false);
+
+                        setAnalyzing(true);
+                        const sp = buildSystemPrompt(kbEntries);
+                        const total = charts.length + (charts.length > 1 ? 1 : 0);
+                        for (let i = 0; i < charts.length; i++) {
+                          setLoadingMsg(`正在分析 ${charts[i].system}（${i + 1}/${total}）...`);
+                          const r = await autoAnalyze(charts[i].system, charts[i].text, sp);
+                          if (r) { setAllResults(prev => [...prev, { system: charts[i].system + "（AI 分析）", result: r }]); setResult(r); }
+                        }
+
+                        if (charts.length > 1) {
+                          setLoadingMsg(`交叉比對 ${charts.length} 大系統...`);
+                          const crossText = charts.map(c => `【${c.system}】\n${c.text}`).join("\n\n===\n\n");
+                          const crossResult = await autoAnalyze(`${charts.length}系統交叉`, crossText, sp);
+                          if (crossResult) { setAllResults(prev => [...prev, { system: "交叉分析", result: crossResult }]); setResult(crossResult); }
+                        }
+
+                        setAnalyzing(false); setLoadingMsg("");
+                      } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
+                    }}>
+                      <span style={{ fontSize: 18 }}>⟐</span>
+                      {autoSystems.length > 1 ? `排盤 + AI 分析（${autoSystems.length} 盤）` : "排盤 + AI 分析"}
+                    </button>
                   </div>
                 )}
 

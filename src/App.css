@@ -376,20 +376,13 @@ button:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.auto-calc-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 16px;
+.auto-system-selector {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 8px;
 }
-.auto-calc-buttons .analyze-btn {
-  margin-top: 0;
-  padding: 12px 16px;
-  font-size: 14px;
-}
-.auto-calc-buttons .auto-all-btn {
-  grid-column: 1 / -1;
-  background: linear-gradient(135deg, var(--accent), var(--gold-dark));
+.auto-system-selector .system-btn {
+  flex: 1;
 }
 
 /* ===== Loading ===== */
