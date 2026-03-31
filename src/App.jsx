@@ -625,6 +625,33 @@ function MainApp({ auth, isAdmin, onLogout }) {
     }
   };
 
+  // 共用：排盤後自動送 AI 分析
+  const autoAnalyze = async (systemName, chartText, systemPrompt) => {
+    try {
+      const submitRes = await fetch(API_BACKEND, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          images: [],
+          system: systemPrompt,
+          prompt: `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${chartText}\n\n請根據以上【${systemName}】排盤進行分析：\n1. 格局分析\n2. 重點宮位/柱位深入分析\n3. 今年運勢（2026丙午年）\n4. 綜合建議\n\n要深入、專業、具體。\n⚠️ 嚴格只用【${systemName}】的術語。`,
+        }),
+      });
+      if (!submitRes.ok) return null;
+      const { job_id } = await submitRes.json();
+      for (let i = 0; i < 200; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+          if (!pollRes.ok) continue;
+          const pd = await pollRes.json();
+          if (pd.status === "done") return pd.result;
+        } catch { continue; }
+      }
+    } catch (err) { console.error(`${systemName} 分析失敗:`, err); }
+    return null;
+  };
+
   const toggleSystem = (sys) => setSelectedSystems(prev =>
     prev.includes(sys) ? prev.filter(s => s !== sys) : [...prev, sys]
   );
@@ -829,51 +856,57 @@ function MainApp({ auth, isAdmin, onLogout }) {
                       </div>
                     </div>
                     <div className="auto-calc-buttons">
-                      <button className="analyze-btn" onClick={() => {
+                      <button className="analyze-btn" onClick={async () => {
                         try {
                           const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
                           const h = parseInt(birthData.hour);
                           if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                          const chart = calculateChart(y, m, d, h, 0, birthData.gender);
-                          const text = formatChart(chart);
+                          const text = formatChart(calculateChart(y, m, d, h, 0, birthData.gender));
                           setAllResults(prev => [...prev, { system: "紫微斗數（自動排盤）", result: text }]);
                           setResult(text);
                           setAddingChart(false);
-                        } catch (err) {
-                          setError("排盤計算錯誤：" + err.message);
-                        }
+                          setAnalyzing(true); setLoadingMsg("正在分析 紫微斗數...");
+                          try {
+                            const r = await autoAnalyze("紫微斗數", text, buildSystemPrompt(kbEntries));
+                            if (r) { setAllResults(prev => [...prev, { system: "紫微斗數（AI 分析）", result: r }]); setResult(r); }
+                          } finally { setAnalyzing(false); setLoadingMsg(""); }
+                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
                       }}>
                         <span style={{ fontSize: 18 }}>💜</span> 紫微排盤
                       </button>
-                      <button className="analyze-btn" onClick={() => {
+                      <button className="analyze-btn" onClick={async () => {
                         try {
                           const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
                           const h = parseInt(birthData.hour);
                           if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                          const chart = calculateBazi(y, m, d, h, birthData.gender);
-                          const text = formatBazi(chart);
+                          const text = formatBazi(calculateBazi(y, m, d, h, birthData.gender));
                           setAllResults(prev => [...prev, { system: "八字（自動排盤）", result: text }]);
                           setResult(text);
                           setAddingChart(false);
-                        } catch (err) {
-                          setError("八字排盤錯誤：" + err.message);
-                        }
+                          setAnalyzing(true); setLoadingMsg("正在分析 八字...");
+                          try {
+                            const r = await autoAnalyze("八字", text, buildSystemPrompt(kbEntries));
+                            if (r) { setAllResults(prev => [...prev, { system: "八字（AI 分析）", result: r }]); setResult(r); }
+                          } finally { setAnalyzing(false); setLoadingMsg(""); }
+                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
                       }}>
                         <span style={{ fontSize: 18 }}>🔥</span> 八字排盤
                       </button>
-                      <button className="analyze-btn" onClick={() => {
+                      <button className="analyze-btn" onClick={async () => {
                         try {
                           const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
                           const h = parseInt(birthData.hour);
                           if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                          const chart = calculateAstro(y, m, d, h, 0);
-                          const text = formatAstro(chart);
+                          const text = formatAstro(calculateAstro(y, m, d, h, 0));
                           setAllResults(prev => [...prev, { system: "西洋占星（自動排盤）", result: text }]);
                           setResult(text);
                           setAddingChart(false);
-                        } catch (err) {
-                          setError("占星排盤錯誤：" + err.message);
-                        }
+                          setAnalyzing(true); setLoadingMsg("正在分析 西洋占星...");
+                          try {
+                            const r = await autoAnalyze("西洋占星", text, buildSystemPrompt(kbEntries));
+                            if (r) { setAllResults(prev => [...prev, { system: "西洋占星（AI 分析）", result: r }]); setResult(r); }
+                          } finally { setAnalyzing(false); setLoadingMsg(""); }
+                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
                       }}>
                         <span style={{ fontSize: 18 }}>♎</span> 占星排盤
                       </button>
@@ -883,91 +916,30 @@ function MainApp({ auth, isAdmin, onLogout }) {
                           const h = parseInt(birthData.hour);
                           if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
 
-                          // 1. 瞬間排三盤
                           const charts = [
                             { system: "紫微斗數", text: formatChart(calculateChart(y, m, d, h, 0, birthData.gender)) },
                             { system: "八字", text: formatBazi(calculateBazi(y, m, d, h, birthData.gender)) },
                             { system: "西洋占星", text: formatAstro(calculateAstro(y, m, d, h, 0)) },
                           ];
-                          const chartResults = charts.map(c => ({ system: c.system + "（自動排盤）", result: c.text }));
-                          setAllResults(prev => [...prev, ...chartResults]);
+                          setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system + "（自動排盤）", result: c.text }))]);
                           setResult(charts.map(c => c.text).join("\n\n---\n\n"));
                           setAddingChart(false);
 
-                          // 2. 逐盤送 AI 分析
                           setAnalyzing(true);
-                          const systemPrompt = buildSystemPrompt(kbEntries);
+                          const sp = buildSystemPrompt(kbEntries);
                           for (let i = 0; i < charts.length; i++) {
-                            const c = charts[i];
-                            setLoadingMsg(`正在分析 ${c.system}（${i + 1}/3）...`);
-                            try {
-                              const submitRes = await fetch(API_BACKEND, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  images: [],
-                                  system: systemPrompt,
-                                  prompt: `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${c.text}\n\n請根據以上【${c.system}】排盤進行分析：\n1. 格局分析\n2. 重點宮位/柱位深入分析\n3. 今年運勢（2026丙午年）\n4. 綜合建議\n\n要深入、專業、具體。\n⚠️ 嚴格只用【${c.system}】的術語。`,
-                                }),
-                              });
-                              if (!submitRes.ok) continue;
-                              const { job_id } = await submitRes.json();
-                              for (let j = 0; j < 200; j++) {
-                                await new Promise(r => setTimeout(r, 3000));
-                                try {
-                                  const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
-                                  if (!pollRes.ok) continue;
-                                  const pd = await pollRes.json();
-                                  if (pd.status === "done") {
-                                    const sys = c.system + "（AI 分析）";
-                                    setAllResults(prev => [...prev, { system: sys, result: pd.result }]);
-                                    setResult(pd.result);
-                                    break;
-                                  }
-                                } catch { continue; }
-                              }
-                            } catch (err) {
-                              console.error(`${c.system} 分析失敗:`, err);
-                            }
+                            setLoadingMsg(`正在分析 ${charts[i].system}（${i + 1}/3）...`);
+                            const r = await autoAnalyze(charts[i].system, charts[i].text, sp);
+                            if (r) { setAllResults(prev => [...prev, { system: charts[i].system + "（AI 分析）", result: r }]); setResult(r); }
                           }
 
-                          // 3. 交叉分析
                           setLoadingMsg("交叉比對三大系統...");
-                          try {
-                            const allChartText = charts.map(c => `【${c.system}】\n${c.text}`).join("\n\n===\n\n");
-                            const submitRes = await fetch(API_BACKEND, {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                images: [],
-                                system: systemPrompt,
-                                prompt: `以下是同一個人的三種命理排盤結果：\n\n${allChartText}\n\n請進行【三系統交叉分析】：\n1. 三個系統的共同指向（性格、天賦、挑戰）\n2. 矛盾之處與解讀\n3. 2026年綜合運勢\n4. 具體建議\n\n用繁體中文，深入專業。`,
-                              }),
-                            });
-                            if (submitRes.ok) {
-                              const { job_id } = await submitRes.json();
-                              for (let j = 0; j < 200; j++) {
-                                await new Promise(r => setTimeout(r, 3000));
-                                try {
-                                  const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
-                                  if (!pollRes.ok) continue;
-                                  const pd = await pollRes.json();
-                                  if (pd.status === "done") {
-                                    setAllResults(prev => [...prev, { system: "三系統交叉分析", result: pd.result }]);
-                                    setResult(pd.result);
-                                    break;
-                                  }
-                                } catch { continue; }
-                              }
-                            }
-                          } catch {}
+                          const crossText = charts.map(c => `【${c.system}】\n${c.text}`).join("\n\n===\n\n");
+                          const crossResult = await autoAnalyze("三系統交叉", crossText, sp);
+                          if (crossResult) { setAllResults(prev => [...prev, { system: "三系統交叉分析", result: crossResult }]); setResult(crossResult); }
 
-                          setAnalyzing(false);
-                          setLoadingMsg("");
-                        } catch (err) {
-                          setError("排盤錯誤：" + err.message);
-                          setAnalyzing(false);
-                        }
+                          setAnalyzing(false); setLoadingMsg("");
+                        } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
                       }}>
                         <span style={{ fontSize: 18 }}>✦</span> 三盤齊排 + AI 分析
                       </button>
