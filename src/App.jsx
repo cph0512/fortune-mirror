@@ -3,6 +3,7 @@ import './App.css';
 import { calculateChart, formatChart } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
+import { calculateFinance, formatFinance } from "./finance-calc.js";
 
 // ============================================================
 // CONSTANTS
@@ -661,9 +662,51 @@ function MainApp({ auth, isAdmin, onLogout }) {
   // 共用：排盤後自動送 AI 分析（engine: "claude" or "manus"）
   const autoAnalyze = async (systemName, chartText, systemPrompt, engine = "claude") => {
     try {
-      const prompt = engine === "manus"
-        ? chartText  // Manus gets raw chart text, backend adds format instructions
-        : `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${chartText}\n\n請根據以上【${systemName}】排盤進行分析：\n1. 格局分析\n2. 重點宮位/柱位深入分析\n3. 今年運勢（2026丙午年）\n4. 綜合建議\n\n要深入、專業、具體。\n⚠️ 嚴格只用【${systemName}】的術語。`;
+      let prompt;
+      if (engine === "manus") {
+        prompt = chartText;
+      } else if (systemName === "紫微財運") {
+        prompt = `⚠️ 以下是紫微斗數財運專項排盤資料，已經確認正確。直接基於此資料進行財運深度分析。
+
+${chartText}
+
+請按照以下框架進行【紫微斗數財運專項分析】：
+
+## 一、本命財運格局
+1. 財帛宮主星特質與財運基本面（參考知識庫中的星曜財運特質）
+2. 三方四正鐵三角分析（命宮→官祿→財帛→遷移的連動）
+3. 福德宮分析（財運真正源頭：豐盛思維 or 匱乏思維）
+4. 田宅宮財庫分析（守財能力、不動產運）
+5. 生年四化對財運的影響
+6. 重點宮位飛化因果推導（用飛化表分析：哪個宮位的天干導致哪顆星化忌/化祿→財務因果鏈）
+
+## 二、大限財運（當前十年）
+1. 大限財帛宮疊本命哪宮→十年財運主題
+2. 大限四化引動分析
+3. 大限福德宮、田宅宮狀態
+
+## 三、今年流年財運
+1. 流年財帛宮疊本命哪宮→今年財運主題
+2. 流年四化引動本命/大限宮位
+3. 高風險區標記（化忌/陀羅/擎羊位置）
+
+## 四、12個月流月財運走勢
+逐月分析流月財帛宮的變化，標出：
+- 財運最好的月份（化祿/祿存進入）
+- 需要注意的月份（化忌/煞星進入）
+- 投資/簽約/求職的最佳時機
+
+## 五、財運建議
+1. 適合的投資類型（穩定型/獲利型/天王型）
+2. 賺錢方式建議（根據命宮+財帛宮主星特質）
+3. 需要避免的財務陷阱
+4. 貴人方向（僕役宮飛化分析）
+5. 財運方位建議
+
+要極度深入、專業、具體。每個分析都要引用具體的星曜和宮位資料作為依據。`;
+      } else {
+        prompt = `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${chartText}\n\n請根據以上【${systemName}】排盤進行分析：\n1. 格局分析\n2. 重點宮位/柱位深入分析\n3. 今年運勢（2026丙午年）\n4. 綜合建議\n\n要深入、專業、具體。\n⚠️ 嚴格只用【${systemName}】的術語。`;
+      }
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -930,6 +973,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         { id: "ziwei", label: "紫微斗數", icon: "💜" },
                         { id: "bazi", label: "八字", icon: "🔥" },
                         { id: "astro", label: "西洋占星", icon: "♎" },
+                        { id: "finance", label: "財運分析", icon: "💰" },
                       ].map(sys => (
                         <button key={sys.id}
                           className={`system-btn ${autoSystems.includes(sys.id) ? "active" : ""}`}
@@ -950,9 +994,10 @@ function MainApp({ auth, isAdmin, onLogout }) {
                           ziwei: { system: "紫微斗數", calc: () => formatChart(calculateChart(y, m, d, h, 0, birthData.gender)) },
                           bazi: { system: "八字", calc: () => formatBazi(calculateBazi(y, m, d, h, birthData.gender)) },
                           astro: { system: "西洋占星", calc: () => formatAstro(calculateAstro(y, m, d, h, min, birthData.lat, birthData.lng)) },
+                          finance: { system: "紫微財運", calc: () => formatFinance(calculateFinance(y, m, d, h, birthData.gender)) },
                         };
 
-                        const engineMap = { "紫微斗數": "claude", "八字": "claude", "西洋占星": "manus" };
+                        const engineMap = { "紫微斗數": "claude", "八字": "claude", "西洋占星": "manus", "紫微財運": "claude" };
                         const charts = autoSystems.map(id => ({ system: calcMap[id].system, text: calcMap[id].calc(), engine: engineMap[calcMap[id].system] || "claude" }));
                         setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system + "（排盤）", result: c.text }))]);
                         setResult(charts.map(c => c.text).join("\n\n---\n\n"));

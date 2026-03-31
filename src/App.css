@@ -405,12 +405,13 @@ button:active:not(:disabled) {
 }
 
 .auto-system-selector {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   margin: 16px 0 8px;
 }
 .auto-system-selector .system-btn {
-  flex: 1;
+  width: 100%;
 }
 
 /* ===== Loading ===== */
