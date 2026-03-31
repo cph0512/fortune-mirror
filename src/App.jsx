@@ -535,7 +535,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [addingChart, setAddingChart] = useState(false);
   const [inputMode, setInputMode] = useState("upload"); // "upload" | "auto"
-  const [birthData, setBirthData] = useState({ year: "", month: "", day: "", hour: "0", minute: "0", gender: "男" });
+  const [birthData, setBirthData] = useState({ year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 });
   const [autoSystems, setAutoSystems] = useState(["ziwei", "bazi", "astro"]); // 自動排盤選擇
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
@@ -843,11 +843,18 @@ function MainApp({ auth, isAdmin, onLogout }) {
                           onChange={e => setBirthData(p => ({...p, day: e.target.value}))} />
                       </div>
                       <div className="birth-row">
-                        <label>出生時間</label>
+                        <label>時辰</label>
                         <select value={birthData.hour} onChange={e => setBirthData(p => ({...p, hour: e.target.value}))}>
                           {SHI_CHEN_RANGE.map((s, i) => <option key={i} value={i * 2 + 23 > 23 ? (i * 2 + 23) % 24 : i * 2 + 1}>{s}</option>)}
                         </select>
                       </div>
+                      {autoSystems.includes("astro") && (
+                        <div className="birth-row">
+                          <label>精確分鐘</label>
+                          <input type="number" placeholder="0" min="0" max="59" value={birthData.minute}
+                            onChange={e => setBirthData(p => ({...p, minute: e.target.value}))} />
+                        </div>
+                      )}
                       <div className="birth-row">
                         <label>性別</label>
                         <select value={birthData.gender} onChange={e => setBirthData(p => ({...p, gender: e.target.value}))}>
@@ -855,6 +862,34 @@ function MainApp({ auth, isAdmin, onLogout }) {
                           <option value="女">女</option>
                         </select>
                       </div>
+                      {autoSystems.includes("astro") && (
+                        <div className="birth-row">
+                          <label>出生地</label>
+                          <select value={birthData.birthPlace} onChange={e => {
+                            const places = {
+                              "桃園": [24.9936, 121.3130], "台北": [25.0330, 121.5654], "新北": [25.0169, 121.4628],
+                              "基隆": [25.1283, 121.7419], "新竹": [24.8015, 120.9718], "苗栗": [24.5602, 120.8214],
+                              "台中": [24.1477, 120.6736], "彰化": [24.0518, 120.5161], "南投": [23.7609, 120.6833],
+                              "雲林": [23.7092, 120.4313], "嘉義": [23.4801, 120.4491], "台南": [22.9999, 120.2269],
+                              "高雄": [22.6273, 120.3014], "屏東": [22.6762, 120.4929], "宜蘭": [24.7570, 121.7533],
+                              "花蓮": [23.9910, 121.6115], "台東": [22.7583, 121.1444], "澎湖": [23.5711, 119.5793],
+                              "金門": [24.4493, 118.3767], "馬祖": [26.1608, 119.9491],
+                              "香港": [22.3193, 114.1694], "上海": [31.2304, 121.4737], "北京": [39.9042, 116.4074],
+                              "東京": [35.6762, 139.6503], "首爾": [37.5665, 126.9780],
+                              "紐約": [40.7128, -74.0060], "洛杉磯": [34.0522, -118.2437], "倫敦": [51.5074, -0.1278],
+                            };
+                            const [lat, lng] = places[e.target.value] || [24.9936, 121.3130];
+                            setBirthData(p => ({...p, birthPlace: e.target.value, lat, lng}));
+                          }}>
+                            <optgroup label="台灣">
+                              {["桃園","台北","新北","基隆","新竹","苗栗","台中","彰化","南投","雲林","嘉義","台南","高雄","屏東","宜蘭","花蓮","台東","澎湖","金門","馬祖"].map(c => <option key={c} value={c}>{c}</option>)}
+                            </optgroup>
+                            <optgroup label="海外">
+                              {["香港","上海","北京","東京","首爾","紐約","洛杉磯","倫敦"].map(c => <option key={c} value={c}>{c}</option>)}
+                            </optgroup>
+                          </select>
+                        </div>
+                      )}
                     </div>
                     <div className="auto-system-selector">
                       {[
@@ -876,10 +911,11 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         const h = parseInt(birthData.hour);
                         if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
 
+                        const min = parseInt(birthData.minute) || 0;
                         const calcMap = {
                           ziwei: { system: "紫微斗數", calc: () => formatChart(calculateChart(y, m, d, h, 0, birthData.gender)) },
                           bazi: { system: "八字", calc: () => formatBazi(calculateBazi(y, m, d, h, birthData.gender)) },
-                          astro: { system: "西洋占星", calc: () => formatAstro(calculateAstro(y, m, d, h, 0)) },
+                          astro: { system: "西洋占星", calc: () => formatAstro(calculateAstro(y, m, d, h, min, birthData.lat, birthData.lng)) },
                         };
 
                         const charts = autoSystems.map(id => ({ system: calcMap[id].system, text: calcMap[id].calc() }));
