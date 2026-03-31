@@ -30,8 +30,8 @@
 }
 
 .birth-form {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
   margin: 12px 0;
 }
@@ -40,8 +40,9 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1;
-  min-width: 80px;
+}
+.birth-row.birth-time-row {
+  grid-column: 1 / -1;
 }
 
 .birth-row label {
@@ -376,19 +377,25 @@ button:active:not(:disabled) {
   transform: translateY(0);
 }
 
+.birth-time-row {
+  flex: 1 1 100% !important;
+  min-width: 100% !important;
+}
 .time-inputs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 .time-inputs input {
-  width: 52px;
+  width: 56px;
   text-align: center;
+  flex-shrink: 0;
 }
 .time-sep {
   font-size: 18px;
   font-weight: bold;
   color: var(--gold);
+  flex-shrink: 0;
 }
 
 .auto-system-selector {
