@@ -836,7 +836,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                     <p className="instruction">輸入出生資料，自動排盤</p>
                     <div className="birth-form">
                       <div className="birth-row">
-                        <label>西元年</label>
+                        <label>年</label>
                         <input type="number" placeholder="1990" value={birthData.year}
                           onChange={e => setBirthData(p => ({...p, year: e.target.value}))} />
                       </div>
@@ -850,15 +850,15 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         <input type="number" placeholder="15" min="1" max="31" value={birthData.day}
                           onChange={e => setBirthData(p => ({...p, day: e.target.value}))} />
                       </div>
-                      <div className="birth-row birth-time-row">
-                        <label>出生時間</label>
-                        <div className="time-inputs">
-                          <input type="number" placeholder="15" min="0" max="23" value={birthData.hour}
-                            onChange={e => setBirthData(p => ({...p, hour: e.target.value}))} />
-                          <span className="time-sep">:</span>
-                          <input type="number" placeholder="00" min="0" max="59" value={birthData.minute}
-                            onChange={e => setBirthData(p => ({...p, minute: e.target.value}))} />
-                        </div>
+                      <div className="birth-row">
+                        <label>時</label>
+                        <input type="number" placeholder="15" min="0" max="23" value={birthData.hour}
+                          onChange={e => setBirthData(p => ({...p, hour: e.target.value}))} />
+                      </div>
+                      <div className="birth-row">
+                        <label>分</label>
+                        <input type="number" placeholder="00" min="0" max="59" value={birthData.minute}
+                          onChange={e => setBirthData(p => ({...p, minute: e.target.value}))} />
                       </div>
                       <div className="birth-row">
                         <label>性別</label>
@@ -868,7 +868,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         </select>
                       </div>
                       {autoSystems.includes("astro") && (
-                        <div className="birth-row">
+                        <div className="birth-row birth-full-row">
                           <label>出生地</label>
                           <select value={birthData.birthPlace} onChange={e => {
                             const places = {
