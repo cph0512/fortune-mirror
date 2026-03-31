@@ -545,7 +545,10 @@ function MainApp({ auth, isAdmin, onLogout }) {
   });
   useEffect(() => { localStorage.setItem("fortune-birth-data", JSON.stringify(birthData)); }, [birthData]);
   useEffect(() => { localStorage.setItem("fortune-auto-systems", JSON.stringify(autoSystems)); }, [autoSystems]);
-  const [result, setResult] = useState("");
+  const [result, setResult] = useState(() => {
+    try { const r = JSON.parse(sessionStorage.getItem("fortune-results")) || []; return r.length ? r[r.length - 1].result : ""; }
+    catch { return ""; }
+  });
   const [error, setError] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -554,12 +557,33 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [model, setModel] = useState(loadModel);
   const [selectedSystems, setSelectedSystems] = useState([]); // ["bazi", "astro", "ziwei"]
   const [correction, setCorrection] = useState(""); // user correction text
-  const [allResults, setAllResults] = useState([]); // [{system, result}] — accumulated analyses
+  const [allResults, setAllResults] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("fortune-results")) || []; }
+    catch { return []; }
+  });
   const [chatHistory, setChatHistory] = useState([]); // [{role, text}]
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [composing, setComposing] = useState(false);
   const [savedList, setSavedList] = useState([]);
+
+  // 自動暫存到 sessionStorage（防頁面跳動遺失）
+  useEffect(() => {
+    if (allResults.length > 0) sessionStorage.setItem("fortune-results", JSON.stringify(allResults));
+  }, [allResults]);
+
+  // 分析完成後自動存檔到後端
+  const autoSaveRef = useRef(null);
+  autoSaveRef.current = async () => {
+    try {
+      const results = JSON.parse(sessionStorage.getItem("fortune-results") || "[]");
+      if (results.length === 0) return;
+      await fetch(`${API_BACKEND}-save`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: auth.username, systems: results.map(r => r.system), results, chat: [], time: new Date().toISOString() }),
+      });
+    } catch {}
+  };
   const [usersList, setUsersList] = useState({});
   const [feedbackList, setFeedbackList] = useState([]);
   const chatEndRef = useRef(null);
@@ -768,6 +792,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       clearInterval(interval);
       setAnalyzing(false);
       setAddingChart(false);
+      autoSaveRef.current?.();
     }
   };
 
@@ -945,6 +970,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         }
 
                         setAnalyzing(false); setLoadingMsg("");
+                        autoSaveRef.current?.();
                       } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
                     }}>
                       <span style={{ fontSize: 18 }}>⟐</span>
@@ -1221,7 +1247,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                   <button className="save-btn" onClick={saveReading}>
                     💾 存檔
                   </button>
-                  <button className="reset-btn" style={{ flex: 1 }} onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); }}>
+                  <button className="reset-btn" style={{ flex: 1 }} onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); sessionStorage.removeItem("fortune-results"); }}>
                     全部重來
                   </button>
                 </div>
