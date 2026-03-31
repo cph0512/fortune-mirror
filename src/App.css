@@ -376,6 +376,22 @@ button:active:not(:disabled) {
   transform: translateY(0);
 }
 
+.auto-calc-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+.auto-calc-buttons .analyze-btn {
+  margin-top: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+.auto-calc-buttons .auto-all-btn {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, var(--accent), var(--gold-dark));
+}
+
 /* ===== Loading ===== */
 .loading-section {
   text-align: center;

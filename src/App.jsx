@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import './App.css';
 import { calculateChart, formatChart, SHI_CHEN_RANGE } from "./ziwei-calc.js";
+import { calculateBazi, formatBazi } from "./bazi-calc.js";
+import { calculateAstro, formatAstro } from "./astro-calc.js";
 
 // ============================================================
 // CONSTANTS
@@ -795,7 +797,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
                 {/* Auto calc mode */}
                 {inputMode === "auto" && (
                   <div className="auto-calc-section">
-                    <p className="instruction">輸入出生資料（紫微斗數自動排盤）</p>
+                    <p className="instruction">輸入出生資料，自動排盤</p>
                     <div className="birth-form">
                       <div className="birth-row">
                         <label>西元年</label>
@@ -826,22 +828,78 @@ function MainApp({ auth, isAdmin, onLogout }) {
                         </select>
                       </div>
                     </div>
-                    <button className="analyze-btn" onClick={() => {
-                      try {
-                        const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
-                        const h = parseInt(birthData.hour);
-                        if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
-                        const chart = calculateChart(y, m, d, h, 0, birthData.gender);
-                        const text = formatChart(chart);
-                        setAllResults(prev => [...prev, { system: "紫微斗數（自動排盤）", result: text }]);
-                        setResult(text);
-                        setAddingChart(false);
-                      } catch (err) {
-                        setError("排盤計算錯誤：" + err.message);
-                      }
-                    }}>
-                      <span style={{ fontSize: 18 }}>⟐</span> 開始排盤
-                    </button>
+                    <div className="auto-calc-buttons">
+                      <button className="analyze-btn" onClick={() => {
+                        try {
+                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
+                          const h = parseInt(birthData.hour);
+                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+                          const chart = calculateChart(y, m, d, h, 0, birthData.gender);
+                          const text = formatChart(chart);
+                          setAllResults(prev => [...prev, { system: "紫微斗數（自動排盤）", result: text }]);
+                          setResult(text);
+                          setAddingChart(false);
+                        } catch (err) {
+                          setError("排盤計算錯誤：" + err.message);
+                        }
+                      }}>
+                        <span style={{ fontSize: 18 }}>💜</span> 紫微排盤
+                      </button>
+                      <button className="analyze-btn" onClick={() => {
+                        try {
+                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
+                          const h = parseInt(birthData.hour);
+                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+                          const chart = calculateBazi(y, m, d, h, birthData.gender);
+                          const text = formatBazi(chart);
+                          setAllResults(prev => [...prev, { system: "八字（自動排盤）", result: text }]);
+                          setResult(text);
+                          setAddingChart(false);
+                        } catch (err) {
+                          setError("八字排盤錯誤：" + err.message);
+                        }
+                      }}>
+                        <span style={{ fontSize: 18 }}>🔥</span> 八字排盤
+                      </button>
+                      <button className="analyze-btn" onClick={() => {
+                        try {
+                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
+                          const h = parseInt(birthData.hour);
+                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+                          const chart = calculateAstro(y, m, d, h, 0);
+                          const text = formatAstro(chart);
+                          setAllResults(prev => [...prev, { system: "西洋占星（自動排盤）", result: text }]);
+                          setResult(text);
+                          setAddingChart(false);
+                        } catch (err) {
+                          setError("占星排盤錯誤：" + err.message);
+                        }
+                      }}>
+                        <span style={{ fontSize: 18 }}>♎</span> 占星排盤
+                      </button>
+                      <button className="analyze-btn auto-all-btn" onClick={() => {
+                        try {
+                          const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
+                          const h = parseInt(birthData.hour);
+                          if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+                          const ziwei = formatChart(calculateChart(y, m, d, h, 0, birthData.gender));
+                          const bazi = formatBazi(calculateBazi(y, m, d, h, birthData.gender));
+                          const astroChart = formatAstro(calculateAstro(y, m, d, h, 0));
+                          setAllResults(prev => [
+                            ...prev,
+                            { system: "紫微斗數（自動排盤）", result: ziwei },
+                            { system: "八字（自動排盤）", result: bazi },
+                            { system: "西洋占星（自動排盤）", result: astroChart },
+                          ]);
+                          setResult(ziwei + "\n\n---\n\n" + bazi + "\n\n---\n\n" + astroChart);
+                          setAddingChart(false);
+                        } catch (err) {
+                          setError("排盤錯誤：" + err.message);
+                        }
+                      }}>
+                        <span style={{ fontSize: 18 }}>✦</span> 三盤齊排
+                      </button>
+                    </div>
                   </div>
                 )}
 
