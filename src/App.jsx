@@ -579,9 +579,13 @@ function MainApp({ auth, isAdmin, onLogout }) {
     try {
       const results = JSON.parse(sessionStorage.getItem("fortune-results") || "[]");
       if (results.length === 0) return;
+      // Try to extract person info from results
+      const allText = results.map(r => r.result).join("\n");
+      const dateMatch = allText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+      const personLabel = dateMatch ? `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}` : "未命名";
       await fetch(`${API_BACKEND}-save`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: auth.username, systems: results.map(r => r.system), results, chat: [], time: new Date().toISOString() }),
+        body: JSON.stringify({ user: auth.username, person: personLabel, systems: results.map(r => r.system), results, chat: [], time: new Date().toISOString() }),
       });
     } catch {}
   };
@@ -589,9 +593,16 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [feedbackList, setFeedbackList] = useState([]);
   const chatEndRef = useRef(null);
 
-  const saveReading = async () => {
+  const saveReading = async (personName) => {
     if (allResults.length === 0) return;
-    const payload = { user: auth.username, systems: allResults.map(r => r.system), results: allResults, chat: chatHistory, time: new Date().toISOString() };
+    const payload = {
+      user: auth.username,
+      person: personName || "未命名",
+      systems: allResults.map(r => r.system),
+      results: allResults,
+      chat: chatHistory,
+      time: new Date().toISOString(),
+    };
     await fetch(`${API_BACKEND}-save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   };
 
@@ -998,12 +1009,17 @@ ${chartText}
                         };
 
                         const engineMap = { "紫微斗數": "claude", "八字": "claude", "西洋占星": "manus", "紫微財運": "claude" };
+
+                        // Show loading animation during chart calculation
+                        setAnalyzing(true);
+                        setLoadingMsg("正在排盤計算中...");
+                        await new Promise(r => setTimeout(r, 2000));
+
                         const charts = autoSystems.map(id => ({ system: calcMap[id].system, text: calcMap[id].calc(), engine: engineMap[calcMap[id].system] || "claude" }));
-                        setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system + "（排盤）", result: c.text }))]);
+                        setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system, result: c.text }))]);
                         setResult(charts.map(c => c.text).join("\n\n---\n\n"));
                         setAddingChart(false);
-
-                        setAnalyzing(true);
+                        setLoadingMsg("排盤完成！命盤分析進行中...");
                         const sp = buildSystemPrompt(kbEntries);
                         setLoadingMsg(`正在並行分析 ${charts.length} 盤...`);
 
@@ -1012,10 +1028,12 @@ ${chartText}
                           autoAnalyze(c.system, c.text, sp, c.engine)
                             .then(r => {
                               if (r) {
-                                const label = c.engine === "manus" ? "Manus 分析" : "AI 分析";
-                                setAllResults(prev => [...prev, { system: `${c.system}（${label}）`, result: r }]);
+                                // 用分析結果替換排盤條目（排盤+分析合併為一條）
+                                setAllResults(prev => prev.map(item =>
+                                  item.system === c.system ? { system: c.system + "（命盤分析）", result: item.result + "\n\n---\n\n" + r } : item
+                                ));
                                 setResult(r);
-                                setLoadingMsg(prev => `${c.system} 分析完成！`);
+                                setLoadingMsg(`${c.system} 分析完成！`);
                               }
                               return { system: c.system, result: r, text: c.text };
                             })
@@ -1236,13 +1254,13 @@ ${chartText}
                     setLoadingMsg("正在計算財運排盤...");
                     try {
                       const finText = formatFinance(calculateFinance(y, m, d, h, gender));
-                      setAllResults(prev => [...prev, { system: "紫微財運（排盤）", result: finText }]);
+                      setAllResults(prev => [...prev, { system: "紫微財運", result: finText }]);
                       setResult(finText);
                       setLoadingMsg("正在進行財運深度分析...");
                       const sp = buildSystemPrompt(kbEntries);
                       const r = await autoAnalyze("紫微財運", finText, sp, "claude");
                       if (r) {
-                        setAllResults(prev => [...prev, { system: "紫微財運（AI 分析）", result: r }]);
+                        setAllResults(prev => [...prev, { system: "紫微財運（命盤分析）", result: r }]);
                         setResult(r);
                       }
                     } catch (err) { setError("財運分析錯誤：" + err.message); }
@@ -1373,8 +1391,8 @@ ${chartText}
               <div className="save-list">
                 {savedList.map((s, i) => (
                   <div key={i} className="save-card" onClick={() => loadReading(s)}>
-                    <div className="save-card-title">{s.systems?.join(" + ") || "命盤分析"}</div>
-                    <div className="save-card-time">{new Date(s.time).toLocaleString("zh-TW")}</div>
+                    <div className="save-card-title">{s.person || "未命名"}</div>
+                    <div className="save-card-time">{s.systems?.filter(x => !x.includes("命盤分析")).join(" + ") || "命盤"} · {new Date(s.time).toLocaleString("zh-TW")}</div>
                     <div className="save-card-preview">{s.results?.[0]?.result?.slice(0, 80)}...</div>
                   </div>
                 ))}
