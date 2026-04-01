@@ -861,7 +861,25 @@ ${partnerCharts}
           {/* Chat follow-up */}
           <div style={{ height: 32 }} />
           <div className="wizard-chat">
-            <div className="wizard-question" style={{ fontSize: 18, marginBottom: 16 }}>想深入了解什麼？</div>
+            <div className="wizard-question" style={{ fontSize: 18, marginBottom: 8 }}>你的命盤還藏著這些沒說完</div>
+            <div className="wizard-subtitle" style={{ marginTop: 0, marginBottom: 20 }}>點選下方問題，或輸入你想問的</div>
+
+            {/* Quick question buttons */}
+            {chatHistory.length === 0 && (
+              <div className="wizard-quick-questions">
+                {[
+                  "我今年的財運怎麼走？",
+                  "我的感情什麼時候會有突破？",
+                  "現在換工作的時機對嗎？",
+                  "我命盤最需要注意什麼？",
+                ].map((q, i) => (
+                  <button key={i} className="wizard-quick-q-btn" onClick={() => sendChat(q)} disabled={chatLoading}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {chatHistory.length > 0 && (
               <div className="wizard-chat-messages">
                 {chatHistory.map((msg, i) => (
@@ -876,7 +894,7 @@ ${partnerCharts}
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) sendChat(chatInput); }}
-                placeholder="問任何關於你命運的問題..."
+                placeholder="或直接輸入你的問題..."
                 disabled={chatLoading}
               />
               <button onClick={() => sendChat(chatInput)} disabled={chatLoading || !chatInput.trim()}>
