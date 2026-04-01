@@ -247,15 +247,7 @@
   box-shadow: 0 4px 24px rgba(120,100,220,0.25);
 }
 
-.wizard-gender-icon {
-  width: 100%;
-  height: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 72px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), transparent);
-}
+/* .wizard-gender-icon defined below with text-based M/F styling */
 
 .wizard-gender-label {
   display: flex;
@@ -614,6 +606,8 @@
   max-width: 700px;
   width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .wizard-chat-messages {
@@ -652,10 +646,13 @@
 .wizard-chat-input {
   display: flex;
   gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .wizard-chat-input input {
   flex: 1;
+  min-width: 0;
   padding: 14px 18px;
   background: rgba(255,255,255,0.06);
   border: 1.5px solid rgba(255,255,255,0.12);
@@ -675,6 +672,8 @@
 
 .wizard-chat-input button {
   padding: 14px 20px;
+  flex-shrink: 0;
+  white-space: nowrap;
   background: linear-gradient(135deg, #7c5cbf, #a855c8);
   border: none;
   border-radius: 12px;
@@ -914,6 +913,50 @@
   color: rgba(255,255,255,0.6);
 }
 
+/* ===== Formatted Result Sections ===== */
+
+.wizard-result-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wizard-section {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 20px 22px;
+  animation: wizardFadeIn 0.4s ease;
+  animation-fill-mode: both;
+}
+
+.wizard-section:nth-child(1) { animation-delay: 0s; }
+.wizard-section:nth-child(2) { animation-delay: 0.08s; }
+.wizard-section:nth-child(3) { animation-delay: 0.16s; }
+.wizard-section:nth-child(4) { animation-delay: 0.24s; }
+.wizard-section:nth-child(5) { animation-delay: 0.32s; }
+
+.wizard-section-header {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.wizard-section-title {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  color: #e2daf5;
+  letter-spacing: 0.5px;
+}
+
+.wizard-section-body {
+  font-size: 15px;
+  line-height: 1.85;
+  color: rgba(255,255,255,0.78);
+  white-space: pre-wrap;
+}
+
 /* ===== 合盤 Heban Section ===== */
 
 .wizard-heban-promo {
@@ -1001,19 +1044,92 @@
   animation: wizardFadeIn 0.5s ease;
 }
 
+/* CSS diamond shape — replaces ✦ emoji */
+.wizard-diamond {
+  display: inline-block;
+  position: relative;
+}
+.wizard-diamond::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, #c084fc, #e2daf5);
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+
+/* Welcome icon diamond — larger */
+.wizard-welcome-icon.wizard-diamond {
+  font-size: 0;
+  margin-bottom: 24px;
+}
+.wizard-welcome-icon.wizard-diamond::before {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  box-shadow: 0 0 24px rgba(192,132,252,0.4);
+}
+
+/* Loading star diamond */
+.wizard-loading-star.wizard-diamond::before {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  box-shadow: 0 0 16px rgba(192,132,252,0.5);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Heban promo icon diamond */
+.wizard-heban-promo-icon.wizard-diamond {
+  font-size: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.wizard-heban-promo-icon.wizard-diamond::before {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  box-shadow: 0 0 12px rgba(192,132,252,0.4);
+}
+
+/* Gender icon — text-based M/F */
+.wizard-gender-icon {
+  width: 100%;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.7);
+  font-family: var(--font-serif);
+  letter-spacing: 2px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), transparent);
+}
+
 /* Mobile responsive */
 @media (max-width: 600px) {
+  .wizard-content {
+    padding: 16px;
+  }
+
   .wizard-gender-cards {
     gap: 12px;
   }
 
   .wizard-gender-icon {
-    height: 120px;
-    font-size: 56px;
+    height: 100px;
+    font-size: 44px;
   }
 
   .wizard-question {
     font-size: 20px;
+    margin-bottom: 20px;
   }
 
   .wizard-time-grid {
@@ -1030,5 +1146,90 @@
 
   .wizard-welcome h1 {
     font-size: 26px;
+  }
+
+  /* Fix chat input overflow on mobile */
+  .wizard-chat {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .wizard-chat-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .wizard-chat-input input {
+    min-width: 0;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .wizard-chat-input button {
+    padding: 12px 14px;
+    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Result sections on mobile */
+  .wizard-section {
+    padding: 16px;
+  }
+
+  .wizard-section-title {
+    font-size: 15px;
+  }
+
+  .wizard-section-body {
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  /* Heban form mobile */
+  .wizard-heban-promo {
+    padding: 16px;
+  }
+
+  .wizard-heban-relations {
+    gap: 6px;
+  }
+
+  .wizard-heban-rel-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .wizard-date-row {
+    gap: 8px;
+  }
+
+  .wizard-select {
+    padding: 12px 8px;
+    font-size: 14px;
+  }
+
+  /* Result actions mobile */
+  .wizard-result-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .wizard-result-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .wizard-cta {
+    margin-bottom: 16px;
+  }
+
+  .wizard-header {
+    padding: 12px 16px;
+  }
+
+  .wizard-logo {
+    font-size: 16px;
+    letter-spacing: 4px;
   }
 }

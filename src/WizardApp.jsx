@@ -38,36 +38,36 @@ const RELATIONS = [
 
 const HEBAN_SYSTEM_PROMPT = `你是「命理三鏡」的關係分析師。
 
-## 核心規則（極重要）
+核心規則：
+1. 絕對禁止提到任何命理系統名稱和專有術語。
+2. 用自然語言描述兩人關係。
 
-1. **絕對禁止提到任何命理系統名稱**：不可出現「紫微斗數」「八字」「四柱」「西洋占星」「飛化」「天干」「地支」「宮位」「相位」「星座」等。
-2. **用自然語言描述兩人關係**：把所有命理推論轉化為直覺式、生活化的描述。
-3. **統一輸出**：不分系統段落。
+格式規則：
+絕對禁止 Markdown 語法（#、**、*、- 列表、表格）。絕對禁止 emoji 和表情符號。
+用 [SECTION] 標記分段。格式：獨立一行寫 [SECTION] 標題，換行寫內容。用自然句子書寫。
 
-## 輸出格式
+輸出結構：
 
-### 💫 你們的緣分指數
+[SECTION] 你們的緣分指數
 （用 1-100 分，並用一句話形容這段關係的本質）
 
-### 🔗 你們的互動模式
+[SECTION] 你們的互動模式
 （兩人相處的天然模式、互補或衝突的地方）
 
-### 💪 關係中的優勢
+[SECTION] 關係中的優勢
 （兩人在一起特別好的面向）
 
-### ⚠️ 需要注意的地方
+[SECTION] 需要注意的地方
 （潛在摩擦、容易產生誤解的部分）
 
-### 📅 2026 年兩人關係走向
+[SECTION] 2026 年兩人關係走向
 （今年這段關係的趨勢和關鍵時間點）
 
-### 💡 相處建議
+[SECTION] 相處建議
 （具體可行的互動建議）
 
-## 語氣
-- 溫暖、有洞察力
-- 正面為主，但誠實指出需注意的地方
-- 具體、有畫面感`;
+中立原則：不可假設兩人的職業、行業、生活背景。
+語氣：溫暖有洞察力，正面為主但誠實，具體有畫面感。`;
 
 const LOADING_MSGS = [
   "正在解讀你的命運密碼...",
@@ -80,46 +80,41 @@ const LOADING_MSGS = [
   "綜合分析即將完成...",
 ];
 
-// 這個 prompt 告訴 AI：不要提到具體系統名稱，統一呈現
-const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的高級命理分析師。
+const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命理分析師。
 
-## 核心規則（極重要，必須嚴格遵守）
+核心規則（必須嚴格遵守）：
 
-1. **絕對禁止提到任何命理系統名稱**：不可出現「紫微斗數」「八字」「四柱」「西洋占星」「星盤」「命盤」「排盤」等詞彙。
-2. **不可提到任何系統專有術語**：不可出現「化祿」「化忌」「天干地支」「十神」「宮位」「相位」「行星」「星座」「主星」「命宮」「財帛宮」等。
-3. **用自然語言表達**：把所有命理推論轉化為直覺式、生活化的描述。例如：
-   - ❌ "你的財帛宮有天府星坐鎮，化祿入命"
-   - ✅ "你天生有穩健的理財天賦，對金錢有獨到的嗅覺"
-   - ❌ "太陽在第十宮，與木星形成三分相"
-   - ✅ "你在職場上有天然的領導魅力，容易獲得上司賞識"
-   - ❌ "日主為甲木，身旺食傷生財"
-   - ✅ "你的性格像大樹一樣正直向上，創意是你最大的賺錢武器"
-4. **統一輸出格式**：不要分系統段落，而是按主題整合所有分析結果。
+1. 絕對禁止提到任何命理系統名稱：不可出現「紫微斗數」「八字」「四柱」「西洋占星」「星盤」「命盤」「排盤」等詞彙。
+2. 不可提到任何系統專有術語：不可出現「化祿」「化忌」「天干地支」「十神」「宮位」「相位」「行星」「星座」「主星」「命宮」「財帛宮」等。
+3. 用自然語言表達：把所有命理推論轉化為直覺式、生活化的描述。
 
-## 輸出格式
+格式規則（必須嚴格遵守）：
+絕對禁止使用 Markdown 語法。不可出現 #、##、###、**粗體**、*斜體*、- 列表、| 表格 |、代碼塊。
+絕對禁止使用 emoji、表情符號、小圖示。不可出現任何 emoji unicode 字元。
+用 [SECTION] 標記來分段。格式為：每段開頭獨立一行寫 [SECTION] 標題文字，然後換行寫內容。段落之間空行分隔。
+內容用自然的句子和段落書寫，像寫文章一樣，不要用列表或項目符號。
 
-根據用戶關注的方向，用以下結構回覆：
+輸出結構：
 
-### 🌟 你的天賦特質
-（性格核心、天生優勢、潛能方向）
+[SECTION] 你的天賦特質
+（性格核心、天生優勢、潛能方向，用 2-3 段自然文字描述）
 
-### 🔮 [用戶關注的主題] 深度解析
+[SECTION] [用戶關注的主題]深度解析
 （針對用戶選擇的方向，深入分析現況與趨勢）
 
-### 📅 2026 年運勢預測
+[SECTION] 2026 年運勢預測
 （今年整體走向、好的月份、需注意的月份）
 
-### 💡 給你的建議
+[SECTION] 給你的建議
 （具體可行的行動建議，避開的陷阱，把握的機會）
 
-### ⚡ 近期關鍵提醒
+[SECTION] 近期關鍵提醒
 （最近 1-3 個月特別需要注意的事）
 
-## 語氣風格
-- 像一位溫暖睿智的顧問，不是冷冰冰的算命師
-- 正面為主，但風險也要誠實說
-- 具體、有畫面感，避免空泛
-- 不需要加免責聲明（前端已有）`;
+中立原則：
+你只知道用戶的出生資料和關注方向，完全不知道用戶的職業、行業、家庭、收入、教育等背景。絕對不可猜測或假設用戶的具體職業或生活狀況。描述特質和建議要保持通用。
+
+語氣：像一位溫暖睿智的顧問在跟朋友聊天。正面為主但風險誠實說。具體有畫面感，避免空泛。不需要加免責聲明。`;
 
 function buildWizardPrompt(kbEntries, goalObj) {
   let prompt = WIZARD_SYSTEM_PROMPT;
@@ -233,44 +228,36 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const min = parseInt(birthMinute) || 0;
       const kbEntries = loadKB();
 
-      // 排盤 system prompt（內部用，帶系統術語）
-      const internalSP = `你是精通紫微斗數、八字命理、西洋占星的命理分析師。深度分析以下排盤資料，特別關注：${goalPrompt}。要深入、具體。`;
-
-      // 永遠跑三系統
-      const calcMap = {
-        ziwei: { system: "紫微斗數", calc: () => formatChart(calculateChart(y, m, d, h, 0, gender)), engine: "claude" },
-        bazi: { system: "八字", calc: () => formatBazi(calculateBazi(y, m, d, h, gender)), engine: "claude" },
-        astro: { system: "西洋占星", calc: () => formatAstro(calculateAstro(y, m, d, h, min, 24.9936, 121.3130)), engine: "manus" },
-      };
-
+      // Step 1: 本地排盤（瞬間完成，不需 API）
       setLoadingMsg("正在解讀你的命運密碼...");
-      await new Promise(r => setTimeout(r, 1500));
+      const ziweiChart = formatChart(calculateChart(y, m, d, h, 0, gender));
+      const baziChart = formatBazi(calculateBazi(y, m, d, h, gender));
+      const astroChart = formatAstro(calculateAstro(y, m, d, h, min, 24.9936, 121.3130));
 
-      const charts = Object.entries(calcMap).map(([id, c]) => ({
-        system: c.system, text: c.calc(), engine: c.engine,
-      }));
+      // 保存排盤資料供合盤用
+      setRawResults([
+        { system: "紫微斗數", text: ziweiChart, result: "" },
+        { system: "八字", text: baziChart, result: "" },
+        { system: "西洋占星", text: astroChart, result: "" },
+      ]);
 
-      // 並行分析三系統（內部）
+      // Step 2: 一次 API call — 直接送三套排盤 + 統一輸出
       setLoadingMsg("深度分析你的個人能量...");
-      const analyzePromises = charts.map(c =>
-        autoAnalyze(c.system, c.text, internalSP, c.engine).then(r => ({
-          system: c.system, result: r, text: c.text,
-        }))
-      );
-      const results = await Promise.all(analyzePromises);
-      setRawResults(results);
-
-      // 最終整合：用 WIZARD prompt 要求 AI 統一輸出、隱藏系統名稱
-      setLoadingMsg("描繪你的命運藍圖...");
       const wizardSP = buildWizardPrompt(kbEntries, goal);
-      const mergedInput = results
-        .filter(r => r.result)
-        .map(r => `【${r.system}排盤資料】\n${r.text}\n\n【${r.system}分析結果】\n${r.result}`)
-        .join("\n\n===\n\n");
+      const oneCallPrompt = `以下是一位用戶的三套命理排盤資料（內部資料，不可對外揭露來源系統）：
 
-      const finalPrompt = `以下是針對一位用戶的多維度命理分析結果（內部資料，不可對外揭露來源）：
+【紫微斗數排盤】
+${ziweiChart}
 
-${mergedInput}
+===
+
+【八字排盤】
+${baziChart}
+
+===
+
+【西洋占星排盤】
+${astroChart}
 
 ## 用戶資料
 - 性別：${gender}
@@ -279,19 +266,23 @@ ${mergedInput}
 - 關注方向：${goal}
 
 ## 任務
-請將以上所有分析結果整合成一份統一的命理報告。
+請綜合以上三套排盤資料，直接產出一份統一的命理報告。
+你需要自己解讀排盤資料、找出格局和重點，然後整合成報告。
 ⚠️ 嚴格遵守系統規則：不提任何命理系統名稱和專有術語，用自然語言表達所有洞見。
 ⚠️ 按照指定的輸出格式（天賦特質 → 主題深度解析 → 年運勢 → 建議 → 近期提醒）組織內容。
-⚠️ 重點針對用戶關注的「${goal}」方向深入分析。`;
+⚠️ 重點針對用戶關注的「${goal}」方向深入分析。
+⚠️ 三套排盤的結論要交叉驗證，共鳴點重點強調，矛盾處以多數為準。
+⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt: finalPrompt }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt }),
       });
-      if (!submitRes.ok) throw new Error("整合分析失敗");
+      if (!submitRes.ok) throw new Error("分析失敗");
       const { job_id } = await submitRes.json();
 
+      setLoadingMsg("描繪你的命運藍圖...");
       for (let i = 0; i < 300; i++) {
         await new Promise(r => setTimeout(r, 3000));
         try {
@@ -450,26 +441,101 @@ ${partnerCharts}
     }
   };
 
+  // ---- RESULT RENDERER ----
+  const renderFormattedResult = (text) => {
+    if (!text) return null;
+
+    // Aggressively clean markdown and emoji
+    let cleaned = text
+      .replace(/^#{1,6}\s*/gm, '')           // # headers
+      .replace(/\*\*([^*]+)\*\*/g, '$1')     // **bold** → text
+      .replace(/\*([^*]+)\*/g, '$1')         // *italic* → text
+      .replace(/__([^_]+)__/g, '$1')         // __bold__
+      .replace(/_([^_]+)_/g, '$1')           // _italic_
+      .replace(/```[\s\S]*?```/g, '')        // code blocks
+      .replace(/`([^`]+)`/g, '$1')           // inline code
+      .replace(/^\|.*\|$/gm, '')             // table rows
+      .replace(/^[-|:]+$/gm, '')             // table separators
+      .replace(/^>\s*/gm, '')                // blockquotes
+      .replace(/^[-*+]\s+/gm, '')            // list bullets
+      .replace(/^\d+\.\s+/gm, '')            // numbered lists
+      // Remove all emoji/emoticons
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{2702}-\u{27B0}\u{200D}\u{20E3}\u{FE0F}\u{E0020}-\u{E007F}✦✧★☆♠♣♥♦⚡❌✅✓✔❤️‍♀️♂️☀️☁️⭐️❄️☯️⚠️]/gu, '')
+      .replace(/\n{3,}/g, '\n\n')            // collapse multiple blank lines
+      .trim();
+
+    // Split by [SECTION] markers
+    const parts = cleaned.split(/\[SECTION\]\s*/i);
+    const sections = [];
+
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+
+      // First line is the title, rest is body
+      const lines = trimmed.split('\n');
+      const title = lines[0].trim();
+      const body = lines.slice(1).join('\n').trim();
+
+      if (body) {
+        sections.push({ title, body });
+      } else if (sections.length === 0) {
+        // Intro text before any section
+        sections.push({ title: "", body: title });
+      } else {
+        // Title with no body — append to previous or create with title as body
+        sections.push({ title, body: "" });
+      }
+    }
+
+    // Fallback: if no [SECTION] tags found, try splitting by blank-line-separated paragraphs with a leading title-like line
+    if (sections.length <= 1 && cleaned.length > 200) {
+      const blocks = cleaned.split(/\n\n+/);
+      if (blocks.length >= 3) {
+        return blocks.map((block, i) => (
+          <div key={i} className="wizard-section">
+            <div className="wizard-section-body">{block.trim()}</div>
+          </div>
+        ));
+      }
+    }
+
+    if (sections.length === 0) {
+      return <div className="wizard-section"><div className="wizard-section-body">{cleaned}</div></div>;
+    }
+
+    return sections.map((sec, i) => (
+      <div key={i} className="wizard-section">
+        {sec.title && (
+          <div className="wizard-section-header">
+            <span className="wizard-section-title">{sec.title}</span>
+          </div>
+        )}
+        {sec.body && <div className="wizard-section-body">{sec.body}</div>}
+      </div>
+    ));
+  };
+
   // ---- RENDER STEPS ----
 
   // Step 0: Welcome + gender
   const renderWelcome = () => (
     <div className="wizard-welcome">
-      <div className="wizard-welcome-icon">✦</div>
+      <div className="wizard-welcome-icon wizard-diamond"></div>
       <h1>命理三鏡</h1>
       <p className="tagline">探索你的命運密碼</p>
       <div className="wizard-badges">
-        <div className="wizard-badge"><span className="wizard-badge-icon">🔒</span> 隱私保護</div>
-        <div className="wizard-badge"><span className="wizard-badge-icon">✓</span> 專業深度解讀</div>
+        <div className="wizard-badge"><span className="wizard-badge-icon">&#x1F512;</span> 隱私保護</div>
+        <div className="wizard-badge"><span className="wizard-badge-icon">&#10003;</span> 專業深度解讀</div>
       </div>
       <div className="wizard-question">我是...</div>
       <div className="wizard-gender-cards">
         <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); setTimeout(() => setStep(1), 300); }}>
-          <div className="wizard-gender-icon">👨</div>
+          <div className="wizard-gender-icon">M</div>
           <div className="wizard-gender-label"><span>男生</span><span>›</span></div>
         </div>
         <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); setTimeout(() => setStep(1), 300); }}>
-          <div className="wizard-gender-icon">👩</div>
+          <div className="wizard-gender-icon">F</div>
           <div className="wizard-gender-label"><span>女生</span><span>›</span></div>
         </div>
       </div>
@@ -631,7 +697,7 @@ ${partnerCharts}
           <div className="wizard-loading-ring" />
           <div className="wizard-loading-ring" />
           <div className="wizard-loading-ring" />
-          <div className="wizard-loading-star">✦</div>
+          <div className="wizard-loading-star wizard-diamond"></div>
         </div>
         <div className="wizard-loading-text">{loadingMsg}</div>
         <div className="wizard-loading-step">請稍候，正在為你深度解讀...</div>
@@ -654,16 +720,16 @@ ${partnerCharts}
     return (
       <div className="wizard-content">
         <div className="wizard-result">
-          <div className="wizard-question" style={{ marginBottom: 24 }}>✦ 你的命運解讀報告</div>
-          <div className="wizard-result-card">
-            <div className="wizard-result-text">{finalResult}</div>
+          <div className="wizard-question" style={{ marginBottom: 24 }}>你的命運解讀報告</div>
+          <div className="wizard-result-sections">
+            {renderFormattedResult(finalResult)}
           </div>
 
           {/* ===== 合盤引導區塊 ===== */}
           {!hebanResult && !hebanAnalyzing && (
             <div className="wizard-heban-promo">
               <div className="wizard-heban-promo-header">
-                <span className="wizard-heban-promo-icon">✦</span>
+                <span className="wizard-heban-promo-icon wizard-diamond"></span>
                 <div>
                   <div className="wizard-heban-promo-title">想了解你和他/她的關係嗎？</div>
                   <div className="wizard-heban-promo-desc">提供對方的出生資料，解讀兩人之間的緣分與互動模式</div>
@@ -691,9 +757,9 @@ ${partnerCharts}
                   <div className="wizard-heban-label">對方性別</div>
                   <div className="wizard-heban-relations">
                     <button className={`wizard-heban-rel-btn ${hebanGender === "男" ? "selected" : ""}`}
-                      onClick={() => setHebanGender("男")}>👨 男生</button>
+                      onClick={() => setHebanGender("男")}>男生</button>
                     <button className={`wizard-heban-rel-btn ${hebanGender === "女" ? "selected" : ""}`}
-                      onClick={() => setHebanGender("女")}>👩 女生</button>
+                      onClick={() => setHebanGender("女")}>女生</button>
                   </div>
 
                   {/* Name (optional) */}
@@ -760,7 +826,7 @@ ${partnerCharts}
                 <div className="wizard-loading-ring" />
                 <div className="wizard-loading-ring" />
                 <div className="wizard-loading-ring" />
-                <div className="wizard-loading-star" style={{ fontSize: 20, inset: 24 }}>✦</div>
+                <div className="wizard-loading-star wizard-diamond" style={{ fontSize: 20, inset: 24 }}></div>
               </div>
               <div className="wizard-loading-text">{loadingMsg}</div>
             </div>
@@ -770,10 +836,10 @@ ${partnerCharts}
           {hebanResult && (
             <div className="wizard-heban-result">
               <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>
-                ✦ 你與{hebanName || "對方"}的關係解讀
+                你與{hebanName || "對方"}的關係解讀
               </div>
-              <div className="wizard-result-card">
-                <div className="wizard-result-text">{hebanResult}</div>
+              <div className="wizard-result-sections">
+                {renderFormattedResult(hebanResult)}
               </div>
             </div>
           )}
@@ -862,7 +928,7 @@ ${partnerCharts}
         : stepRenderers[step] ? stepRenderers[step]()
         : renderLoading()}
 
-      <div className="wizard-footer">僅供參考娛樂 · 命理三鏡</div>
+      <div className="wizard-footer">僅供參考 · 命理三鏡</div>
     </div>
   );
 }
