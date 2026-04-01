@@ -623,6 +623,9 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [feedbackList, setFeedbackList] = useState([]);
   const [activityList, setActivityList] = useState([]);
   const [activityFilter, setActivityFilter] = useState("");
+  const [adminSelectedUser, setAdminSelectedUser] = useState(null); // 點選的用戶
+  const [adminSearch, setAdminSearch] = useState(""); // 搜尋關鍵字
+  const [adminUserSaves, setAdminUserSaves] = useState([]); // 選中用戶的存檔
   const chatEndRef = useRef(null);
 
   const loadActivity = async (userFilter) => {
@@ -632,6 +635,16 @@ function MainApp({ auth, isAdmin, onLogout }) {
       const data = await res.json();
       setActivityList(data || []);
     } catch { setActivityList([]); }
+  };
+
+  const loadAdminUserDetail = async (username) => {
+    setAdminSelectedUser(username);
+    loadActivity(username);
+    try {
+      const res = await fetch(`${API_BACKEND}-save?user=${encodeURIComponent(username)}`);
+      const data = await res.json();
+      setAdminUserSaves(data || []);
+    } catch { setAdminUserSaves([]); }
   };
 
   const saveReading = async (personName) => {
@@ -1042,21 +1055,8 @@ ${question || "請分析兩人的整體緣分和互動模式"}
             </button>
           )}
           {isAdmin && (
-            <button className={`nav-tab ${tab === "users" ? "active" : ""}`} onClick={() => { setTab("users"); loadUsersList(); }}>
-              <span className="tab-icon">⟐</span> 用戶
-            </button>
-          )}
-          {isAdmin && (
-            <button className={`nav-tab ${tab === "feedback" ? "active" : ""}`} onClick={() => {
-              setTab("feedback");
-              fetch(`${API_BACKEND}-feedback`).then(r => r.json()).then(d => setFeedbackList(d)).catch(() => {});
-            }}>
-              <span className="tab-icon">⟐</span> 反饋
-            </button>
-          )}
-          {isAdmin && (
-            <button className={`nav-tab ${tab === "activity" ? "active" : ""}`} onClick={() => { setTab("activity"); loadActivity(); }}>
-              <span className="tab-icon">⟐</span> 活動
+            <button className={`nav-tab ${tab === "admin" ? "active" : ""}`} onClick={() => { setTab("admin"); loadUsersList(); loadActivity(); fetch(`${API_BACKEND}-feedback`).then(r => r.json()).then(d => setFeedbackList(d)).catch(() => {}); }}>
+              <span className="tab-icon">⟐</span> 管理
             </button>
           )}
           <button className="nav-tab logout-tab" onClick={() => { if (confirm("確定登出？")) onLogout(); }}>
@@ -1734,110 +1734,164 @@ ${question || "請分析兩人的整體緣分和互動模式"}
           </div>
         )}
 
-        {/* ===== Users Tab (admin) ===== */}
-        {tab === "users" && isAdmin && (
+        {/* ===== Admin Tab (unified) ===== */}
+        {tab === "admin" && isAdmin && (
           <div className="saves-section">
-            <div className="setting-card">
-              <div className="setting-title">用戶管理</div>
+            {/* 搜尋列 */}
+            <div className="admin-search-bar">
+              <input type="text" placeholder="搜尋用戶、活動、聊天內容..." value={adminSearch}
+                onChange={e => setAdminSearch(e.target.value)} />
             </div>
-            <div className="save-list">
-              {Object.entries(usersList).map(([uname, u]) => (
-                <div key={uname} className="save-card user-card">
-                  <div className="save-card-title">
-                    {u.name || uname}
-                    <span className={`role-badge ${u.role}`}>{u.role === "admin" ? "管理員" : "用戶"}</span>
-                  </div>
-                  <div className="save-card-time">帳號：{uname}</div>
-                  {uname !== "admin" && (
-                    <div className="user-actions">
-                      <button onClick={async () => {
-                        await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "set_role", username: uname, role: u.role === "admin" ? "user" : "admin" }),
-                        });
-                        loadUsersList();
-                      }}>{u.role === "admin" ? "降為用戶" : "升為管理員"}</button>
-                      <button onClick={async () => {
-                        await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "reset_password", username: uname, password: "123456" }),
-                        });
-                        alert(`已重設 ${uname} 密碼為 123456`);
-                      }}>重設密碼</button>
-                      <button className="danger" onClick={async () => {
-                        if (!confirm(`確定刪除 ${uname}？`)) return;
-                        await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
-                          method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "delete", username: uname }),
-                        });
-                        loadUsersList();
-                      }}>刪除</button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* ===== Feedback Tab (admin) ===== */}
-        {tab === "feedback" && isAdmin && (
-          <div className="saves-section">
-            <div className="setting-card">
-              <div className="setting-title">用戶反饋（{feedbackList.length} 筆）</div>
-            </div>
-            {feedbackList.length > 0 ? (
-              <div className="save-list">
-                {feedbackList.map((f, i) => (
-                  <div key={i} className="save-card feedback-card">
-                    <div className="save-card-title">
-                      👤 {f.user || "匿名"} — {f.context || ""}
+            {/* 反饋提示 */}
+            {feedbackList.length > 0 && !adminSelectedUser && (
+              <div className="admin-feedback-banner" onClick={() => setAdminSearch("__feedback__")}>
+                {feedbackList.length} 筆用戶反饋待處理
+              </div>
+            )}
+
+            {/* 反饋列表 */}
+            {adminSearch === "__feedback__" && (
+              <>
+                <div className="admin-section-title">
+                  用戶反饋
+                  <button className="admin-back" onClick={() => setAdminSearch("")}>返回</button>
+                </div>
+                <div className="save-list">
+                  {feedbackList.map((f, i) => (
+                    <div key={i} className="save-card feedback-card">
+                      <div className="save-card-title">{f.user || "匿名"} — {f.context || ""}</div>
+                      <div className="save-card-time">{f.time ? new Date(f.time).toLocaleString("zh-TW") : ""}</div>
+                      <div className="feedback-issue">{f.issue}</div>
+                      {f.result_preview && (
+                        <details>
+                          <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>查看分析摘要</summary>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{f.result_preview}</div>
+                        </details>
+                      )}
                     </div>
-                    <div className="save-card-time">{f.time ? new Date(f.time).toLocaleString("zh-TW") : ""}</div>
-                    <div className="feedback-issue">{f.issue}</div>
-                    {f.result_preview && (
-                      <details>
-                        <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>查看分析摘要</summary>
-                        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{f.result_preview}</div>
-                      </details>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* 用戶詳情頁 */}
+            {adminSelectedUser && adminSearch !== "__feedback__" && (
+              <>
+                <div className="admin-section-title">
+                  {adminSelectedUser} 的記錄
+                  <button className="admin-back" onClick={() => { setAdminSelectedUser(null); setActivityList([]); setAdminUserSaves([]); }}>返回用戶列表</button>
+                </div>
+
+                {/* 存檔 */}
+                {adminUserSaves.length > 0 && (
+                  <>
+                    <div className="admin-sub-title">命盤存檔（{adminUserSaves.length} 筆）</div>
+                    <div className="save-list">
+                      {adminUserSaves.filter(s => {
+                        if (!adminSearch) return true;
+                        const text = JSON.stringify(s).toLowerCase();
+                        return text.includes(adminSearch.toLowerCase());
+                      }).map((s, i) => (
+                        <details key={i} className="save-card">
+                          <summary>
+                            <span className="save-card-title">{s.person || "未命名"}</span>
+                            <span className="save-card-time" style={{ marginLeft: 8 }}>
+                              {s.systems?.filter(x => !x.includes("命盤分析")).join(" + ") || "命盤"} · {new Date(s.time).toLocaleString("zh-TW")}
+                            </span>
+                          </summary>
+                          <div className="admin-save-detail">
+                            {s.birthData && (
+                              <div className="admin-birth-info">
+                                出生：{s.birthData.year}/{s.birthData.month}/{s.birthData.day} {s.birthData.hour}:{s.birthData.minute || "00"} {s.birthData.gender} · {s.birthData.birthPlace || ""}
+                              </div>
+                            )}
+                            {s.chat && s.chat.length > 0 && (
+                              <div className="admin-chat-log">
+                                <div className="admin-sub-title">對話記錄（{s.chat.length} 則）</div>
+                                {s.chat.filter(m => {
+                                  if (!adminSearch) return true;
+                                  return m.text?.toLowerCase().includes(adminSearch.toLowerCase());
+                                }).map((m, j) => (
+                                  <div key={j} className={`admin-chat-msg ${m.role}`}>
+                                    <span className="admin-chat-role">{m.role === "user" ? "用戶" : "AI"}</span>
+                                    <span className="admin-chat-text">{m.text?.slice(0, 300)}{m.text?.length > 300 ? "..." : ""}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* 活動 */}
+                {activityList.length > 0 && (
+                  <>
+                    <div className="admin-sub-title" style={{ marginTop: 16 }}>活動記錄（{activityList.length} 筆）</div>
+                    <div className="activity-list">
+                      {activityList.filter(a => {
+                        if (!adminSearch) return true;
+                        return (a.action + a.detail).toLowerCase().includes(adminSearch.toLowerCase());
+                      }).map((a, i) => (
+                        <div key={i} className="activity-item">
+                          <div className="activity-time">{a.time ? new Date(a.time).toLocaleString("zh-TW") : ""}</div>
+                          <div className="activity-main">
+                            <span className="activity-action">{a.action}</span>
+                          </div>
+                          {a.detail && <div className="activity-detail">{a.detail}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* 用戶列表 */}
+            {!adminSelectedUser && adminSearch !== "__feedback__" && (
+              <div className="save-list">
+                {Object.entries(usersList).filter(([uname, u]) => {
+                  if (!adminSearch) return true;
+                  return (uname + (u.name || "")).toLowerCase().includes(adminSearch.toLowerCase());
+                }).map(([uname, u]) => (
+                  <div key={uname} className="save-card user-card" onClick={() => loadAdminUserDetail(uname)} style={{ cursor: "pointer" }}>
+                    <div className="save-card-title">
+                      {u.name || uname}
+                      <span className={`role-badge ${u.role}`}>{u.role === "admin" ? "管理員" : "用戶"}</span>
+                    </div>
+                    <div className="save-card-time">帳號：{uname}</div>
+                    {uname !== "admin" && (
+                      <div className="user-actions" onClick={e => e.stopPropagation()}>
+                        <button onClick={async () => {
+                          await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "set_role", username: uname, role: u.role === "admin" ? "user" : "admin" }),
+                          });
+                          loadUsersList();
+                        }}>{u.role === "admin" ? "降為用戶" : "升為管理員"}</button>
+                        <button onClick={async () => {
+                          await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "reset_password", username: uname, password: "123456" }),
+                          });
+                          alert(`已重設 ${uname} 密碼為 123456`);
+                        }}>重設密碼</button>
+                        <button className="danger" onClick={async () => {
+                          if (!confirm(`確定刪除 ${uname}？`)) return;
+                          await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "delete", username: uname }),
+                          });
+                          loadUsersList();
+                        }}>刪除</button>
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="save-empty">尚無反饋</div>
-            )}
-          </div>
-        )}
-        {/* ===== Activity Tab (admin) ===== */}
-        {tab === "activity" && isAdmin && (
-          <div className="saves-section">
-            <div className="setting-card">
-              <div className="setting-title">活動記錄</div>
-              <div className="activity-filter">
-                <input type="text" placeholder="篩選用戶..." value={activityFilter}
-                  onChange={e => setActivityFilter(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") loadActivity(activityFilter); }}
-                />
-                <button onClick={() => loadActivity(activityFilter)}>篩選</button>
-                <button onClick={() => { setActivityFilter(""); loadActivity(); }}>全部</button>
-              </div>
-            </div>
-            {activityList.length > 0 ? (
-              <div className="activity-list">
-                {activityList.map((a, i) => (
-                  <div key={i} className="activity-item">
-                    <div className="activity-time">{a.time ? new Date(a.time).toLocaleString("zh-TW") : ""}</div>
-                    <div className="activity-main">
-                      <span className="activity-user">{a.user}</span>
-                      <span className={`activity-action action-${a.action?.replace(/[^a-z]/gi, "") || "other"}`}>{a.action}</span>
-                    </div>
-                    {a.detail && <div className="activity-detail">{a.detail}</div>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="save-empty">尚無活動記錄</div>
             )}
           </div>
         )}

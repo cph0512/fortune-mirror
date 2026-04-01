@@ -1697,6 +1697,124 @@ button:active:not(:disabled) {
   background: rgba(180, 130, 255, 0.15);
 }
 
+/* ===== Admin Panel ===== */
+.admin-search-bar {
+  margin-bottom: 12px;
+}
+
+.admin-search-bar input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.admin-search-bar input:focus {
+  border-color: var(--teal);
+}
+
+.admin-feedback-banner {
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #ff9f43;
+  background: rgba(255, 159, 67, 0.08);
+  border: 1px solid rgba(255, 159, 67, 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-feedback-banner:hover {
+  background: rgba(255, 159, 67, 0.15);
+}
+
+.admin-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.admin-back {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.admin-back:hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.admin-sub-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 8px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-save-detail {
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.admin-birth-info {
+  font-size: 12px;
+  color: var(--teal);
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: rgba(76, 201, 176, 0.08);
+  border-radius: 6px;
+}
+
+.admin-chat-log {
+  margin-top: 8px;
+}
+
+.admin-chat-msg {
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-chat-msg.user {
+  background: rgba(76, 201, 176, 0.06);
+}
+
+.admin-chat-msg.assistant {
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.admin-chat-role {
+  font-weight: 600;
+  margin-right: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.admin-chat-text {
+  color: var(--text);
+  word-break: break-all;
+}
+
 /* ===== Activity Log ===== */
 .activity-filter {
   display: flex;
