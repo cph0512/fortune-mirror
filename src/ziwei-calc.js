@@ -334,4 +334,89 @@ export function formatChart(chart) {
   return text;
 }
 
+/**
+ * 無出生時間時，用天干推算宮位影響（不依賴時辰）
+ * 年干四化、生年天干飛化入十二宮 — 這些不受出生時辰影響
+ */
+export function formatChartByTianGan(solarYear, solarMonth, solarDay, gender) {
+  // 用 lunar-javascript 取得年干支（不需要時辰）
+  // 先用 iztro 起一個參考盤（子時），只取天干相關資料
+  const dateStr = `${solarYear}-${solarMonth}-${solarDay}`;
+  const refChart = astro.bySolar(dateStr, 0, gender === '男' ? '男' : '女');
+
+  const chineseDate = refChart.chineseDate || '';
+  const parts = chineseDate.split(' ');
+  const yearGanZhi = parts[0] || '';
+  const yearGan = yearGanZhi ? yearGanZhi[0] : '';
+
+  // 天干四化表
+  const SI_HUA_TABLE = {
+    "甲":["廉貞化祿","破軍化權","武曲化科","太陽化忌"],
+    "乙":["天機化祿","天梁化權","紫微化科","太陰化忌"],
+    "丙":["天同化祿","天機化權","文昌化科","廉貞化忌"],
+    "丁":["太陰化祿","天同化權","天機化科","巨門化忌"],
+    "戊":["貪狼化祿","太陰化權","右弼化科","天機化忌"],
+    "己":["武曲化祿","貪狼化權","天梁化科","文曲化忌"],
+    "庚":["太陽化祿","武曲化權","天同化科","天相化忌"],
+    "辛":["巨門化祿","太陽化權","文曲化科","文昌化忌"],
+    "壬":["天梁化祿","紫微化權","左輔化科","武曲化忌"],
+    "癸":["破軍化祿","巨門化權","太陰化科","貪狼化忌"],
+  };
+
+  const yearSiHua = SI_HUA_TABLE[toTC(yearGan)] || [];
+
+  // 農曆日期
+  const lunarDate = refChart.lunarDate || '';
+
+  // 遍歷十二宮，收集主星分佈（主星位置不隨時辰改變的有：紫微系和天府系星曜位置由農曆日決定）
+  // 但命宮位置受時辰影響，所以我們只列出星曜在哪個地支宮
+  const starMap = {};
+  for (const p of refChart.palaces) {
+    const zhi = toTC(p.earthlyBranch);
+    const gan = toTC(p.heavenlyStem);
+    const stars = [];
+    for (const s of (p.majorStars || [])) {
+      stars.push(toTC(s.name));
+    }
+    starMap[zhi] = { gan, stars };
+  }
+
+  let text = `## 紫微斗數天干分析（無出生時間）\n\n`;
+  text += `### 基本資料\n`;
+  text += `- 陽曆：${solarYear}年${solarMonth}月${solarDay}日\n`;
+  text += `- 農曆：農曆${lunarDate}\n`;
+  text += `- 年柱：${yearGanZhi}年\n`;
+  text += `- 性別：${gender}\n`;
+  text += `- 出生時間：未知\n\n`;
+
+  text += `### 生年四化（年干「${toTC(yearGan)}」）\n`;
+  text += `⚠️ 以下四化不受出生時辰影響，是此人命格的核心能量：\n`;
+  yearSiHua.forEach(h => { text += `- ${h}\n`; });
+
+  text += `\n### 十二宮主星分佈\n`;
+  text += `⚠️ 注意：因無出生時間，命宮位置不確定，以下僅列出主星在各地支宮的分佈，供交叉比對用。\n`;
+  text += `| 地支 | 宮干 | 主星 |\n`;
+  text += `|------|------|------|\n`;
+  for (const zhi of DI_ZHI) {
+    const info = starMap[zhi];
+    if (info) {
+      text += `| ${zhi} | ${info.gan} | ${info.stars.join("、") || "-"} |\n`;
+    }
+  }
+
+  text += `\n### 天干飛化對照\n`;
+  text += `⚠️ 用生年天干看此人的四化星落入哪些宮位的主星，可推斷此人的天賦能量方向：\n`;
+  for (const zhi of DI_ZHI) {
+    const info = starMap[zhi];
+    if (!info) continue;
+    const gan = info.gan;
+    const ganHua = SI_HUA_TABLE[toTC(gan)];
+    if (ganHua) {
+      text += `- ${zhi}宮（宮干${gan}）→ ${ganHua.join("、")}\n`;
+    }
+  }
+
+  return text;
+}
+
 export { SHI_CHEN_RANGE, DI_ZHI, TIAN_GAN };
