@@ -637,14 +637,21 @@ function MainApp({ auth, isAdmin, onLogout }) {
     } catch { setActivityList([]); }
   };
 
+  const [adminUserHistory, setAdminUserHistory] = useState([]); // API 分析記錄
+
   const loadAdminUserDetail = async (username) => {
     setAdminSelectedUser(username);
     loadActivity(username);
+    // 載入存檔
     try {
       const res = await fetch(`${API_BACKEND}-save?user=${encodeURIComponent(username)}`);
-      const data = await res.json();
-      setAdminUserSaves(data || []);
+      setAdminUserSaves(await res.json() || []);
     } catch { setAdminUserSaves([]); }
+    // 載入 API 分析記錄
+    try {
+      const res = await fetch(`${API_BACKEND}-history?user=${encodeURIComponent(username)}`);
+      setAdminUserHistory(await res.json() || []);
+    } catch { setAdminUserHistory([]); }
   };
 
   const saveReading = async (personName) => {
@@ -709,7 +716,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: "你是命理分析師，根據命盤分析結果回答追問。必須使用繁體中文（台灣用語），嚴禁簡體字，嚴禁 emoji。簡潔專業。", prompt: context }),
+        body: JSON.stringify({ images: [], system: "你是命理分析師，根據命盤分析結果回答追問。必須使用繁體中文（台灣用語），嚴禁簡體字，嚴禁 emoji。簡潔專業。", prompt: context, user: auth.username }),
       });
       if (!submitRes.ok) throw new Error(`提交失敗 ${submitRes.status}`);
       const { job_id } = await submitRes.json();
@@ -790,6 +797,7 @@ ${chartText}
           system: systemPrompt,
           prompt,
           engine,
+          user: auth.username,
         }),
       });
       if (!submitRes.ok) return null;
@@ -843,7 +851,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: "你是命理合盤分析專家，精通紫微斗數飛化合盤。必須使用繁體中文（台灣用語），嚴禁簡體字，嚴禁 emoji。簡潔專業。", prompt }),
+        body: JSON.stringify({ images: [], system: "你是命理合盤分析專家，精通紫微斗數飛化合盤。必須使用繁體中文（台灣用語），嚴禁簡體字，嚴禁 emoji。簡潔專業。", prompt, user: auth.username }),
       });
       if (!submitRes.ok) throw new Error(`提交失敗 ${submitRes.status}`);
       const { job_id } = await submitRes.json();
@@ -977,6 +985,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
             images: [{ data: img.data, media_type: img.type }],
             system: systemPrompt,
             prompt: extraPrompt,
+            user: auth.username,
           }),
         });
         if (!submitRes.ok) throw new Error(`提交失敗 ${submitRes.status}`);
@@ -1375,6 +1384,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                           images: [],
                           system: buildSystemPrompt(kbEntries),
                           prompt: `⚠️ 以下排盤資料已經過確認，是正確的。不要重新排盤，不要修改任何宮位或星曜。直接基於此資料分析。\n\n${lastResult.result}\n\n請根據以上【已確認的排盤資料】進行完整詳細分析：\n1. 格局分析（命格、主星特質）\n2. 各宮位詳解（重點宮位深入分析）\n3. 四化影響\n4. 今年流年運勢（2026丙午年）——若有紫微命盤，必須用流年斗君定位排月，不可用占星方法替代\n5. 大限走勢\n6. 綜合建議\n\n要深入、專業、具體，不要泛泛而談。\n⚠️ 嚴格只用該系統的術語，不要混入其他命理系統概念。\n⚠️ 禁止使用任何 emoji 或插圖符號，純文字輸出。必須使用繁體中文，嚴禁簡體字。`,
+                          user: auth.username,
                         }),
                       });
                       const { job_id } = await submitRes.json();
@@ -1635,6 +1645,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                             images: [],
                             system: "你是命理交叉分析專家。必須使用繁體中文（台灣用語），嚴禁簡體字，嚴禁 emoji。",
                             prompt: `以下是同一個人的多個命盤分析結果，請進行交叉比對，找出共鳴點和矛盾點，給出綜合結論。\n\n${allText}`,
+                            user: auth.username,
                           }),
                         });
                         const { job_id } = await submitRes.json();
@@ -1820,6 +1831,31 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                                 ))}
                               </div>
                             )}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* API 分析記錄 */}
+                {adminUserHistory.length > 0 && (
+                  <>
+                    <div className="admin-sub-title" style={{ marginTop: 16 }}>API 分析記錄（{adminUserHistory.length} 筆）</div>
+                    <div className="save-list">
+                      {adminUserHistory.filter(h => {
+                        if (!adminSearch) return true;
+                        return (h.prompt + h.result_preview).toLowerCase().includes(adminSearch.toLowerCase());
+                      }).map((h, i) => (
+                        <details key={i} className="save-card">
+                          <summary>
+                            <span className="activity-time">{new Date(h.time).toLocaleString("zh-TW")}</span>
+                            <span className="activity-action" style={{ marginLeft: 8 }}>{h.systems?.join("+") || "auto"}</span>
+                            <span style={{ fontSize: 11, color: "var(--text-faint)", marginLeft: 8 }}>{h.images > 0 ? `${h.images} 張圖` : "文字"} · {h.result_length} 字</span>
+                          </summary>
+                          <div className="admin-save-detail">
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Prompt: {h.prompt}</div>
+                            <div style={{ fontSize: 12, color: "var(--text)" }}>{h.result_preview}...</div>
                           </div>
                         </details>
                       ))}
