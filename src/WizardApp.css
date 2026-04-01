@@ -914,6 +914,93 @@
   color: rgba(255,255,255,0.6);
 }
 
+/* ===== 合盤 Heban Section ===== */
+
+.wizard-heban-promo {
+  background: linear-gradient(135deg, rgba(120,100,220,0.1), rgba(200,100,180,0.08));
+  border: 1.5px solid rgba(160,140,255,0.2);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 24px 0;
+}
+
+.wizard-heban-promo-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.wizard-heban-promo-icon {
+  font-size: 28px;
+  color: #c084fc;
+  flex-shrink: 0;
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.wizard-heban-promo-title {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.wizard-heban-promo-desc {
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.5;
+}
+
+.wizard-heban-form {
+  margin-top: 20px;
+}
+
+.wizard-heban-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: 8px;
+  margin-top: 16px;
+}
+
+.wizard-heban-label:first-child {
+  margin-top: 0;
+}
+
+.wizard-heban-relations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.wizard-heban-rel-btn {
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.wizard-heban-rel-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(160,140,255,0.3);
+}
+
+.wizard-heban-rel-btn.selected {
+  background: rgba(120,100,220,0.15);
+  border-color: rgba(160,140,255,0.6);
+  color: #fff;
+}
+
+.wizard-heban-result {
+  margin: 24px 0;
+  animation: wizardFadeIn 0.5s ease;
+}
+
 /* Mobile responsive */
 @media (max-width: 600px) {
   .wizard-gender-cards {
