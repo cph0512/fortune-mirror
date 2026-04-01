@@ -543,7 +543,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [addingChart, setAddingChart] = useState(false);
-  const [inputMode, setInputMode] = useState("upload"); // "upload" | "auto"
+  const [inputMode, setInputMode] = useState("auto"); // "auto" | "upload"
   const [birthData, setBirthData] = useState(() => {
     try { return JSON.parse(localStorage.getItem("fortune-birth-data")) || { year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 }; }
     catch { return { year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 }; }
