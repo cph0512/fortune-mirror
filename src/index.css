@@ -7,23 +7,24 @@
 }
 
 :root {
-  --bg: #08080f;
-  --surface: #0e0e1a;
-  --surface2: #12121f;
-  --surface3: #1a1a2e;
-  --border: rgba(201, 168, 76, 0.12);
-  --border-hover: rgba(201, 168, 76, 0.3);
-  --border-active: rgba(201, 168, 76, 0.5);
-  --gold: #c9a84c;
-  --gold-light: #e8d48b;
-  --gold-dark: #8a7333;
-  --text: #e8e6f0;
-  --text-dim: #9896a8;
-  --text-muted: #6b6980;
-  --text-faint: #4a4860;
-  --teal: #2dd4bf;
-  --red: #f87171;
-  --purple: #6b5ce7;
+  /* 觀星台 Observatory Theme — 沉穩溫潤 */
+  --bg: #111827;
+  --surface: rgba(22, 30, 48, 0.9);
+  --surface2: rgba(28, 37, 58, 0.8);
+  --surface3: rgba(35, 45, 65, 0.7);
+  --border: rgba(148, 133, 105, 0.15);
+  --border-hover: rgba(148, 133, 105, 0.3);
+  --border-active: rgba(196, 175, 130, 0.4);
+  --gold: #c4af82;
+  --gold-light: #ddd0a8;
+  --gold-dark: #8a7c5a;
+  --text: #d6d0c4;
+  --text-dim: #a09888;
+  --text-muted: #706860;
+  --text-faint: #4d463e;
+  --teal: #7a9e8e;
+  --red: #c97070;
+  --purple: #8e7eaa;
   --font-serif: 'Noto Serif TC', serif;
   --font-sans: 'Noto Sans TC', sans-serif;
 }
@@ -38,6 +39,7 @@ body {
 
 #root {
   min-height: 100vh;
+  background: linear-gradient(170deg, #111827 0%, #151c2c 50%, #18202e 100%);
 }
 
 button {
@@ -71,5 +73,5 @@ textarea, input {
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(201, 168, 76, 0.2); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(201, 168, 76, 0.4); }
+::-webkit-scrollbar-thumb { background: rgba(148, 133, 105, 0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148, 133, 105, 0.35); }
