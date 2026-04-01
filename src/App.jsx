@@ -1171,19 +1171,20 @@ ${chartText}
                 </div>
 
                 {/* Show all accumulated results — collapsible */}
-                {allResults.length > 1 ? (
-                  allResults.map((r, i) => (
+                {allResults.map((r, i) => {
+                  const isDone = r.system.includes("命盤分析") || r.system.includes("交叉分析") || !analyzing;
+                  return (
                     <details key={i} className="result-block" open={i === allResults.length - 1}>
-                      <summary className="result-block-title">{r.system} 分析 <span className="toggle-hint">{i === allResults.length - 1 ? "▼" : "▶"}</span></summary>
+                      <summary className="result-block-title">
+                        {isDone ? <span className="status-done">✓</span> : <span className="status-analyzing" />}
+                        {r.system}
+                        {!isDone && <span className="analyzing-dots">分析中<span className="dot"/><span className="dot"/><span className="dot"/></span>}
+                        <span className="toggle-hint">{i === allResults.length - 1 ? "▼" : "▶"}</span>
+                      </summary>
                       <div className="result-content">{renderMarkdown(r.result)}</div>
                     </details>
-                  ))
-                ) : (
-                  <details className="result-block" open>
-                    <summary className="result-block-title">{allResults[0]?.system || "分析結果"} <span className="toggle-hint">▼</span></summary>
-                    <div className="result-content">{renderMarkdown(result)}</div>
-                  </details>
-                )}
+                  );
+                })}
 
                 {/* Inline loading while AI analysis in progress */}
                 {analyzing && (

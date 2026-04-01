@@ -438,6 +438,42 @@ button:active:not(:disabled) {
   margin-bottom: 16px;
 }
 
+.status-done {
+  color: var(--teal);
+  margin-right: 6px;
+}
+.status-analyzing {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(201, 168, 76, 0.2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.analyzing-dots {
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--gold);
+  display: inline-flex;
+  gap: 3px;
+}
+.analyzing-dots .dot {
+  width: 4px;
+  height: 4px;
+  background: var(--gold);
+  border-radius: 50%;
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+.analyzing-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+.analyzing-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotBounce {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
 .inline-loading {
   display: flex;
   align-items: center;
