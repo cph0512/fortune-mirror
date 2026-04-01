@@ -547,6 +547,7 @@ export default function App() {
 }
 
 function MainApp({ auth, isAdmin, onLogout }) {
+  const ukey = (k) => `${k}_${auth.username}`; // per-user localStorage key
   const [tab, setTab] = useState("analyze"); // analyze | kb | saves | settings | users
   const [images, setImages] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -554,17 +555,17 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [addingChart, setAddingChart] = useState(false);
   const [inputMode, setInputMode] = useState("auto"); // "auto" | "upload"
   const [birthData, setBirthData] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("fortune-birth-data")) || { year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 }; }
+    try { return JSON.parse(localStorage.getItem(ukey("fortune-birth-data"))) || { year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 }; }
     catch { return { year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", birthPlace: "桃園", lat: 24.9936, lng: 121.3130 }; }
   });
   const [autoSystems, setAutoSystems] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("fortune-auto-systems")) || ["ziwei", "bazi", "astro"]; }
+    try { return JSON.parse(localStorage.getItem(ukey("fortune-auto-systems"))) || ["ziwei", "bazi", "astro"]; }
     catch { return ["ziwei", "bazi", "astro"]; }
   });
-  useEffect(() => { localStorage.setItem("fortune-birth-data", JSON.stringify(birthData)); }, [birthData]);
-  useEffect(() => { localStorage.setItem("fortune-auto-systems", JSON.stringify(autoSystems)); }, [autoSystems]);
+  useEffect(() => { localStorage.setItem(ukey("fortune-birth-data"), JSON.stringify(birthData)); }, [birthData]);
+  useEffect(() => { localStorage.setItem(ukey("fortune-auto-systems"), JSON.stringify(autoSystems)); }, [autoSystems]);
   const [result, setResult] = useState(() => {
-    try { const r = JSON.parse(sessionStorage.getItem("fortune-results")) || []; return r.length ? r[r.length - 1].result : ""; }
+    try { const r = JSON.parse(sessionStorage.getItem(ukey("fortune-results"))) || []; return r.length ? r[r.length - 1].result : ""; }
     catch { return ""; }
   });
   const [error, setError] = useState("");
@@ -576,7 +577,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [selectedSystems, setSelectedSystems] = useState([]); // ["bazi", "astro", "ziwei"]
   const [correction, setCorrection] = useState(""); // user correction text
   const [allResults, setAllResults] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem("fortune-results")) || []; }
+    try { return JSON.parse(sessionStorage.getItem(ukey("fortune-results"))) || []; }
     catch { return []; }
   });
   const [chatHistory, setChatHistory] = useState([]); // [{role, text}]
@@ -595,16 +596,16 @@ function MainApp({ auth, isAdmin, onLogout }) {
 
   // 自動暫存到 sessionStorage（防頁面跳動遺失）
   useEffect(() => {
-    if (allResults.length > 0) sessionStorage.setItem("fortune-results", JSON.stringify(allResults));
+    if (allResults.length > 0) sessionStorage.setItem(ukey("fortune-results"), JSON.stringify(allResults));
   }, [allResults]);
 
   // 分析完成後自動存檔到後端
   const autoSaveRef = useRef(null);
   autoSaveRef.current = async () => {
     try {
-      const results = JSON.parse(sessionStorage.getItem("fortune-results") || "[]");
+      const results = JSON.parse(sessionStorage.getItem(ukey("fortune-results")) || "[]");
       if (results.length === 0) return;
-      const bd = JSON.parse(localStorage.getItem("fortune-birth-data") || "null");
+      const bd = JSON.parse(localStorage.getItem(ukey("fortune-birth-data")) || "null");
       let personLabel = "未命名";
       if (bd?.year) {
         personLabel = `${bd.year}/${bd.month||"?"}/${bd.day||"?"} ${bd.gender||""}`;
@@ -656,7 +657,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
 
   const saveReading = async (personName) => {
     if (allResults.length === 0) return;
-    const bd = JSON.parse(localStorage.getItem("fortune-birth-data") || "null");
+    const bd = JSON.parse(localStorage.getItem(ukey("fortune-birth-data")) || "null");
     const label = personName || (bd?.year ? `${bd.year}/${bd.month||"?"}/${bd.day||"?"} ${bd.gender||""}` : "未命名");
     const payload = {
       user: auth.username,
@@ -686,7 +687,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
     setResult(save.results?.length ? save.results[save.results.length - 1].result : "");
     if (save.birthData) {
       setBirthData(save.birthData);
-      localStorage.setItem("fortune-birth-data", JSON.stringify(save.birthData));
+      localStorage.setItem(ukey("fortune-birth-data"), JSON.stringify(save.birthData));
     }
     setTab("analyze");
   };
@@ -1673,7 +1674,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   <button className="save-btn" onClick={saveReading}>
                     存檔
                   </button>
-                  <button className="reset-btn" style={{ flex: 1 }} onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); sessionStorage.removeItem("fortune-results"); }}>
+                  <button className="reset-btn" style={{ flex: 1 }} onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); sessionStorage.removeItem(ukey("fortune-results")); }}>
                     全部重來
                   </button>
                 </div>
