@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import './App.css';
+import './WizardApp.css';
 import { calculateChart, formatChart } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
 import { calculateFinance, formatFinance } from "./finance-calc.js";
+import WizardApp from "./WizardApp.jsx";
 
 // ============================================================
 // CONSTANTS
@@ -539,11 +541,40 @@ export default function App() {
   const [auth, setAuth] = useState(() => {
     try { return JSON.parse(localStorage.getItem("fortune_auth")); } catch { return null; }
   });
+  const [appMode, setAppMode] = useState(() => localStorage.getItem("fortune-app-mode") || null); // null | "classic" | "wizard"
   const isAdmin = auth?.role === "admin";
 
   if (!auth) return <LoginPage onLogin={setAuth} />;
 
-  return <MainApp auth={auth} isAdmin={isAdmin} onLogout={() => { localStorage.removeItem("fortune_auth"); setAuth(null); }} />;
+  const handleLogout = () => { localStorage.removeItem("fortune_auth"); localStorage.removeItem("fortune-app-mode"); setAuth(null); setAppMode(null); };
+  const selectMode = (mode) => { localStorage.setItem("fortune-app-mode", mode); setAppMode(mode); };
+
+  if (appMode === "wizard") return <WizardApp auth={auth} onBack={() => { localStorage.removeItem("fortune-app-mode"); setAppMode(null); }} onLogout={handleLogout} />;
+  if (appMode === "classic") return <MainApp auth={auth} isAdmin={isAdmin} onLogout={handleLogout} />;
+
+  // Mode selector
+  return (
+    <div className="mode-selector">
+      <div className="mode-selector-bg" />
+      <h1>命理三鏡</h1>
+      <p className="tagline">選擇你喜歡的體驗模式</p>
+      <div className="mode-cards">
+        <div className="mode-card" onClick={() => selectMode("classic")}>
+          <div className="mode-card-icon">🔭</div>
+          <h3>專業模式</h3>
+          <p>上傳命盤截圖、手動輸入資料、知識庫管理、完整功能</p>
+          <span className="mode-card-tag classic">經典版</span>
+        </div>
+        <div className="mode-card" onClick={() => selectMode("wizard")}>
+          <div className="mode-card-icon">✨</div>
+          <h3>引導模式</h3>
+          <p>一步步回答問題，系統自動排盤分析，適合新手體驗</p>
+          <span className="mode-card-tag new">NEW</span>
+        </div>
+      </div>
+      <button className="mode-selector-logout" onClick={handleLogout}>登出</button>
+    </div>
+  );
 }
 
 function MainApp({ auth, isAdmin, onLogout }) {
