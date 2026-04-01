@@ -593,13 +593,13 @@ function MainApp({ auth, isAdmin, onLogout }) {
     try {
       const results = JSON.parse(sessionStorage.getItem("fortune-results") || "[]");
       if (results.length === 0) return;
-      // Try to extract person info from results
       const allText = results.map(r => r.result).join("\n");
       const dateMatch = allText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
       const personLabel = dateMatch ? `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}` : "未命名";
+      const bd = JSON.parse(localStorage.getItem("fortune-birth-data") || "null");
       await fetch(`${API_BACKEND}-save`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: auth.username, person: personLabel, systems: results.map(r => r.system), results, chat: [], time: new Date().toISOString() }),
+        body: JSON.stringify({ user: auth.username, person: personLabel, systems: results.map(r => r.system), results, chat: [], time: new Date().toISOString(), birthData: bd }),
       });
     } catch {}
   };
@@ -609,6 +609,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
 
   const saveReading = async (personName) => {
     if (allResults.length === 0) return;
+    const bd = JSON.parse(localStorage.getItem("fortune-birth-data") || "null");
     const payload = {
       user: auth.username,
       person: personName || "未命名",
@@ -616,6 +617,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       results: allResults,
       chat: chatHistory,
       time: new Date().toISOString(),
+      birthData: bd,
     };
     await fetch(`${API_BACKEND}-save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   };
@@ -632,6 +634,10 @@ function MainApp({ auth, isAdmin, onLogout }) {
     setAllResults(save.results || []);
     setChatHistory(save.chat || []);
     setResult(save.results?.length ? save.results[save.results.length - 1].result : "");
+    if (save.birthData) {
+      setBirthData(save.birthData);
+      localStorage.setItem("fortune-birth-data", JSON.stringify(save.birthData));
+    }
     setTab("analyze");
   };
 
