@@ -141,6 +141,14 @@ function saveKB(entries) {
 }
 
 const API_BACKEND = "https://bot.velopulse.io/api/fortune";
+const API_ACTIVITY = "https://bot.velopulse.io/api/fortune-activity";
+
+function logActivity(user, action, detail) {
+  fetch(API_ACTIVITY, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user, action, detail }),
+  }).catch(() => {});
+}
 
 function loadApiKey() {
   return "server"; // API key managed server-side
@@ -492,6 +500,7 @@ function LoginPage({ onLogin }) {
       const data = await res.json();
       if (!res.ok) { setErr(data.error || "失敗"); return; }
       localStorage.setItem("fortune_auth", JSON.stringify(data));
+      logActivity(data.username, mode === "login" ? "登入" : "註冊", "");
       onLogin(data);
     } catch (e) { setErr("連線失敗"); } finally { setLoading(false); }
   };
@@ -595,26 +604,43 @@ function MainApp({ auth, isAdmin, onLogout }) {
     try {
       const results = JSON.parse(sessionStorage.getItem("fortune-results") || "[]");
       if (results.length === 0) return;
-      const allText = results.map(r => r.result).join("\n");
-      const dateMatch = allText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
-      const personLabel = dateMatch ? `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}` : "未命名";
       const bd = JSON.parse(localStorage.getItem("fortune-birth-data") || "null");
+      let personLabel = "未命名";
+      if (bd?.year) {
+        personLabel = `${bd.year}/${bd.month||"?"}/${bd.day||"?"} ${bd.gender||""}`;
+      } else {
+        const allText = results.map(r => r.result).join("\n");
+        const dateMatch = allText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        if (dateMatch) personLabel = `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}`;
+      }
       await fetch(`${API_BACKEND}-save`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: auth.username, person: personLabel, systems: results.map(r => r.system), results, chat: [], time: new Date().toISOString(), birthData: bd }),
+        body: JSON.stringify({ user: auth.username, person: personLabel, systems: results.map(r => r.system), results, chat: chatHistory, time: new Date().toISOString(), birthData: bd }),
       });
     } catch {}
   };
   const [usersList, setUsersList] = useState({});
   const [feedbackList, setFeedbackList] = useState([]);
+  const [activityList, setActivityList] = useState([]);
+  const [activityFilter, setActivityFilter] = useState("");
   const chatEndRef = useRef(null);
+
+  const loadActivity = async (userFilter) => {
+    try {
+      const url = userFilter ? `${API_ACTIVITY}?user=${encodeURIComponent(userFilter)}` : API_ACTIVITY;
+      const res = await fetch(url);
+      const data = await res.json();
+      setActivityList(data || []);
+    } catch { setActivityList([]); }
+  };
 
   const saveReading = async (personName) => {
     if (allResults.length === 0) return;
     const bd = JSON.parse(localStorage.getItem("fortune-birth-data") || "null");
+    const label = personName || (bd?.year ? `${bd.year}/${bd.month||"?"}/${bd.day||"?"} ${bd.gender||""}` : "未命名");
     const payload = {
       user: auth.username,
-      person: personName || "未命名",
+      person: label,
       systems: allResults.map(r => r.system),
       results: allResults,
       chat: chatHistory,
@@ -622,6 +648,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
       birthData: bd,
     };
     await fetch(`${API_BACKEND}-save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    logActivity(auth.username, "存檔", label);
   };
 
   const loadSaves = async () => {
@@ -633,6 +660,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
   };
 
   const loadReading = (save) => {
+    logActivity(auth.username, "載入存檔", save.person || "未命名");
     setAllResults(save.results || []);
     setChatHistory(save.chat || []);
     setResult(save.results?.length ? save.results[save.results.length - 1].result : "");
@@ -658,6 +686,7 @@ function MainApp({ auth, isAdmin, onLogout }) {
     setChatInput("");
     setChatHistory(prev => [...prev, { role: "user", text: question }]);
     setChatLoading(true);
+    logActivity(auth.username, "追問", question);
     try {
       // Build full context — include ALL chart data as persistent memory
       const chartMemory = allResults.map(r => `【${r.system}】\n${r.result}`).join("\n\n===\n\n");
@@ -833,6 +862,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
   const submitHeban = async (question) => {
     const y = parseInt(hebanData.year);
     if (!y) { setError("請至少填寫出生年份"); return; }
+    logActivity(auth.username, "合盤分析", `精度:${hebanPrecision} 對方:${hebanData.name||hebanData.relation||"未命名"} ${y}年 問:${question||"整體"}`);
     const m = parseInt(hebanData.month), d = parseInt(hebanData.day), h = parseInt(hebanData.hour);
     const label = hebanData.name || hebanData.relation || "對方";
     let chartText = "";
@@ -865,6 +895,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
     const personAResults = saveA.results || [];
     const personBText = (saveB.results || []).map(r => `【${r.system}】\n${r.result}`).join("\n\n===\n\n");
     const labelB = saveB.person || "對方";
+    logActivity(auth.username, "存檔合盤", `${saveA.person||"未命名"} × ${labelB}`);
     setAllResults(personAResults);
     setResult(personAResults.length ? personAResults[personAResults.length - 1].result : "");
     setChatHistory([]);
@@ -911,6 +942,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
     setAnalyzing(true);
     setError("");
     setResult("");
+    logActivity(auth.username, "上傳圖片解盤", `${images.length} 張`);
 
     let msgIdx = 0;
     setLoadingMsg(LOADING_MESSAGES[0]);
@@ -1022,6 +1054,11 @@ ${question || "請分析兩人的整體緣分和互動模式"}
               <span className="tab-icon">⟐</span> 反饋
             </button>
           )}
+          {isAdmin && (
+            <button className={`nav-tab ${tab === "activity" ? "active" : ""}`} onClick={() => { setTab("activity"); loadActivity(); }}>
+              <span className="tab-icon">⟐</span> 活動
+            </button>
+          )}
           <button className="nav-tab logout-tab" onClick={() => { if (confirm("確定登出？")) onLogout(); }}>
             {auth.name || auth.username} ✕
           </button>
@@ -1128,6 +1165,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                         const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
                         const h = parseInt(birthData.hour);
                         if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+                        logActivity(auth.username, "自動排盤", `${y}/${m}/${d} ${h}時 ${birthData.gender} [${autoSystems.join("+")}]`);
 
                         const min = parseInt(birthData.minute) || 0;
                         const calcMap = {
@@ -1327,6 +1365,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                 <div className="action-row">
                   <button className="detail-btn" disabled={detailLoading} onClick={async () => {
                     setDetailLoading(true);
+                    logActivity(auth.username, "詳細分析", allResults[allResults.length - 1]?.system || "");
                     try {
                       const lastResult = allResults[allResults.length - 1];
                       const submitRes = await fetch(API_BACKEND, {
@@ -1382,6 +1421,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                     }
                     setAnalyzing(true);
                     setLoadingMsg("正在計算財運排盤...");
+                    logActivity(auth.username, "財運分析", `${y}/${m}/${d} ${h}時 ${gender}`);
                     try {
                       const finText = formatFinance(calculateFinance(y, m, d, h, gender));
                       setAllResults(prev => [...prev, { system: "紫微財運", result: finText }]);
@@ -1766,6 +1806,38 @@ ${question || "請分析兩人的整體緣分和互動模式"}
               </div>
             ) : (
               <div className="save-empty">尚無反饋</div>
+            )}
+          </div>
+        )}
+        {/* ===== Activity Tab (admin) ===== */}
+        {tab === "activity" && isAdmin && (
+          <div className="saves-section">
+            <div className="setting-card">
+              <div className="setting-title">活動記錄</div>
+              <div className="activity-filter">
+                <input type="text" placeholder="篩選用戶..." value={activityFilter}
+                  onChange={e => setActivityFilter(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") loadActivity(activityFilter); }}
+                />
+                <button onClick={() => loadActivity(activityFilter)}>篩選</button>
+                <button onClick={() => { setActivityFilter(""); loadActivity(); }}>全部</button>
+              </div>
+            </div>
+            {activityList.length > 0 ? (
+              <div className="activity-list">
+                {activityList.map((a, i) => (
+                  <div key={i} className="activity-item">
+                    <div className="activity-time">{a.time ? new Date(a.time).toLocaleString("zh-TW") : ""}</div>
+                    <div className="activity-main">
+                      <span className="activity-user">{a.user}</span>
+                      <span className={`activity-action action-${a.action?.replace(/[^a-z]/gi, "") || "other"}`}>{a.action}</span>
+                    </div>
+                    {a.detail && <div className="activity-detail">{a.detail}</div>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="save-empty">尚無活動記錄</div>
             )}
           </div>
         )}
