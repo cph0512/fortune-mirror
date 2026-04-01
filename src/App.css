@@ -1421,6 +1421,282 @@ button:active:not(:disabled) {
   border-color: var(--border-hover);
 }
 
+/* ===== 合盤 Modal ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.heban-modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: modalIn 0.25s ease-out;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.heban-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.heban-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.modal-close:hover { background: var(--bg-hover); }
+
+.heban-precision-selector {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.heban-precision-selector button {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.heban-precision-selector button.active {
+  background: rgba(76, 201, 176, 0.15);
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.heban-precision-selector button:hover {
+  border-color: var(--border-hover);
+}
+
+.heban-precision-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}
+
+.heban-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.heban-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.heban-row label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.heban-row input,
+.heban-row select {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.heban-row input:focus,
+.heban-row select:focus {
+  border-color: var(--teal);
+}
+
+.heban-question {
+  margin-bottom: 16px;
+}
+
+.heban-question label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.heban-question input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.heban-question input:focus {
+  border-color: var(--teal);
+}
+
+.heban-submit {
+  width: 100%;
+  margin-top: 0;
+}
+
+/* 合盤按鈕 */
+.heban-btn {
+  background: rgba(180, 130, 255, 0.1) !important;
+  border-color: rgba(180, 130, 255, 0.3) !important;
+  color: #b482ff !important;
+}
+
+.heban-btn:hover:not(:disabled) {
+  background: rgba(180, 130, 255, 0.2) !important;
+  border-color: rgba(180, 130, 255, 0.5) !important;
+}
+
+/* 追問中的合盤提示按鈕 */
+.heban-chat-btn {
+  display: block;
+  margin-top: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  background: rgba(180, 130, 255, 0.12);
+  border: 1px solid rgba(180, 130, 255, 0.3);
+  border-radius: 8px;
+  color: #b482ff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.heban-chat-btn:hover {
+  background: rgba(180, 130, 255, 0.2);
+  border-color: rgba(180, 130, 255, 0.5);
+  transform: scale(1.02);
+}
+
+.heban-chat-btn:active {
+  transform: scale(0.98);
+}
+
+/* 存檔頁合盤 */
+.heban-save-toggle {
+  padding: 6px 14px;
+  font-size: 12px;
+  background: rgba(180, 130, 255, 0.1);
+  border: 1px solid rgba(180, 130, 255, 0.3);
+  border-radius: 8px;
+  color: #b482ff;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.heban-save-toggle.active {
+  background: rgba(255, 100, 100, 0.1);
+  border-color: rgba(255, 100, 100, 0.3);
+  color: #ff6464;
+}
+
+.heban-save-hint {
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #b482ff;
+  background: rgba(180, 130, 255, 0.08);
+  border: 1px solid rgba(180, 130, 255, 0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.heban-save-go {
+  padding: 6px 16px;
+  font-size: 13px;
+  background: rgba(180, 130, 255, 0.15);
+  border: 1px solid rgba(180, 130, 255, 0.4);
+  border-radius: 8px;
+  color: #b482ff;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.2s;
+}
+
+.heban-save-go:hover:not(:disabled) {
+  background: rgba(180, 130, 255, 0.25);
+}
+
+.save-card.selectable {
+  cursor: pointer;
+  position: relative;
+  padding-left: 40px;
+}
+
+.save-card.selected {
+  border-color: rgba(180, 130, 255, 0.5);
+  background: rgba(180, 130, 255, 0.06);
+}
+
+.save-check {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #b482ff;
+  transition: all 0.2s;
+}
+
+.save-card.selected .save-check {
+  border-color: #b482ff;
+  background: rgba(180, 130, 255, 0.15);
+}
+
 /* ===== Footer ===== */
 .footer {
   position: relative;
