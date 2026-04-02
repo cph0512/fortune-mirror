@@ -288,15 +288,16 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [rawResults, setRawResults] = useState(saved?.rawResults ?? []);
   const [error, setError] = useState("");
 
-  const [showHeban, setShowHeban] = useState(false);
-  const [hebanRelation, setHebanRelation] = useState("");
-  const [hebanName, setHebanName] = useState("");
-  const [hebanYear, setHebanYear] = useState("");
-  const [hebanMonth, setHebanMonth] = useState("");
-  const [hebanDay, setHebanDay] = useState("");
-  const [hebanHour, setHebanHour] = useState("");
-  const [hebanMinute, setHebanMinute] = useState("0");
-  const [hebanGender, setHebanGender] = useState("");
+  // 合盤 state (restore from session)
+  const [showHeban, setShowHeban] = useState(saved?.showHeban ?? false);
+  const [hebanRelation, setHebanRelation] = useState(saved?.hebanRelation ?? "");
+  const [hebanName, setHebanName] = useState(saved?.hebanName ?? "");
+  const [hebanYear, setHebanYear] = useState(saved?.hebanYear ?? "");
+  const [hebanMonth, setHebanMonth] = useState(saved?.hebanMonth ?? "");
+  const [hebanDay, setHebanDay] = useState(saved?.hebanDay ?? "");
+  const [hebanHour, setHebanHour] = useState(saved?.hebanHour ?? "");
+  const [hebanMinute, setHebanMinute] = useState(saved?.hebanMinute ?? "0");
+  const [hebanGender, setHebanGender] = useState(saved?.hebanGender ?? "");
 
   // Twin state — uses language-neutral values: "same"/"mixed" and "first"/"second"
   const [isTwin, setIsTwin] = useState(saved?.isTwin ?? false);
@@ -344,16 +345,23 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
+  // Save session to localStorage whenever ANY user data changes (per-user, including guest)
   useEffect(() => {
     if (analyzing || hebanAnalyzing) return;
     const sessionData = {
       step, gender, goal, goalPrompt, loveSub,
       birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity,
       isTwin, twinOrder, twinType,
-      finalResult, rawResults, hebanResult, chatHistory,
+      finalResult, rawResults,
+      // 合盤
+      hebanResult, hebanRelation, hebanName, hebanGender,
+      hebanYear, hebanMonth, hebanDay, hebanHour, hebanMinute,
+      showHeban,
+      // 追問
+      chatHistory,
     };
     saveSession(sessionData, wizardUser);
-  }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity, isTwin, twinOrder, twinType, finalResult, rawResults, hebanResult, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
+  }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity, isTwin, twinOrder, twinType, finalResult, rawResults, hebanResult, hebanRelation, hebanName, hebanGender, hebanYear, hebanMonth, hebanDay, hebanHour, hebanMinute, showHeban, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
 
   useEffect(() => {
     if (saved?.finalResult && saved.step >= TOTAL_STEPS) {
@@ -387,7 +395,18 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     if (s.birthPlace) setBirthPlace(s.birthPlace);
     if (s.finalResult) { setFinalResult(s.finalResult); setStep(TOTAL_STEPS + 1); }
     if (s.rawResults) setRawResults(s.rawResults);
+    // 合盤
     if (s.hebanResult) setHebanResult(s.hebanResult);
+    if (s.hebanRelation) setHebanRelation(s.hebanRelation);
+    if (s.hebanName) setHebanName(s.hebanName);
+    if (s.hebanGender) setHebanGender(s.hebanGender);
+    if (s.hebanYear) setHebanYear(s.hebanYear);
+    if (s.hebanMonth) setHebanMonth(s.hebanMonth);
+    if (s.hebanDay) setHebanDay(s.hebanDay);
+    if (s.hebanHour) setHebanHour(s.hebanHour);
+    if (s.hebanMinute) setHebanMinute(s.hebanMinute);
+    if (s.showHeban) setShowHeban(s.showHeban);
+    // 追問
     if (s.chatHistory) setChatHistory(s.chatHistory);
   };
 
