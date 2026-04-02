@@ -238,7 +238,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // Auth state (local registration)
   const [wizardUser, setWizardUser] = useState(savedAuth);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState("register"); // "register" or "login"
+  const [authMode, setAuthMode] = useState("login"); // "login" or "register"
   const [authName, setAuthName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -757,13 +757,31 @@ ${hasPartnerTime
         </>
       ) : (
         <div className="wizard-welcome-auth">
-          {/* Inline auth form */}
+          {/* Guest try-first section */}
+          <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>直接開始體驗</div>
+          <div className="wizard-gender-cards">
+            <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); setTimeout(() => setStep(1), 300); }}>
+              <div className="wizard-gender-icon">M</div>
+              <div className="wizard-gender-label"><span>男生</span><span>›</span></div>
+            </div>
+            <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); setTimeout(() => setStep(1), 300); }}>
+              <div className="wizard-gender-icon">F</div>
+              <div className="wizard-gender-label"><span>女生</span><span>›</span></div>
+            </div>
+          </div>
+          <div className="wizard-guest-note">免費排盤一次，進階功能需註冊</div>
+
+          <div className="wizard-welcome-divider">
+            <span>已有帳號？</span>
+          </div>
+
+          {/* Login/Register form */}
           <div className="wizard-welcome-auth-card">
             <div className="wizard-welcome-auth-tabs">
-              <button className={`wizard-welcome-auth-tab ${authMode === "register" ? "active" : ""}`}
-                onClick={() => { setAuthMode("register"); setAuthError(""); }}>註冊</button>
               <button className={`wizard-welcome-auth-tab ${authMode === "login" ? "active" : ""}`}
                 onClick={() => { setAuthMode("login"); setAuthError(""); }}>登入</button>
+              <button className={`wizard-welcome-auth-tab ${authMode === "register" ? "active" : ""}`}
+                onClick={() => { setAuthMode("register"); setAuthError(""); }}>註冊</button>
             </div>
 
             {authMode === "register" && (
@@ -779,26 +797,9 @@ ${hasPartnerTime
             {authError && <div className="wizard-auth-error">{authError}</div>}
 
             <button className="wizard-cta" onClick={handleAuthSubmit}>
-              {authMode === "register" ? "免費註冊" : "登入"}
+              {authMode === "login" ? "登入" : "免費註冊"}
             </button>
           </div>
-
-          <div className="wizard-welcome-divider">
-            <span>或</span>
-          </div>
-
-          <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>直接開始體驗</div>
-          <div className="wizard-gender-cards">
-            <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); setTimeout(() => setStep(1), 300); }}>
-              <div className="wizard-gender-icon">M</div>
-              <div className="wizard-gender-label"><span>男生</span><span>›</span></div>
-            </div>
-            <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); setTimeout(() => setStep(1), 300); }}>
-              <div className="wizard-gender-icon">F</div>
-              <div className="wizard-gender-label"><span>女生</span><span>›</span></div>
-            </div>
-          </div>
-          <div className="wizard-guest-note">免費排盤一次，進階功能需註冊</div>
         </div>
       )}
     </div>
