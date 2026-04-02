@@ -375,7 +375,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: systemPrompt, prompt, engine }),
+        body: JSON.stringify({ images: [], system: systemPrompt, prompt, engine, analysis_type: "general" }),
       });
       if (!submitRes.ok) return null;
       const { job_id } = await submitRes.json();
@@ -507,10 +507,12 @@ ${astroChart}
       const wizardSP = buildWizardPrompt(kbEntries, goal);
       const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
       const prompt = `之前的分析報告：\n${finalResult.slice(0, 2000)}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答時嚴格遵守規則：不提任何命理系統名稱和專有術語，用自然語言回覆。`;
+      // Deep analysis for 大運/流年 questions → Opus; others → Sonnet
+      const isDeep = /大運|流年|逐月|十年|運勢走向/.test(question);
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt, analysis_type: isDeep ? "deep" : "general" }),
       });
       if (!submitRes.ok) throw new Error("送出失敗");
       const { job_id } = await submitRes.json();
