@@ -80,33 +80,26 @@ const HEBAN_SYSTEM_PROMPT = `你是「命理三鏡」的關係分析師。
 格式規則：
 絕對禁止 Markdown 語法（#、**、*、- 列表、表格）。絕對禁止 emoji 和表情符號。
 用 [SECTION] 標記分段。格式：獨立一行寫 [SECTION] 標題，換行寫內容。用自然句子書寫。
-每個段落最後一行用「【總結】」開頭寫一句話精華摘要（15-30字）。
 
 輸出結構：
 
 [SECTION] 你們的緣分指數
 （用 1-100 分，並用一句話形容這段關係的本質）
-【總結】一句話概括
 
 [SECTION] 你們的互動模式
 （兩人相處的天然模式、互補或衝突的地方）
-【總結】一句話概括
 
 [SECTION] 關係中的優勢
 （兩人在一起特別好的面向）
-【總結】一句話概括
 
 [SECTION] 需要注意的地方
 （潛在摩擦、容易產生誤解的部分）
-【總結】一句話概括
 
 [SECTION] 2026 年兩人關係走向
 （今年這段關係的趨勢和關鍵時間點）
-【總結】一句話概括
 
 [SECTION] 相處建議
 （具體可行的互動建議）
-【總結】一句話概括
 
 日期規則：
 所有日期一律使用國曆（西元）。提到農曆月份時必須用括號標註國曆對照，例如「農曆三月（國曆4月中旬）」。
@@ -141,29 +134,23 @@ const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命理分析師。
 絕對禁止使用 emoji、表情符號、小圖示。不可出現任何 emoji unicode 字元。
 用 [SECTION] 標記來分段。格式為：每段開頭獨立一行寫 [SECTION] 標題文字，然後換行寫內容。段落之間空行分隔。
 內容用自然的句子和段落書寫，像寫文章一樣，不要用列表或項目符號。
-每個段落的最後一行，用「【總結】」開頭寫一句話精華摘要（15-30字），讓不想看全文的人可以快速掌握重點。
 
 輸出結構：
 
 [SECTION] 你的天賦特質
 （性格核心、天生優勢、潛能方向，用 2-3 段自然文字描述）
-【總結】一句話概括這個人最核心的特質
 
 [SECTION] [用戶關注的主題]深度解析
 （針對用戶選擇的方向，深入分析現況與趨勢）
-【總結】一句話點出這個領域的關鍵訊息
 
 [SECTION] 2026 年運勢預測
 （今年整體走向、好的月份、需注意的月份）
-【總結】一句話概括今年運勢走向
 
 [SECTION] 給你的建議
 （具體可行的行動建議，避開的陷阱，把握的機會）
-【總結】一句話點出最重要的行動方向
 
 [SECTION] 近期關鍵提醒
 （最近 1-3 個月特別需要注意的事）
-【總結】一句話提醒最近最該注意的事
 
 日期規則：
 所有日期一律使用國曆（西元）。如果需要提到農曆月份或節氣，必須在旁邊用括號標註對應的國曆日期，例如「農曆三月（國曆4月中旬）」。絕對不可只寫農曆日期而不附上國曆對照。
@@ -722,13 +709,25 @@ ${hasPartnerTime
     }
 
     return sections.map((sec, i) => {
-      // Split body into main content and summary
+      // Auto-detect summary: last sentence of each section body
       let mainBody = sec.body || "";
       let summary = "";
-      const sumMatch = mainBody.match(/[【\[](?:總結|小結|結論|重點)[】\]]\s*[:：]?\s*([\s\S]*?)$/);
-      if (sumMatch) {
-        summary = sumMatch[1].trim();
-        mainBody = mainBody.slice(0, sumMatch.index).trim();
+      // Check for explicit markers first
+      const explicitMatch = mainBody.match(/[【\[](?:總結|小結|結論|重點)[】\]]\s*[:：]?\s*([\s\S]*?)$/);
+      if (explicitMatch) {
+        summary = explicitMatch[1].trim();
+        mainBody = mainBody.slice(0, explicitMatch.index).trim();
+      } else if (mainBody.length > 100) {
+        // Auto-extract: last line as summary if body is long enough
+        const lines = mainBody.trim().split('\n').filter(l => l.trim());
+        if (lines.length >= 3) {
+          const lastLine = lines[lines.length - 1].trim();
+          // Only use as summary if it looks like a concluding sentence (short, not a question)
+          if (lastLine.length >= 10 && lastLine.length <= 80 && !lastLine.includes('？')) {
+            summary = lastLine;
+            mainBody = lines.slice(0, -1).join('\n').trim();
+          }
+        }
       }
       return (
         <div key={i} className="wizard-section">
