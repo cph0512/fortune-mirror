@@ -3,6 +3,7 @@ import './WizardApp.css';
 import { calculateChart, formatChart, formatChartByTianGan } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
+import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
 
 // ============================================================
 // CONSTANTS
@@ -430,7 +431,10 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       setLoadingMsg("正在解讀你的命運密碼...");
       const ziweiChart = formatChart(calculateChart(y, m, d, h, 0, gender));
       const baziChart = formatBazi(calculateBazi(y, m, d, h, gender));
-      const astroChart = formatAstro(calculateAstro(y, m, d, h, min, 24.9936, 121.3130));
+      const cityMatch = findCity(birthPlace);
+      const astroLat = cityMatch ? cityMatch.lat : 24.9936;
+      const astroLng = cityMatch ? cityMatch.lng : 121.3130;
+      const astroChart = formatAstro(calculateAstro(y, m, d, h, min, astroLat, astroLng));
 
       // 保存排盤資料供合盤用
       setRawResults([
@@ -959,22 +963,60 @@ ${hasPartnerTime
   };
 
   // Step 3: Birth place
-  const renderPlace = () => (
-    <div className="wizard-content">
-      <div className="wizard-question">出生地</div>
-      <div className="wizard-subtitle">用於更精確的命運解讀</div>
-      <input
-        className="wizard-input"
-        value={birthPlace}
-        onChange={e => setBirthPlace(e.target.value)}
-        placeholder="例：台北、桃園、高雄..."
-      />
-      <div style={{ height: 32 }} />
-      <button className="wizard-cta" disabled={!birthPlace.trim()} onClick={() => setStep(4)}>
-        繼續
-      </button>
-    </div>
-  );
+  const renderPlace = () => {
+    const groups = getCityGroups();
+    const groupOrder = ["台灣", "中國", "港澳", "東亞", "東南亞", "北美", "歐洲", "大洋洲"];
+    const isCustom = birthPlace && !findCity(birthPlace);
+
+    return (
+      <div className="wizard-content">
+        <div className="wizard-question">出生地</div>
+        <div className="wizard-subtitle">影響占星排盤的精確度</div>
+        <div className="wizard-select-wrap" style={{ maxWidth: 300 }}>
+          <select
+            className="wizard-select"
+            value={isCustom ? "__custom__" : birthPlace}
+            onChange={e => {
+              if (e.target.value === "__custom__") {
+                setBirthPlace("");
+              } else {
+                setBirthPlace(e.target.value);
+              }
+            }}
+            style={{ width: "100%", fontSize: 16, padding: "10px 12px" }}
+          >
+            <option value="">-- 選擇城市 --</option>
+            {groupOrder.map(g => groups[g] && (
+              <optgroup key={g} label={g}>
+                {groups[g].map(c => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </optgroup>
+            ))}
+            <option value="__custom__">其他城市（手動輸入）</option>
+          </select>
+        </div>
+        {(isCustom || birthPlace === "") && findCity(birthPlace) === null && birthPlace !== "" && (
+          <div style={{ marginTop: 8 }}>
+            <input
+              className="wizard-input"
+              value={birthPlace}
+              onChange={e => setBirthPlace(e.target.value)}
+              placeholder="輸入城市名稱..."
+              style={{ maxWidth: 300 }}
+            />
+            <div className="wizard-hint" style={{ marginTop: 4 }}>
+              <span className="wizard-hint-text">手動輸入的城市將使用預設座標，可能略有偏差</span>
+            </div>
+          </div>
+        )}
+        <div style={{ height: 32 }} />
+        <button className="wizard-cta" disabled={!birthPlace.trim()} onClick={() => setStep(4)}>
+          繼續
+        </button>
+      </div>
+    );
+  };
 
   // Step 4: Confirm
   const renderConfirm = () => (
