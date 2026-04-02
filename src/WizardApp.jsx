@@ -57,11 +57,16 @@ function loadKB() {
 }
 
 const GOALS = [
-  { text: "感情與姻緣", prompt: "感情、姻緣、桃花、婚姻、另一半" },
+  { text: "感情與姻緣", prompt: "感情、姻緣、桃花、婚姻、另一半", hasSub: true },
   { text: "事業與升遷", prompt: "事業、工作、升遷、職涯方向、貴人" },
   { text: "財富與投資", prompt: "財運、投資、理財、收入、財庫" },
   { text: "健康與養生", prompt: "健康、身體、養生、需注意的部位" },
   { text: "全面綜合分析", prompt: "全面性格、事業、感情、財運、健康、今年運勢" },
+];
+
+const LOVE_SUBS = [
+  { text: "未婚／單身", prompt: "感情、姻緣、桃花、戀愛、交往對象、何時遇到對的人" },
+  { text: "已婚／穩定交往中", prompt: "婚姻、夫妻關係、感情經營、另一半互動、婚後挑戰" },
 ];
 
 const RELATIONS = [
@@ -121,13 +126,13 @@ const LOADING_MSGS = [
   "綜合分析即將完成...",
 ];
 
-const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命理分析師。
+const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命運顧問，用溫暖自然的語氣為一般大眾解讀命運。
 
 核心規則（必須嚴格遵守）：
-
 1. 絕對禁止提到任何命理系統名稱：不可出現「紫微斗數」「八字」「四柱」「西洋占星」「星盤」「命盤」「排盤」等詞彙。
 2. 不可提到任何系統專有術語：不可出現「化祿」「化忌」「天干地支」「十神」「宮位」「相位」「行星」「星座」「主星」「命宮」「財帛宮」等。
-3. 用自然語言表達：把所有命理推論轉化為直覺式、生活化的描述。
+3. 直接給出結論和建議，不要展示推理過程。用戶不需要知道「為什麼」，只需要知道「是什麼」和「怎麼做」。
+4. 用日常生活化的語言，像朋友在聊天一樣自然。
 
 格式規則（必須嚴格遵守）：
 絕對禁止使用 Markdown 語法。不可出現 #、##、###、**粗體**、*斜體*、- 列表、| 表格 |、代碼塊。
@@ -137,36 +142,34 @@ const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命理分析師。
 
 輸出結構：
 
-[SECTION] 你的天賦特質
-（性格核心、天生優勢、潛能方向，用 2-3 段自然文字描述）
+[SECTION] 你是這樣的人
+（用 2-3 段生動描述性格亮點和天賦，讓人覺得「對！就是我」）
 
-[SECTION] [用戶關注的主題]深度解析
-（針對用戶選擇的方向，深入分析現況與趨勢）
+[SECTION] [用戶關注的主題]——你的現況與趨勢
+（直接告訴用戶目前的狀態、即將發生的變化，具體有畫面感）
 
-[SECTION] 2026 年運勢預測
-（今年整體走向、好的月份、需注意的月份）
+[SECTION] 2026 年重點月份
+（哪幾個月是好時機、哪幾個月要小心，直接講結論）
 
-[SECTION] 給你的建議
-（具體可行的行動建議，避開的陷阱，把握的機會）
+[SECTION] 你現在該做的三件事
+（具體、可行動的建議，不要空泛的道理）
 
-[SECTION] 近期關鍵提醒
-（最近 1-3 個月特別需要注意的事）
+[SECTION] 近期提醒
+（最近 1-3 個月最關鍵的一件事）
+
+寫作風格：
+把每一段寫得像在跟好朋友說話，有溫度、有畫面。避免學術口吻和空泛的形容詞。每個建議都要具體到「做什麼」而不是「注意什麼」。篇幅適中，不要太長，重點突出。
 
 日期規則：
-所有日期一律使用國曆（西元）。如果需要提到農曆月份或節氣，必須在旁邊用括號標註對應的國曆日期，例如「農曆三月（國曆4月中旬）」。絕對不可只寫農曆日期而不附上國曆對照。
+所有日期一律使用國曆（西元）。如果需要提到農曆月份，必須附上國曆對照。
 
-一致性原則（極度重要）：
-你的分析必須 100% 基於排盤資料的客觀格局，不可隨意發揮。
-分析步驟：先仔細閱讀排盤資料 → 確認命盤的核心格局特徵（主星組合、四化落宮、格局吉凶）→ 基於這些客觀事實推導結論。
-核心性格描述必須完全由主星特質和四化格局決定，不可加入隨機元素。
-大方向建議必須由格局的優劣勢直接推導，不可每次給出不同方向。
-年度運勢必須由流年四化和大限四化的具體落宮決定，月份判斷要有依據。
-每一個結論都必須能追溯到排盤資料中的具體依據。
+一致性原則：
+分析必須 100% 基於排盤資料的客觀格局，不可隨意發揮。但輸出時只呈現結論，不暴露推導過程。
 
 中立原則：
-你只知道用戶的出生資料和關注方向，完全不知道用戶的職業、行業、家庭、收入、教育等背景。絕對不可猜測或假設用戶的具體職業或生活狀況。描述特質和建議要保持通用。
+不可猜測或假設用戶的職業、行業、家庭、收入、教育等背景。描述保持通用。
 
-語氣：像一位溫暖睿智的顧問在跟朋友聊天。正面為主但風險誠實說。具體有畫面感，避免空泛。不需要加免責聲明。`;
+語氣：溫暖、直接、有洞察力。正面為主但誠實。不需要加免責聲明。`;
 
 function buildWizardPrompt(kbEntries, goalObj) {
   let prompt = WIZARD_SYSTEM_PROMPT;
@@ -200,6 +203,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [gender, setGender] = useState(saved?.gender ?? "");
   const [goal, setGoal] = useState(saved?.goal ?? "");
   const [goalPrompt, setGoalPrompt] = useState(saved?.goalPrompt ?? "");
+  const [loveSub, setLoveSub] = useState(saved?.loveSub ?? "");
   const [birthYear, setBirthYear] = useState(saved?.birthYear ?? "");
   const [birthMonth, setBirthMonth] = useState(saved?.birthMonth ?? "");
   const [birthDay, setBirthDay] = useState(saved?.birthDay ?? "");
@@ -254,12 +258,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     // Don't save while analyzing (transient state)
     if (analyzing || hebanAnalyzing) return;
     const sessionData = {
-      step, gender, goal, goalPrompt,
+      step, gender, goal, goalPrompt, loveSub,
       birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace,
       finalResult, rawResults, hebanResult, chatHistory,
     };
     saveSession(sessionData, wizardUser);
-  }, [step, gender, goal, goalPrompt, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, finalResult, rawResults, hebanResult, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
+  }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, finalResult, rawResults, hebanResult, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
 
   // If session had a result, jump to result screen on mount
   useEffect(() => {
@@ -287,6 +291,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     if (s.gender) setGender(s.gender);
     if (s.goal) setGoal(s.goal);
     if (s.goalPrompt) setGoalPrompt(s.goalPrompt);
+    if (s.loveSub) setLoveSub(s.loveSub);
     if (s.birthYear) setBirthYear(s.birthYear);
     if (s.birthMonth) setBirthMonth(s.birthMonth);
     if (s.birthDay) setBirthDay(s.birthDay);
@@ -447,7 +452,7 @@ ${astroChart}
 - 性別：${gender}
 - 出生：${birthYear}年${birthMonth}月${birthDay}日 ${h}時${min}分
 - 出生地：${birthPlace}
-- 關注方向：${goal}
+- 關注方向：${goal}${loveSub ? `（${loveSub}）` : ""}
 
 ## 任務
 請綜合以上三套排盤資料，直接產出一份統一的命理報告。
@@ -460,7 +465,7 @@ ${astroChart}
 
 ⚠️ 嚴格遵守系統規則：不提任何命理系統名稱和專有術語，用自然語言表達所有洞見。
 ⚠️ 按照指定的輸出格式（天賦特質 → 主題深度解析 → 年運勢 → 建議 → 近期提醒）組織內容。
-⚠️ 重點針對用戶關注的「${goal}」方向深入分析。
+⚠️ 重點針對用戶關注的「${goal}${loveSub ? `（${loveSub}）` : ""}」方向深入分析。
 ⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。`;
 
       const submitRes = await fetch(API_BACKEND, {
@@ -833,16 +838,40 @@ ${hasPartnerTime
   // Step 1: Goal
   const renderGoal = () => (
     <div className="wizard-content">
-      <div className="wizard-question">你想了解什麼？</div>
-      <div className="wizard-subtitle">選擇你最關注的方向</div>
+      <div className="wizard-question">{goal === "感情與姻緣" && loveSub === "" ? "你目前的感情狀態？" : "你想了解什麼？"}</div>
+      <div className="wizard-subtitle">{goal === "感情與姻緣" && loveSub === "" ? "不同階段，解讀重點不同" : "選擇你最關注的方向"}</div>
       <div className="wizard-options">
-        {GOALS.map(g => (
-          <div key={g.text} className={`wizard-option ${goal === g.text ? "selected" : ""}`}
-            onClick={() => { setGoal(g.text); setGoalPrompt(g.prompt); setTimeout(() => setStep(2), 300); }}>
-            <span className="wizard-option-text">{g.text}</span>
-            <span className="wizard-option-arrow">›</span>
-          </div>
-        ))}
+        {goal === "感情與姻緣" && loveSub === "" ? (
+          <>
+            {LOVE_SUBS.map(s => (
+              <div key={s.text} className="wizard-option"
+                onClick={() => { setLoveSub(s.text); setGoalPrompt(s.prompt); setTimeout(() => setStep(2), 300); }}>
+                <span className="wizard-option-text">{s.text}</span>
+                <span className="wizard-option-arrow">›</span>
+              </div>
+            ))}
+            <div className="wizard-option" style={{ opacity: 0.6 }}
+              onClick={() => { setGoal(""); setLoveSub(""); }}>
+              <span className="wizard-option-text">‹ 返回</span>
+            </div>
+          </>
+        ) : (
+          GOALS.map(g => (
+            <div key={g.text} className={`wizard-option ${goal === g.text ? "selected" : ""}`}
+              onClick={() => {
+                setGoal(g.text);
+                if (g.hasSub) {
+                  setLoveSub("");
+                } else {
+                  setGoalPrompt(g.prompt);
+                  setTimeout(() => setStep(2), 300);
+                }
+              }}>
+              <span className="wizard-option-text">{g.text}</span>
+              <span className="wizard-option-arrow">›</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -950,7 +979,7 @@ ${hasPartnerTime
           </div>
           <div className="wizard-confirm-row">
             <span className="wizard-confirm-label">關注方向</span>
-            <span className="wizard-confirm-value">{goal}</span>
+            <span className="wizard-confirm-value">{goal}{loveSub ? `（${loveSub}）` : ""}</span>
           </div>
           <div className="wizard-confirm-row">
             <span className="wizard-confirm-label">出生日期</span>
@@ -1133,7 +1162,7 @@ ${hasPartnerTime
           {/* Action buttons */}
           <div className="wizard-result-actions">
             <button className="wizard-result-btn primary" onClick={() => {
-              setStep(0); setFinalResult(""); setRawResults([]); setChatHistory([]);
+              setStep(0); setFinalResult(""); setRawResults([]); setChatHistory([]); setLoveSub("");
               setShowHeban(false); setHebanResult(""); setHebanRelation(""); setHebanName("");
               setHebanYear(""); setHebanMonth(""); setHebanDay(""); setHebanHour(""); setHebanGender("");
             }}>
