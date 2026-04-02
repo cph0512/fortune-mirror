@@ -1250,7 +1250,7 @@ ${hasPartnerTime
         : stepRenderers[step] ? stepRenderers[step]()
         : renderLoading()}
 
-      <div className="wizard-footer">僅供參考 · 命理三鏡</div>
+      <div className="wizard-footer">論命僅供參考</div>
 
       {/* Auth Modal */}
       {showAuthModal && (
