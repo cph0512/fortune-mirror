@@ -140,7 +140,7 @@ function saveKB(entries) {
   localStorage.setItem(STORAGE_KEY_KB, JSON.stringify(entries));
 }
 
-const API_BACKEND = "https://bot.velopulse.io/api/fortune";
+const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
 const API_ACTIVITY = "https://bot.velopulse.io/api/fortune-activity";
 
 function logActivity(user, action, detail) {

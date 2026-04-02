@@ -8,7 +8,7 @@ import { calculateAstro, formatAstro } from "./astro-calc.js";
 // CONSTANTS
 // ============================================================
 
-const API_BACKEND = "https://bot.velopulse.io/api/fortune";
+const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
 const STORAGE_KEY_KB = "fortune-app-kb";
 const KB_VERSION = "20260401b";
 const SESSION_KEY_PREFIX = "wizard-session-";
