@@ -958,6 +958,19 @@
   white-space: pre-wrap;
 }
 
+.wizard-section-summary {
+  margin-top: 14px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(167,139,250,0.12), rgba(192,132,252,0.08));
+  border-left: 3px solid rgba(167,139,250,0.6);
+  border-radius: 0 10px 10px 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.92);
+  font-weight: 500;
+  white-space: pre-wrap;
+}
+
 /* ===== 合盤 Heban Section ===== */
 
 .wizard-heban-promo {
