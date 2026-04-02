@@ -199,7 +199,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const savedAuth = loadAuth();
   const saved = loadSession(savedAuth);
 
-  const [step, setStep] = useState(saved?.step ?? 0);
+  // Always start at welcome (step 0) unless user has a completed result
+  const [step, setStep] = useState(saved?.finalResult ? (saved.step ?? 0) : 0);
   const [gender, setGender] = useState(saved?.gender ?? "");
   const [goal, setGoal] = useState(saved?.goal ?? "");
   const [goalPrompt, setGoalPrompt] = useState(saved?.goalPrompt ?? "");
@@ -327,9 +328,17 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         return;
       }
       user = { name: authName.trim(), email: authEmail.trim() };
-      // Save user credentials
+      // Save user credentials locally
       existingUsers[authEmail.trim()] = { name: authName.trim(), passwordHash: btoa(authPassword) };
       localStorage.setItem("wizard-users", JSON.stringify(existingUsers));
+      // Sync registration to backend
+      try {
+        fetch(API_BACKEND.replace("/fortune", "/fortune-register"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: authEmail.trim(), password: authPassword, name: authName.trim() }),
+        });
+      } catch {}
       // Migrate current guest session to this user
       migrateGuestSession(user);
     } else {
