@@ -10,7 +10,7 @@ import { calculateAstro, formatAstro } from "./astro-calc.js";
 
 const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
 const STORAGE_KEY_KB = "fortune-app-kb";
-const KB_VERSION = "20260401b";
+const KB_VERSION = "20260402c";
 const SESSION_KEY_PREFIX = "wizard-session-";
 const SESSION_KEY_GUEST = "wizard-session-guest";
 const AUTH_KEY = "wizard-auth";

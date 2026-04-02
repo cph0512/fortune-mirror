@@ -117,7 +117,7 @@ const STORAGE_KEY_MODEL = "fortune-app-model";
 // HELPERS
 // ============================================================
 
-const KB_VERSION = "20260402b"; // 更新知識庫時改這個版號
+const KB_VERSION = "20260402c"; // 更新知識庫時改這個版號
 
 function loadKB() {
   try {
