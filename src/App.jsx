@@ -627,6 +627,10 @@ function MainApp({ auth, isAdmin, onLogout }) {
   const [adminSelectedUser, setAdminSelectedUser] = useState(null); // 點選的用戶
   const [adminSearch, setAdminSearch] = useState(""); // 搜尋關鍵字
   const [adminUserSaves, setAdminUserSaves] = useState([]); // 選中用戶的存檔
+  const [adminSourceFilter, setAdminSourceFilter] = useState("all"); // all / b2c / b2b
+  const [adminView, setAdminView] = useState("users"); // users / visitors
+  const [visitorList, setVisitorList] = useState([]);
+  const [selectedVisitor, setSelectedVisitor] = useState(null);
   const chatEndRef = useRef(null);
 
   const loadActivity = async (userFilter) => {
@@ -697,6 +701,20 @@ function MainApp({ auth, isAdmin, onLogout }) {
       const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`);
       const data = await res.json();
       setUsersList(data || {});
+    } catch {}
+  };
+  const loadVisitorList = async () => {
+    try {
+      const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-track")}`);
+      const data = await res.json();
+      setVisitorList(Array.isArray(data) ? data : []);
+    } catch {}
+  };
+  const loadVisitorDetail = async (vid) => {
+    try {
+      const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-track/" + vid)}`);
+      const data = await res.json();
+      setSelectedVisitor(data);
     } catch {}
   };
   const fileInputRef = useRef(null);
@@ -1749,6 +1767,21 @@ ${question || "請分析兩人的整體緣分和互動模式"}
         {/* ===== Admin Tab (unified) ===== */}
         {tab === "admin" && isAdmin && (
           <div className="saves-section">
+            {/* 來源篩選 + 檢視切換 */}
+            <div className="admin-filter-bar" style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              {[["all", "全部"], ["b2c", "B2C 大眾版"], ["b2b", "B2B 專業版"]].map(([val, label]) => (
+                <button key={val}
+                  style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid var(--border)", background: adminSourceFilter === val ? "var(--gold)" : "transparent", color: adminSourceFilter === val ? "#111" : "var(--text)", cursor: "pointer", fontSize: 13 }}
+                  onClick={() => setAdminSourceFilter(val)}>{label}</button>
+              ))}
+              <span style={{ flex: 1 }} />
+              {[["users", "註冊用戶"], ["visitors", "訪客軌跡"]].map(([val, label]) => (
+                <button key={val}
+                  style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid var(--border)", background: adminView === val ? "var(--teal)" : "transparent", color: adminView === val ? "#111" : "var(--text)", cursor: "pointer", fontSize: 13 }}
+                  onClick={() => { setAdminView(val); if (val === "visitors" && visitorList.length === 0) loadVisitorList(); }}>{label}</button>
+              ))}
+            </div>
+
             {/* 搜尋列 */}
             <div className="admin-search-bar">
               <input type="text" placeholder="搜尋用戶、活動、聊天內容..." value={adminSearch}
@@ -1888,9 +1921,10 @@ ${question || "請分析兩人的整體緣分和互動模式"}
             )}
 
             {/* 用戶列表 */}
-            {!adminSelectedUser && adminSearch !== "__feedback__" && (
+            {!adminSelectedUser && adminSearch !== "__feedback__" && adminView === "users" && (
               <div className="save-list">
                 {Object.entries(usersList).filter(([uname, u]) => {
+                  if (adminSourceFilter !== "all" && (u.source || "b2b") !== adminSourceFilter) return false;
                   if (!adminSearch) return true;
                   return (uname + (u.name || "")).toLowerCase().includes(adminSearch.toLowerCase());
                 }).map(([uname, u]) => (
@@ -1898,8 +1932,11 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                     <div className="save-card-title">
                       {u.name || uname}
                       <span className={`role-badge ${u.role}`}>{u.role === "admin" ? "管理員" : "用戶"}</span>
+                      <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, marginLeft: 6, background: (u.source || "b2b") === "b2c" ? "#7a9e8e33" : "#8e7eaa33", color: (u.source || "b2b") === "b2c" ? "var(--teal)" : "var(--purple)" }}>
+                        {(u.source || "b2b").toUpperCase()}
+                      </span>
                     </div>
-                    <div className="save-card-time">帳號：{uname}</div>
+                    <div className="save-card-time">帳號：{uname}{u.last_active ? ` · 最後活動：${new Date(u.last_active).toLocaleDateString("zh-TW")}` : ""}{u.activity_count ? ` · ${u.activity_count} 次` : ""}</div>
                     {uname !== "admin" && (
                       <div className="user-actions" onClick={e => e.stopPropagation()}>
                         <button onClick={async () => {
@@ -1929,6 +1966,65 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* 訪客軌跡列表 */}
+            {adminView === "visitors" && !selectedVisitor && adminSearch !== "__feedback__" && (
+              <div className="save-list">
+                <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 8 }}>
+                  共 {visitorList.length} 個訪客{adminSourceFilter !== "all" ? `（篩選：${adminSourceFilter.toUpperCase()}）` : ""}
+                  <button style={{ marginLeft: 8, fontSize: 12, padding: "2px 8px", cursor: "pointer" }} onClick={loadVisitorList}>重新載入</button>
+                </div>
+                {visitorList.filter(v => {
+                  if (adminSearch) {
+                    const s = adminSearch.toLowerCase();
+                    return (v.visitor_id + (v.user || "") + (v.user_name || "") + v.actions?.join(",")).toLowerCase().includes(s);
+                  }
+                  return true;
+                }).map(v => (
+                  <div key={v.visitor_id} className="save-card" onClick={() => loadVisitorDetail(v.visitor_id)} style={{ cursor: "pointer" }}>
+                    <div className="save-card-title">
+                      {v.user_name || v.user || v.visitor_id}
+                      {v.user && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, marginLeft: 6, background: "#7a9e8e33", color: "var(--teal)" }}>已註冊</span>}
+                      {!v.user && <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, marginLeft: 6, background: "#c9707033", color: "var(--red)" }}>訪客</span>}
+                    </div>
+                    <div className="save-card-time">
+                      {v.event_count} 個事件 · 首次：{v.first_seen ? new Date(v.first_seen).toLocaleString("zh-TW") : "?"} · 最後：{v.last_seen ? new Date(v.last_seen).toLocaleString("zh-TW") : "?"}
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>
+                      {v.actions?.slice(-5).join(" → ")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 訪客詳情 */}
+            {adminView === "visitors" && selectedVisitor && (
+              <>
+                <div className="admin-section-title">
+                  {selectedVisitor.user_name || selectedVisitor.user || selectedVisitor.visitor_id} 的軌跡
+                  <button className="admin-back" onClick={() => setSelectedVisitor(null)}>返回列表</button>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 12 }}>
+                  ID: {selectedVisitor.visitor_id}{selectedVisitor.user ? ` · 帳號: ${selectedVisitor.user}` : " · 未註冊訪客"}
+                </div>
+                <div className="save-list">
+                  {(selectedVisitor.events || []).map((evt, i) => (
+                    <div key={i} className="save-card" style={{ padding: "8px 12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{evt.action}</span>
+                        <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{evt.ts ? new Date(evt.ts).toLocaleString("zh-TW") : ""}</span>
+                      </div>
+                      {evt.detail && Object.keys(evt.detail).length > 0 && (
+                        <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>
+                          {Object.entries(evt.detail).map(([k, v]) => `${k}: ${typeof v === "string" ? v.slice(0, 100) : JSON.stringify(v)}`).join(" · ")}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
