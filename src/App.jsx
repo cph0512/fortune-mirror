@@ -141,7 +141,7 @@ function saveKB(entries) {
 }
 
 const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
-const API_ACTIVITY = "https://bot.velopulse.io/api/fortune-activity";
+const API_ACTIVITY = API_BACKEND.replace("/fortune", "/fortune-activity");
 
 function logActivity(user, action, detail) {
   fetch(API_ACTIVITY, {
