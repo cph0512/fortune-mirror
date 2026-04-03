@@ -10,11 +10,42 @@ import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
 // ============================================================
 
 const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
+const API_TRACK = API_BACKEND.replace("/fortune", "/fortune-track");
 const STORAGE_KEY_KB = "fortune-app-kb";
-const KB_VERSION = "20260402c";
+const KB_VERSION = "20260402d";
 const SESSION_KEY_PREFIX = "wizard-session-";
 const SESSION_KEY_GUEST = "wizard-session-guest";
 const AUTH_KEY = "wizard-auth";
+const VISITOR_ID_KEY = "fortune-visitor-id";
+
+// 每個訪客唯一 ID（即使未註冊也有）
+function getVisitorId() {
+  let vid = localStorage.getItem(VISITOR_ID_KEY);
+  if (!vid) {
+    vid = "v_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem(VISITOR_ID_KEY, vid);
+  }
+  return vid;
+}
+
+// 活動追蹤（fire and forget）
+function trackEvent(action, detail = {}) {
+  try {
+    const auth = loadAuth();
+    fetch(API_TRACK, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        visitor_id: getVisitorId(),
+        user: auth?.email || null,
+        user_name: auth?.name || null,
+        action,
+        detail,
+        ts: new Date().toISOString(),
+      }),
+    }).catch(() => {});
+  } catch {}
+}
 
 function sessionKey(user) {
   return user?.email ? `${SESSION_KEY_PREFIX}${user.email}` : SESSION_KEY_GUEST;
@@ -337,9 +368,10 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         fetch(API_BACKEND.replace("/fortune", "/fortune-register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: authEmail.trim(), password: authPassword, name: authName.trim() }),
+          body: JSON.stringify({ username: authEmail.trim(), password: authPassword, name: authName.trim(), visitor_id: getVisitorId(), source: "b2c" }),
         });
       } catch {}
+      trackEvent("register", { email: authEmail.trim(), name: authName.trim() });
       // Migrate current guest session to this user
       migrateGuestSession(user);
     } else {
@@ -413,6 +445,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     setError("");
     setFinalResult("");
     setRawResults([]);
+    trackEvent("start_analysis", { gender, goal, loveSub, birth: `${birthYear}/${birthMonth}/${birthDay} ${birthHour}:${birthMinute}`, birthPlace });
 
     let msgIdx = 0;
     setLoadingMsg(LOADING_MSGS[0]);
@@ -484,7 +517,7 @@ ${astroChart}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
       if (!submitRes.ok) throw new Error("分析失敗");
       const { job_id } = await submitRes.json();
@@ -506,6 +539,7 @@ ${astroChart}
       setAnalyzing(false);
       setLoadingMsg("");
       setStep(TOTAL_STEPS + 1); // result screen
+      trackEvent("analysis_complete", { goal, loveSub, resultLength: finalResult?.length || 0 });
     } catch (err) {
       setError("分析過程發生錯誤：" + err.message);
       setAnalyzing(false);
@@ -517,6 +551,7 @@ ${astroChart}
   const sendChat = async (question) => {
     if (!question.trim() || chatLoading) return;
     setShowQuickQ(false);
+    trackEvent("chat_question", { question: question.slice(0, 200) });
     setChatHistory(prev => [...prev, { role: "user", text: question }]);
     setChatInput("");
     setChatLoading(true);
@@ -530,7 +565,7 @@ ${astroChart}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt, analysis_type: isDeep ? "deep" : "general" }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
       if (!submitRes.ok) throw new Error("送出失敗");
       const { job_id } = await submitRes.json();
@@ -556,6 +591,7 @@ ${astroChart}
     setHebanAnalyzing(true);
     setHebanResult("");
     setError("");
+    trackEvent("start_heban", { relation: hebanRelation, partnerGender: hebanGender, partnerName: hebanName });
 
     let msgIdx = 0;
     setLoadingMsg("正在解讀兩人的緣分密碼...");
@@ -627,7 +663,7 @@ ${hasPartnerTime
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt }),
+        body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
       if (!submitRes.ok) throw new Error("合盤分析送出失敗");
       const { job_id } = await submitRes.json();
@@ -788,11 +824,11 @@ ${hasPartnerTime
           </div>
           <div className="wizard-question">我是...</div>
           <div className="wizard-gender-cards">
-            <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); setTimeout(() => setStep(1), 300); }}>
+            <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); trackEvent("select_gender", { gender: "男" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">M</div>
               <div className="wizard-gender-label"><span>男生</span><span>›</span></div>
             </div>
-            <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); setTimeout(() => setStep(1), 300); }}>
+            <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); trackEvent("select_gender", { gender: "女" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">F</div>
               <div className="wizard-gender-label"><span>女生</span><span>›</span></div>
             </div>
@@ -803,11 +839,11 @@ ${hasPartnerTime
           {/* Guest try-first section */}
           <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>直接開始體驗</div>
           <div className="wizard-gender-cards">
-            <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); setTimeout(() => setStep(1), 300); }}>
+            <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); trackEvent("select_gender", { gender: "男" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">M</div>
               <div className="wizard-gender-label"><span>男生</span><span>›</span></div>
             </div>
-            <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); setTimeout(() => setStep(1), 300); }}>
+            <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); trackEvent("select_gender", { gender: "女" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">F</div>
               <div className="wizard-gender-label"><span>女生</span><span>›</span></div>
             </div>
@@ -858,7 +894,7 @@ ${hasPartnerTime
           <>
             {LOVE_SUBS.map(s => (
               <div key={s.text} className="wizard-option"
-                onClick={() => { setLoveSub(s.text); setGoalPrompt(s.prompt); setTimeout(() => setStep(2), 300); }}>
+                onClick={() => { setLoveSub(s.text); setGoalPrompt(s.prompt); trackEvent("select_goal", { goal: "感情與姻緣", sub: s.text }); setTimeout(() => setStep(2), 300); }}>
                 <span className="wizard-option-text">{s.text}</span>
                 <span className="wizard-option-arrow">›</span>
               </div>
@@ -877,6 +913,7 @@ ${hasPartnerTime
                   setLoveSub("");
                 } else {
                   setGoalPrompt(g.prompt);
+                  trackEvent("select_goal", { goal: g.text });
                   setTimeout(() => setStep(2), 300);
                 }
               }}>
