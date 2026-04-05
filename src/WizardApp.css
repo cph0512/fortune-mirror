@@ -1556,6 +1556,23 @@
   }
 }
 
+/* ===== Language Switcher ===== */
+
+.wizard-lang-switcher {
+  display: flex; justify-content: center; gap: 6px;
+  margin-bottom: 20px;
+}
+.wizard-lang-btn {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(180, 160, 255, 0.15);
+  color: #94a3b8; border-radius: 16px; padding: 5px 14px;
+  font-size: 12px; cursor: pointer; transition: all 0.2s;
+}
+.wizard-lang-btn:hover { border-color: rgba(180, 160, 255, 0.4); color: #c4b5fd; }
+.wizard-lang-btn.active {
+  background: rgba(124, 58, 237, 0.25); border-color: #7c3aed;
+  color: #e8e0ff; font-weight: 600;
+}
+
 /* ===== Twin Toggle ===== */
 
 .wizard-twin-toggle {

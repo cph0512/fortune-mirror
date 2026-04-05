@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import './i18n.js';
 import './WizardApp.css';
 import { calculateChart, formatChart, formatChartByTianGan } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
@@ -6,6 +8,9 @@ import { calculateAstro, formatAstro } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
 import { calculateTrueSolarTime, formatCorrectionDetails } from "./true-solar-time.js";
 import { searchCities } from "./city-search.js";
+
+const LANG_NAMES = { 'zh-TW': '繁中', en: 'EN', ja: '日本語' };
+const LANG_AI = { 'zh-TW': '繁體中文', en: 'English', ja: '日本語' };
 
 // ============================================================
 // CONSTANTS
@@ -91,25 +96,25 @@ function loadKB() {
 }
 
 const GOALS = [
-  { text: "感情與姻緣", prompt: "感情、姻緣、桃花、婚姻、另一半", hasSub: true },
-  { text: "事業與升遷", prompt: "事業、工作、升遷、職涯方向、貴人" },
-  { text: "財富與投資", prompt: "財運、投資、理財、收入、財庫" },
-  { text: "健康與養生", prompt: "健康、身體、養生、需注意的部位" },
-  { text: "全面綜合分析", prompt: "全面性格、事業、感情、財運、健康、今年運勢" },
+  { text: "感情與姻緣", key: "goal.love", prompt: "感情、姻緣、桃花、婚姻、另一半", hasSub: true },
+  { text: "事業與升遷", key: "goal.career", prompt: "事業、工作、升遷、職涯方向、貴人" },
+  { text: "財富與投資", key: "goal.wealth", prompt: "財運、投資、理財、收入、財庫" },
+  { text: "健康與養生", key: "goal.health", prompt: "健康、身體、養生、需注意的部位" },
+  { text: "全面綜合分析", key: "goal.general", prompt: "全面性格、事業、感情、財運、健康、今年運勢" },
 ];
 
 const LOVE_SUBS = [
-  { text: "未婚／單身", prompt: "感情、姻緣、桃花、戀愛、交往對象、何時遇到對的人" },
-  { text: "已婚／穩定交往中", prompt: "婚姻、夫妻關係、感情經營、另一半互動、婚後挑戰" },
+  { text: "未婚／單身", key: "goal.loveSingle", prompt: "感情、姻緣、桃花、戀愛、交往對象、何時遇到對的人" },
+  { text: "已婚／穩定交往中", key: "goal.loveMarried", prompt: "婚姻、夫妻關係、感情經營、另一半互動、婚後挑戰" },
 ];
 
 const RELATIONS = [
-  { text: "情人 / 曖昧對象" },
-  { text: "夫妻 / 伴侶" },
-  { text: "家人" },
-  { text: "朋友" },
-  { text: "同事 / 上下屬" },
-  { text: "雙胞胎手足" },
+  { text: "情人 / 曖昧對象", key: "relations.lover" },
+  { text: "夫妻 / 伴侶", key: "relations.spouse" },
+  { text: "家人", key: "relations.family" },
+  { text: "朋友", key: "relations.friend" },
+  { text: "同事 / 上下屬", key: "relations.colleague" },
+  { text: "雙胞胎手足", key: "relations.twin" },
 ];
 
 const HEBAN_SYSTEM_PROMPT = `你是「命理三鏡」的關係分析師。
@@ -272,6 +277,10 @@ function buildWizardPrompt(kbEntries, goalObj) {
 const TOTAL_STEPS = 5; // welcome, goal, birthday+time, place, confirm
 
 export default function WizardApp({ auth, onBack, onLogout }) {
+  const { t, i18n } = useTranslation();
+  const currentLang = i18n.language || 'zh-TW';
+  const changeLang = (lng) => i18n.changeLanguage(lng);
+
   // Load auth first, then restore the correct user's session
   const savedAuth = loadAuth();
   const saved = loadSession(savedAuth);
@@ -402,21 +411,21 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     let user;
     if (authMode === "register") {
       if (!authName.trim() || !authEmail.trim() || !authPassword.trim()) {
-        setAuthError("請填寫所有欄位");
+        setAuthError(t('auth.fillAll'));
         return;
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authEmail)) {
-        setAuthError("Email 格式不正確");
+        setAuthError(t('auth.invalidEmail'));
         return;
       }
       if (authPassword.length < 6) {
-        setAuthError("密碼至少 6 個字元");
+        setAuthError(t('auth.passwordMin'));
         return;
       }
       // Check if email already registered
       const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
       if (existingUsers[authEmail.trim()]) {
-        setAuthError("此 Email 已註冊，請登入");
+        setAuthError(t('auth.emailExists'));
         setAuthMode("login");
         return;
       }
@@ -438,17 +447,17 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     } else {
       // Login — verify email + password
       if (!authEmail.trim() || !authPassword.trim()) {
-        setAuthError("請填寫 Email 和密碼");
+        setAuthError(t('auth.fillEmailPw'));
         return;
       }
       const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
       const stored = existingUsers[authEmail.trim()];
       if (!stored) {
-        setAuthError("找不到此帳號，請先註冊");
+        setAuthError(t('auth.notFound'));
         return;
       }
       if (stored.passwordHash !== btoa(authPassword)) {
-        setAuthError("密碼不正確");
+        setAuthError(t('auth.wrongPassword'));
         return;
       }
       user = { name: stored.name, email: authEmail.trim() };
@@ -711,7 +720,8 @@ ${astroChart}${twinChartBlock}
 ⚠️ 嚴格遵守系統規則：不提任何命理系統名稱和專有術語，用自然語言表達所有洞見。
 ⚠️ 按照指定的輸出格式（天賦特質 → 主題深度解析 → 年運勢 → 建議 → 近期提醒）組織內容。
 ⚠️ 重點針對用戶關注的「${goal}${loveSub ? `（${loveSub}）` : ""}」方向深入分析。
-⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。${twinTaskBlock}`;
+⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。${twinTaskBlock}
+⚠️ 你必須用「${LANG_AI[currentLang] || '繁體中文'}」撰寫整份報告。所有標題、內容、建議都必須使用「${LANG_AI[currentLang] || '繁體中文'}」。`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
@@ -759,7 +769,7 @@ ${astroChart}${twinChartBlock}
       const kbEntries = loadKB();
       const wizardSP = buildWizardPrompt(kbEntries, goal);
       const recentChat = chatHistory.slice(-10).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
-      const prompt = `之前的完整分析報告：\n${finalResult}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先以紫微斗數的宮位、飛化、星曜組合進行深度推論，給出具體而非籠統的回答\n3. 引用分析報告中的相關內容，結合命盤資訊給出精確判斷\n4. 如果問題涉及時間點，要具體到年份或時期`;
+      const prompt = `之前的完整分析報告：\n${finalResult}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先以紫微斗數的宮位、飛化、星曜組合進行深度推論，給出具體而非籠統的回答\n3. 引用分析報告中的相關內容，結合命盤資訊給出精確判斷\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
       // Deep analysis for 大運/流年 questions → Opus; others → Sonnet
       const isDeep = /大運|流年|逐月|十年|運勢走向/.test(question);
       const submitRes = await fetch(API_BACKEND, {
@@ -873,7 +883,8 @@ ${hebanRelation === "雙胞胎手足" ? `
 
 ⚠️ 嚴格遵守規則：不提任何命理系統名稱和專有術語。
 ⚠️ 用自然語言描述兩人的互動與緣分。
-⚠️ 按照指定輸出格式。`;
+⚠️ 按照指定輸出格式。
+⚠️ 你必須用「${LANG_AI[currentLang] || '繁體中文'}」撰寫整份報告。`;
 
       let sp = HEBAN_SYSTEM_PROMPT;
       if (kbEntries.length > 0) {
@@ -1025,14 +1036,14 @@ ${hebanRelation === "雙胞胎手足" ? `
   // Step 0: Welcome + gender
   // Account management panel
   const renderAccountPanel = () => {
-    const FEATURE_NAMES = { deep: "深度分析（大運/流年）", heban: "合盤解讀" };
+    const FEATURE_NAMES = { deep: t('account.featureDeep'), heban: t('account.featureHeban') };
     const PLAN_ICONS = { deep_analysis: "深", heban: "合", bundle: "全" };
 
     return (
       <div className="wizard-account-panel">
         <div className="wizard-account-header">
           <button className="wizard-back" onClick={() => setShowAccount(false)}>‹</button>
-          <div className="wizard-account-title">我的帳號</div>
+          <div className="wizard-account-title">{t('account.title')}</div>
         </div>
 
         <div className="wizard-account-info">
@@ -1044,7 +1055,7 @@ ${hebanRelation === "雙胞胎手足" ? `
         </div>
 
         <div className="wizard-account-section">
-          <div className="wizard-account-section-title">已解鎖功能</div>
+          <div className="wizard-account-section-title">{t('account.unlockedFeatures')}</div>
           {userFeatures.length > 0 ? (
             <div className="wizard-account-features">
               {userFeatures.map(f => (
@@ -1052,12 +1063,12 @@ ${hebanRelation === "雙胞胎手足" ? `
               ))}
             </div>
           ) : (
-            <div className="wizard-account-empty">尚未解鎖付費功能</div>
+            <div className="wizard-account-empty">{t('account.noFeatures')}</div>
           )}
         </div>
 
         <div className="wizard-account-section">
-          <div className="wizard-account-section-title">付費方案</div>
+          <div className="wizard-account-section-title">{t('account.plans')}</div>
           {paymentPlans ? (
             <div className="wizard-account-plans">
               {Object.entries(paymentPlans).map(([id, plan]) => {
@@ -1072,11 +1083,11 @@ ${hebanRelation === "雙胞胎手足" ? `
                       <div className="wizard-account-plan-price">NT$ {plan.price}</div>
                     </div>
                     {owned ? (
-                      <div className="wizard-account-plan-owned">已解鎖</div>
+                      <div className="wizard-account-plan-owned">{t('account.unlocked')}</div>
                     ) : (
                       <button className="wizard-account-plan-btn" disabled={loadingPayment}
                         onClick={() => handleCheckout(id)}>
-                        {loadingPayment ? "處理中..." : "購買"}
+                        {loadingPayment ? t('account.processing') : t('account.buy')}
                       </button>
                     )}
                   </div>
@@ -1084,7 +1095,7 @@ ${hebanRelation === "雙胞胎手足" ? `
               })}
             </div>
           ) : (
-            <div className="wizard-account-empty">載入中...</div>
+            <div className="wizard-account-empty">{t('account.loadingPlans')}</div>
           )}
         </div>
 
@@ -1097,7 +1108,7 @@ ${hebanRelation === "雙胞胎手足" ? `
           setBirthPlace("桃園"); setFinalResult(""); setRawResults([]); setHebanResult("");
           setChatHistory([]); setShowHeban(false);
         }}>
-          登出
+          {t('welcome.logout')}
         </button>
       </div>
     );
@@ -1105,15 +1116,21 @@ ${hebanRelation === "雙胞胎手足" ? `
 
   const renderWelcome = () => (
     <div className="wizard-welcome">
+      <div className="wizard-lang-switcher">
+        {Object.entries(LANG_NAMES).map(([lng, label]) => (
+          <button key={lng} className={`wizard-lang-btn ${currentLang === lng ? 'active' : ''}`}
+            onClick={() => changeLang(lng)}>{label}</button>
+        ))}
+      </div>
       <div className="wizard-welcome-icon wizard-diamond"></div>
-      <h1>命理三鏡</h1>
-      <p className="tagline">探索你的命運密碼</p>
+      <h1>{t('app.title')}</h1>
+      <p className="tagline">{t('app.tagline')}</p>
 
       {wizardUser ? (
         <>
           <div className="wizard-user-greeting">
-            {wizardUser.name}，歡迎回來
-            <button className="wizard-account-link" onClick={() => setShowAccount(true)}>我的帳號</button>
+            {t('welcome.greeting', { name: wizardUser.name })}
+            <button className="wizard-account-link" onClick={() => setShowAccount(true)}>{t('welcome.myAccount')}</button>
             <button className="wizard-logout-link" onClick={() => {
               setWizardUser(null);
               localStorage.removeItem(AUTH_KEY);
@@ -1123,63 +1140,63 @@ ${hebanRelation === "雙胞胎手足" ? `
               setBirthPlace("桃園"); setIsTwin(false); setTwinOrder(""); setTwinType("");
               setFinalResult(""); setRawResults([]); setHebanResult("");
               setChatHistory([]); setShowHeban(false);
-            }}>登出</button>
+            }}>{t('welcome.logout')}</button>
           </div>
-          <div className="wizard-question">我是...</div>
+          <div className="wizard-question">{t('welcome.iAm')}</div>
           <div className="wizard-gender-cards">
             <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); trackEvent("select_gender", { gender: "男" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">M</div>
-              <div className="wizard-gender-label"><span>男生</span><span>›</span></div>
+              <div className="wizard-gender-label"><span>{t('welcome.male')}</span><span>›</span></div>
             </div>
             <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); trackEvent("select_gender", { gender: "女" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">F</div>
-              <div className="wizard-gender-label"><span>女生</span><span>›</span></div>
+              <div className="wizard-gender-label"><span>{t('welcome.female')}</span><span>›</span></div>
             </div>
           </div>
         </>
       ) : (
         <div className="wizard-welcome-auth">
           {/* Guest try-first section */}
-          <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>直接開始體驗</div>
+          <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>{t('welcome.tryFirst')}</div>
           <div className="wizard-gender-cards">
             <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); trackEvent("select_gender", { gender: "男" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">M</div>
-              <div className="wizard-gender-label"><span>男生</span><span>›</span></div>
+              <div className="wizard-gender-label"><span>{t('welcome.male')}</span><span>›</span></div>
             </div>
             <div className={`wizard-gender-card ${gender === "女" ? "selected" : ""}`} onClick={() => { setGender("女"); trackEvent("select_gender", { gender: "女" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">F</div>
-              <div className="wizard-gender-label"><span>女生</span><span>›</span></div>
+              <div className="wizard-gender-label"><span>{t('welcome.female')}</span><span>›</span></div>
             </div>
           </div>
-          <div className="wizard-guest-note">免費排盤一次，進階功能需註冊</div>
+          <div className="wizard-guest-note">{t('welcome.guestNote')}</div>
 
           <div className="wizard-welcome-divider">
-            <span>已有帳號？</span>
+            <span>{t('welcome.hasAccount')}</span>
           </div>
 
           {/* Login/Register form */}
           <div className="wizard-welcome-auth-card">
             <div className="wizard-welcome-auth-tabs">
               <button className={`wizard-welcome-auth-tab ${authMode === "login" ? "active" : ""}`}
-                onClick={() => { setAuthMode("login"); setAuthError(""); }}>登入</button>
+                onClick={() => { setAuthMode("login"); setAuthError(""); }}>{t('auth.login')}</button>
               <button className={`wizard-welcome-auth-tab ${authMode === "register" ? "active" : ""}`}
-                onClick={() => { setAuthMode("register"); setAuthError(""); }}>註冊</button>
+                onClick={() => { setAuthMode("register"); setAuthError(""); }}>{t('auth.register')}</button>
             </div>
 
             {authMode === "register" && (
-              <input className="wizard-auth-input" placeholder="你的稱呼" value={authName}
+              <input className="wizard-auth-input" placeholder={t('auth.name')} value={authName}
                 onChange={e => setAuthName(e.target.value)} />
             )}
-            <input className="wizard-auth-input" placeholder="Email" type="email" value={authEmail}
+            <input className="wizard-auth-input" placeholder={t('auth.email')} type="email" value={authEmail}
               onChange={e => setAuthEmail(e.target.value)} />
-            <input className="wizard-auth-input" placeholder="密碼" type="password" value={authPassword}
+            <input className="wizard-auth-input" placeholder={t('auth.password')} type="password" value={authPassword}
               onChange={e => setAuthPassword(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleAuthSubmit(); }} />
 
             {authError && <div className="wizard-auth-error">{authError}</div>}
 
             <button className="wizard-cta" onClick={handleAuthSubmit}>
-              {authMode === "login" ? "登入" : "免費註冊"}
+              {authMode === "login" ? t('auth.login') : t('auth.freeRegister')}
             </button>
           </div>
         </div>
@@ -1190,21 +1207,21 @@ ${hebanRelation === "雙胞胎手足" ? `
   // Step 1: Goal
   const renderGoal = () => (
     <div className="wizard-content">
-      <div className="wizard-question">{goal === "感情與姻緣" && loveSub === "" ? "你目前的感情狀態？" : "你想了解什麼？"}</div>
-      <div className="wizard-subtitle">{goal === "感情與姻緣" && loveSub === "" ? "不同階段，解讀重點不同" : "選擇你最關注的方向"}</div>
+      <div className="wizard-question">{goal === "感情與姻緣" && loveSub === "" ? t('goal.loveStatus') : t('goal.question')}</div>
+      <div className="wizard-subtitle">{goal === "感情與姻緣" && loveSub === "" ? t('goal.loveStatusSub') : t('goal.subtitle')}</div>
       <div className="wizard-options">
         {goal === "感情與姻緣" && loveSub === "" ? (
           <>
             {LOVE_SUBS.map(s => (
               <div key={s.text} className="wizard-option"
                 onClick={() => { setLoveSub(s.text); setGoalPrompt(s.prompt); trackEvent("select_goal", { goal: "感情與姻緣", sub: s.text }); setTimeout(() => setStep(2), 300); }}>
-                <span className="wizard-option-text">{s.text}</span>
+                <span className="wizard-option-text">{t(s.key)}</span>
                 <span className="wizard-option-arrow">›</span>
               </div>
             ))}
             <div className="wizard-option" style={{ opacity: 0.6 }}
               onClick={() => { setGoal(""); setLoveSub(""); }}>
-              <span className="wizard-option-text">‹ 返回</span>
+              <span className="wizard-option-text">{t('goal.back')}</span>
             </div>
           </>
         ) : (
@@ -1220,7 +1237,7 @@ ${hebanRelation === "雙胞胎手足" ? `
                   setTimeout(() => setStep(2), 300);
                 }
               }}>
-              <span className="wizard-option-text">{g.text}</span>
+              <span className="wizard-option-text">{t(g.key)}</span>
               <span className="wizard-option-arrow">›</span>
             </div>
           ))
@@ -1242,29 +1259,29 @@ ${hebanRelation === "雙胞胎手足" ? `
 
     return (
       <div className="wizard-content">
-        <div className="wizard-question">你的出生時間？</div>
+        <div className="wizard-question">{t('birth.question')}</div>
         <div className="wizard-hint">
-          <span className="wizard-hint-text">出生日期與時間可以幫助我們精準解讀你的命運密碼</span>
+          <span className="wizard-hint-text">{t('birth.hint')}</span>
         </div>
 
         {/* Date row */}
         <div className="wizard-date-row">
           <div className="wizard-select-wrap">
-            <label>年</label>
+            <label>{t('birth.year')}</label>
             <select className="wizard-select" value={birthYear} onChange={e => setBirthYear(e.target.value)}>
               <option value="">--</option>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
           <div className="wizard-select-wrap">
-            <label>月</label>
+            <label>{t('birth.month')}</label>
             <select className="wizard-select" value={birthMonth} onChange={e => setBirthMonth(e.target.value)}>
               <option value="">--</option>
               {months.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div className="wizard-select-wrap">
-            <label>日</label>
+            <label>{t('birth.day')}</label>
             <select className="wizard-select" value={birthDay} onChange={e => setBirthDay(e.target.value)}>
               <option value="">--</option>
               {days.map(d => <option key={d} value={d}>{d}</option>)}
@@ -1277,16 +1294,16 @@ ${hebanRelation === "雙胞胎手足" ? `
         {/* Time row */}
         <div className="wizard-date-row">
           <div className="wizard-select-wrap">
-            <label>時</label>
+            <label>{t('birth.hour')}</label>
             <select className="wizard-select" value={birthHour} onChange={e => setBirthHour(e.target.value)}>
               <option value="">--</option>
-              {hours.map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}時</option>)}
+              {hours.map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}{t('birth.hourSuffix')}</option>)}
             </select>
           </div>
           <div className="wizard-select-wrap">
-            <label>分</label>
+            <label>{t('birth.minute')}</label>
             <select className="wizard-select" value={birthMinute} onChange={e => setBirthMinute(e.target.value)}>
-              {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}分</option>)}
+              {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}{t('birth.minuteSuffix')}</option>)}
             </select>
           </div>
         </div>
@@ -1296,24 +1313,24 @@ ${hebanRelation === "雙胞胎手足" ? `
         <div className="wizard-twin-toggle">
           <label className="wizard-twin-check">
             <input type="checkbox" checked={isTwin} onChange={e => { setIsTwin(e.target.checked); if (!e.target.checked) { setTwinOrder(""); setTwinType(""); } }} />
-            <span>我是雙胞胎 / 龍鳳胎</span>
+            <span>{t('birth.twin')}</span>
           </label>
         </div>
 
         {isTwin && (
           <div className="wizard-twin-options">
             <div className="wizard-twin-row">
-              <div className="wizard-twin-label">手足性別</div>
+              <div className="wizard-twin-label">{t('birth.twinSibGender')}</div>
               <div className="wizard-twin-btns">
-                <button className={`wizard-twin-btn ${twinType === "同性" ? "selected" : ""}`} onClick={() => setTwinType("同性")}>同性（都是{gender}生）</button>
-                <button className={`wizard-twin-btn ${twinType === "龍鳳" ? "selected" : ""}`} onClick={() => setTwinType("龍鳳")}>{gender === "男" ? "手足是女生" : "手足是男生"}</button>
+                <button className={`wizard-twin-btn ${twinType === "同性" ? "selected" : ""}`} onClick={() => setTwinType("同性")}>{t('birth.twinSameGender', { gender: gender === "男" ? t('welcome.male') : t('welcome.female') })}</button>
+                <button className={`wizard-twin-btn ${twinType === "龍鳳" ? "selected" : ""}`} onClick={() => setTwinType("龍鳳")}>{t('birth.twinDiffGender', { otherGender: gender === "男" ? t('welcome.female') : t('welcome.male') })}</button>
               </div>
             </div>
             <div className="wizard-twin-row">
-              <div className="wizard-twin-label">你的出生順序</div>
+              <div className="wizard-twin-label">{t('birth.twinOrder')}</div>
               <div className="wizard-twin-btns">
-                <button className={`wizard-twin-btn ${twinOrder === "先" ? "selected" : ""}`} onClick={() => setTwinOrder("先")}>我先出生</button>
-                <button className={`wizard-twin-btn ${twinOrder === "後" ? "selected" : ""}`} onClick={() => setTwinOrder("後")}>我後出生</button>
+                <button className={`wizard-twin-btn ${twinOrder === "先" ? "selected" : ""}`} onClick={() => setTwinOrder("先")}>{t('birth.twinFirst')}</button>
+                <button className={`wizard-twin-btn ${twinOrder === "後" ? "selected" : ""}`} onClick={() => setTwinOrder("後")}>{t('birth.twinSecond')}</button>
               </div>
             </div>
           </div>
@@ -1321,10 +1338,10 @@ ${hebanRelation === "雙胞胎手足" ? `
 
         <div style={{ height: 32 }} />
         <button className="wizard-cta" disabled={!canProceed || (isTwin && (!twinOrder || !twinType))} onClick={() => setStep(3)}>
-          繼續
+          {t('birth.continue')}
         </button>
         <button className="wizard-cta-secondary" onClick={() => { setBirthHour("12"); setBirthMinute("0"); setStep(3); }}>
-          不確定時間，使用預設
+          {t('birth.defaultTime')}
         </button>
       </div>
     );
@@ -1352,15 +1369,15 @@ ${hebanRelation === "雙胞胎手足" ? `
   const renderPlace = () => {
     return (
       <div className="wizard-content">
-        <div className="wizard-question">出生地</div>
-        <div className="wizard-subtitle">影響排盤的時辰判定與精確度</div>
+        <div className="wizard-question">{t('place.question')}</div>
+        <div className="wizard-subtitle">{t('place.subtitle')}</div>
         <div style={{ maxWidth: 340, margin: "0 auto", position: "relative" }}>
           <input
             className="wizard-input"
             value={citySearchQuery || birthPlace}
             onChange={e => handleCitySearch(e.target.value)}
             onFocus={() => { if (birthPlace) handleCitySearch(birthPlace); }}
-            placeholder="搜尋城市（中/英/日）..."
+            placeholder={t('place.search')}
             style={{ width: "100%", fontSize: 16, padding: "10px 12px" }}
             autoComplete="off"
           />
@@ -1400,7 +1417,7 @@ ${hebanRelation === "雙胞胎手足" ? `
         </div>
         <div style={{ height: 32 }} />
         <button className="wizard-cta" disabled={!birthPlace.trim()} onClick={() => { setCitySearchResults([]); setStep(4); }}>
-          繼續
+          {t('birth.continue')}
         </button>
       </div>
     );
@@ -1409,41 +1426,41 @@ ${hebanRelation === "雙胞胎手足" ? `
   // Step 4: Confirm
   const renderConfirm = () => (
     <div className="wizard-content">
-      <div className="wizard-question">確認你的資料</div>
+      <div className="wizard-question">{t('confirm.question')}</div>
       <div className="wizard-confirm">
         <div className="wizard-confirm-card">
           <div className="wizard-confirm-row">
-            <span className="wizard-confirm-label">性別</span>
+            <span className="wizard-confirm-label">{t('confirm.gender')}</span>
             <span className="wizard-confirm-value">{gender}</span>
           </div>
           <div className="wizard-confirm-row">
-            <span className="wizard-confirm-label">關注方向</span>
+            <span className="wizard-confirm-label">{t('confirm.focus')}</span>
             <span className="wizard-confirm-value">{goal}{loveSub ? `（${loveSub}）` : ""}</span>
           </div>
           <div className="wizard-confirm-row">
-            <span className="wizard-confirm-label">出生日期</span>
+            <span className="wizard-confirm-label">{t('confirm.birthDate')}</span>
             <span className="wizard-confirm-value">{birthYear}年{birthMonth}月{birthDay}日</span>
           </div>
           <div className="wizard-confirm-row">
-            <span className="wizard-confirm-label">出生時間</span>
+            <span className="wizard-confirm-label">{t('confirm.birthTime')}</span>
             <span className="wizard-confirm-value">{String(birthHour).padStart(2, '0')}:{String(birthMinute).padStart(2, '0')}</span>
           </div>
           <div className="wizard-confirm-row">
-            <span className="wizard-confirm-label">出生地</span>
+            <span className="wizard-confirm-label">{t('confirm.birthPlace')}</span>
             <span className="wizard-confirm-value">{birthPlace}</span>
           </div>
           {isTwin && (
             <div className="wizard-confirm-row">
-              <span className="wizard-confirm-label">雙胞胎</span>
-              <span className="wizard-confirm-value">{twinType}・{twinOrder === "先" ? "先出生" : "後出生"}</span>
+              <span className="wizard-confirm-label">{t('confirm.twinLabel')}</span>
+              <span className="wizard-confirm-value">{twinType === "同性" ? t('confirm.twinSame') : t('confirm.twinDiff')}・{twinOrder === "先" ? t('confirm.twinFirst') : t('confirm.twinSecond')}</span>
             </div>
           )}
         </div>
         <button className="wizard-cta" onClick={startAnalysis}>
-          開始解讀命運
+          {t('confirm.startAnalysis')}
         </button>
         <button className="wizard-cta-secondary" onClick={() => setStep(0)}>
-          重新填寫
+          {t('confirm.redo')}
         </button>
       </div>
     </div>
@@ -1460,7 +1477,7 @@ ${hebanRelation === "雙胞胎手足" ? `
           <div className="wizard-loading-star wizard-diamond"></div>
         </div>
         <div className="wizard-loading-text">{loadingMsg}</div>
-        <div className="wizard-loading-step">請稍候，正在為你深度解讀...</div>
+        <div className="wizard-loading-step">{t('loading.wait')}</div>
       </div>
       {error && <div style={{ color: "#f87171", marginTop: 24, textAlign: "center" }}>{error}</div>}
     </div>
@@ -1480,7 +1497,7 @@ ${hebanRelation === "雙胞胎手足" ? `
     return (
       <div className="wizard-content">
         <div className="wizard-result">
-          <div className="wizard-question" style={{ marginBottom: 24 }}>你的命運解讀報告</div>
+          <div className="wizard-question" style={{ marginBottom: 24 }}>{t('result.title')}</div>
           <div className="wizard-result-sections">
             {renderFormattedResult(finalResult)}
           </div>
@@ -1491,61 +1508,61 @@ ${hebanRelation === "雙胞胎手足" ? `
               <div className="wizard-heban-promo-header">
                 <span className="wizard-heban-promo-icon wizard-diamond"></span>
                 <div>
-                  <div className="wizard-heban-promo-title">想了解你和他/她的關係嗎？</div>
-                  <div className="wizard-heban-promo-desc">輸入對方生日，立即揭開你們之間的緣分密碼</div>
+                  <div className="wizard-heban-promo-title">{t('result.hebanPromoTitle')}</div>
+                  <div className="wizard-heban-promo-desc">{t('result.hebanPromoDesc')}</div>
                 </div>
               </div>
               {!showHeban ? (
                 <button className="wizard-cta" style={{ marginTop: 16 }} onClick={() => requireAuth(() => setShowHeban(true))}>
-                  開始合盤解讀
+                  {t('result.startHeban')}
                 </button>
               ) : (
                 <div className="wizard-heban-form">
                   {/* Relation */}
-                  <div className="wizard-heban-label">你們的關係</div>
+                  <div className="wizard-heban-label">{t('result.hebanRelation')}</div>
                   <div className="wizard-heban-relations">
                     {RELATIONS.map(r => (
                       <button key={r.text}
                         className={`wizard-heban-rel-btn ${hebanRelation === r.text ? "selected" : ""}`}
                         onClick={() => setHebanRelation(r.text)}>
-                        {r.text}
+                        {t(r.key)}
                       </button>
                     ))}
                   </div>
 
                   {/* Gender */}
-                  <div className="wizard-heban-label">對方性別</div>
+                  <div className="wizard-heban-label">{t('result.hebanGender')}</div>
                   <div className="wizard-heban-relations">
                     <button className={`wizard-heban-rel-btn ${hebanGender === "男" ? "selected" : ""}`}
-                      onClick={() => setHebanGender("男")}>男生</button>
+                      onClick={() => setHebanGender("男")}>{t('welcome.male')}</button>
                     <button className={`wizard-heban-rel-btn ${hebanGender === "女" ? "selected" : ""}`}
-                      onClick={() => setHebanGender("女")}>女生</button>
+                      onClick={() => setHebanGender("女")}>{t('welcome.female')}</button>
                   </div>
 
                   {/* Name (optional) */}
-                  <div className="wizard-heban-label">對方稱呼（選填）</div>
+                  <div className="wizard-heban-label">{t('result.hebanName')}</div>
                   <input className="wizard-input" value={hebanName} onChange={e => setHebanName(e.target.value)}
-                    placeholder="例：小明、Amy..." style={{ maxWidth: 300, marginBottom: 16 }} />
+                    placeholder={t('result.hebanNamePlaceholder')} style={{ maxWidth: 300, marginBottom: 16 }} />
 
                   {/* Birthday */}
-                  <div className="wizard-heban-label">對方出生日期</div>
+                  <div className="wizard-heban-label">{t('result.hebanBirth')}</div>
                   <div className="wizard-date-row" style={{ marginBottom: 16 }}>
                     <div className="wizard-select-wrap">
-                      <label>年</label>
+                      <label>{t('birth.year')}</label>
                       <select className="wizard-select" value={hebanYear} onChange={e => setHebanYear(e.target.value)}>
                         <option value="">--</option>
                         {years.map(y => <option key={y} value={y}>{y}</option>)}
                       </select>
                     </div>
                     <div className="wizard-select-wrap">
-                      <label>月</label>
+                      <label>{t('birth.month')}</label>
                       <select className="wizard-select" value={hebanMonth} onChange={e => setHebanMonth(e.target.value)}>
                         <option value="">--</option>
                         {months.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
                     <div className="wizard-select-wrap">
-                      <label>日</label>
+                      <label>{t('birth.day')}</label>
                       <select className="wizard-select" value={hebanDay} onChange={e => setHebanDay(e.target.value)}>
                         <option value="">--</option>
                         {days.map(d => <option key={d} value={d}>{d}</option>)}
@@ -1554,25 +1571,25 @@ ${hebanRelation === "雙胞胎手足" ? `
                   </div>
 
                   {/* Time (optional) */}
-                  <div className="wizard-heban-label">出生時間（選填，有的話更準）</div>
+                  <div className="wizard-heban-label">{t('result.hebanTime')}</div>
                   <div className="wizard-date-row" style={{ maxWidth: 250, marginBottom: 24 }}>
                     <div className="wizard-select-wrap">
-                      <label>時</label>
+                      <label>{t('birth.hour')}</label>
                       <select className="wizard-select" value={hebanHour} onChange={e => setHebanHour(e.target.value)}>
-                        <option value="">不確定</option>
-                        {hours.map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}時</option>)}
+                        <option value="">{t('result.hebanNoTime')}</option>
+                        {hours.map(h => <option key={h} value={h}>{String(h).padStart(2, '0')}{t('birth.hourSuffix')}</option>)}
                       </select>
                     </div>
                     <div className="wizard-select-wrap">
-                      <label>分</label>
+                      <label>{t('birth.minute')}</label>
                       <select className="wizard-select" value={hebanMinute} onChange={e => setHebanMinute(e.target.value)}>
-                        {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}分</option>)}
+                        {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}{t('birth.minuteSuffix')}</option>)}
                       </select>
                     </div>
                   </div>
 
                   <button className="wizard-cta" disabled={!hebanReady} onClick={startHeban}>
-                    開始解讀兩人關係
+                    {t('result.hebanAnalyze')}
                   </button>
                 </div>
               )}
@@ -1596,7 +1613,7 @@ ${hebanRelation === "雙胞胎手足" ? `
           {hebanResult && (
             <div className="wizard-heban-result">
               <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>
-                你與{hebanName || "對方"}的關係解讀
+                {t('result.hebanResult')}
               </div>
               <div className="wizard-result-sections">
                 {renderFormattedResult(hebanResult)}
@@ -1675,7 +1692,7 @@ ${hebanRelation === "雙胞胎手足" ? `
             {/* Toggle button to re-show quick questions */}
             {!showQuickQ && chatHistory.length > 0 && (
               <button className="wizard-quick-q-toggle" onClick={() => setShowQuickQ(true)}>
-                更多問題建議
+                {t('result.moreQuestions')}
               </button>
             )}
 
@@ -1688,7 +1705,7 @@ ${hebanRelation === "雙胞胎手足" ? `
                       : msg.text
                   }</div>
                 ))}
-                {chatLoading && <div className="wizard-chat-msg assistant" style={{ opacity: 0.5 }}>正在為你解讀...</div>}
+                {chatLoading && <div className="wizard-chat-msg assistant" style={{ opacity: 0.5 }}>{t('result.chatLoading')}</div>}
                 <div ref={chatEndRef} />
               </div>
             )}
@@ -1697,11 +1714,11 @@ ${hebanRelation === "雙胞胎手足" ? `
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) requireAuth(() => sendChat(chatInput)); }}
-                placeholder="或直接輸入你的問題..."
+                placeholder={t('result.chatPlaceholder')}
                 disabled={chatLoading}
               />
               <button onClick={() => requireAuth(() => sendChat(chatInput))} disabled={chatLoading || !chatInput.trim()}>
-                送出
+                {t('result.chatSend')}
               </button>
             </div>
           </div>
@@ -1751,7 +1768,7 @@ ${hebanRelation === "雙胞胎手足" ? `
         : stepRenderers[step] ? stepRenderers[step]()
         : renderLoading()}
 
-      <div className="wizard-footer">論命僅供參考</div>
+      <div className="wizard-footer">{t('app.footer')}</div>
 
       {/* Auth Modal */}
       {showAuthModal && (
@@ -1759,33 +1776,33 @@ ${hebanRelation === "雙胞胎手足" ? `
           <div className="wizard-auth-modal" onClick={e => e.stopPropagation()}>
             <button className="wizard-auth-close" onClick={() => setShowAuthModal(false)}>✕</button>
             <div className="wizard-auth-title">
-              {authMode === "register" ? "免費註冊，解鎖下一步" : "歡迎回來"}
+              {authMode === "register" ? t('auth.registerUnlock') : t('auth.welcomeBack')}
             </div>
             <div className="wizard-auth-subtitle">
-              {authMode === "register" ? "註冊後可使用大運分析、合盤解讀、追問等完整功能" : "輸入你的帳號密碼登入"}
+              {authMode === "register" ? t('auth.registerDesc') : t('auth.loginDesc')}
             </div>
 
             {authMode === "register" && (
-              <input className="wizard-auth-input" placeholder="你的稱呼" value={authName}
+              <input className="wizard-auth-input" placeholder={t('auth.name')} value={authName}
                 onChange={e => setAuthName(e.target.value)} />
             )}
-            <input className="wizard-auth-input" placeholder="Email" type="email" value={authEmail}
+            <input className="wizard-auth-input" placeholder={t('auth.email')} type="email" value={authEmail}
               onChange={e => setAuthEmail(e.target.value)} />
-            <input className="wizard-auth-input" placeholder="密碼" type="password" value={authPassword}
+            <input className="wizard-auth-input" placeholder={t('auth.password')} type="password" value={authPassword}
               onChange={e => setAuthPassword(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleAuthSubmit(); }} />
 
             {authError && <div className="wizard-auth-error">{authError}</div>}
 
             <button className="wizard-cta" style={{ marginTop: 8 }} onClick={handleAuthSubmit}>
-              {authMode === "register" ? "註冊" : "登入"}
+              {authMode === "register" ? t('auth.register') : t('auth.login')}
             </button>
 
             <button className="wizard-auth-switch" onClick={() => {
               setAuthMode(authMode === "register" ? "login" : "register");
               setAuthError("");
             }}>
-              {authMode === "register" ? "已有帳號？登入" : "還沒有帳號？免費註冊"}
+              {authMode === "register" ? t('auth.hasAccountLogin') : t('auth.noAccountRegister')}
             </button>
           </div>
         </div>
