@@ -1573,6 +1573,21 @@
   color: #e8e0ff; font-weight: 600;
 }
 
+/* ===== Translate Bar ===== */
+
+.wizard-translate-bar {
+  display: flex; justify-content: center; align-items: center; gap: 6px;
+  margin-bottom: 20px;
+}
+.wizard-translate-loading {
+  font-size: 12px; color: #94a3b8; margin-left: 8px;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* ===== Twin Toggle ===== */
 
 .wizard-twin-toggle {

@@ -344,6 +344,11 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [authError, setAuthError] = useState("");
   const pendingActionRef = useRef(null);
 
+  // Translation cache: { "en": "translated text", "ja": "translated text" }
+  const [translatedResults, setTranslatedResults] = useState({});
+  const [translating, setTranslating] = useState(false);
+  const [displayLang, setDisplayLang] = useState(null); // null = original
+
   // Account / payment state
   const [showAccount, setShowAccount] = useState(false);
   const [userFeatures, setUserFeatures] = useState([]);
@@ -543,6 +548,45 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       if (!paymentPlans) fetchPlans();
     }
   }, [showAccount]);
+
+  // Translate result to another language (B option)
+  const translateResult = async (targetLang) => {
+    if (!finalResult) return;
+    // If already translated to this language, just switch display
+    if (translatedResults[targetLang]) {
+      setDisplayLang(targetLang);
+      return;
+    }
+    setTranslating(true);
+    try {
+      const langName = LANG_AI[targetLang] || targetLang;
+      const prompt = `請將以下命理分析報告完整翻譯成「${langName}」。保持原始格式（[SECTION] 標記、段落結構），只翻譯內容，不要添加或刪減任何分析內容。\n\n${finalResult}`;
+      const submitRes = await fetch(API_BACKEND, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: [], system: `你是專業翻譯。將命理報告翻譯成${langName}，保持[SECTION]格式標記不變，保持原文的語氣和風格。`, prompt, analysis_type: "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
+      });
+      if (!submitRes.ok) throw new Error("翻譯失敗");
+      const { job_id } = await submitRes.json();
+      for (let i = 0; i < 200; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+        if (!pollRes.ok) continue;
+        const data = await pollRes.json();
+        if (data.status === "done") {
+          setTranslatedResults(prev => ({ ...prev, [targetLang]: data.result }));
+          setDisplayLang(targetLang);
+          break;
+        }
+      }
+    } catch (e) {
+      console.error("Translation failed:", e);
+    }
+    setTranslating(false);
+  };
+
+  // The text to display (original or translated)
+  const displayResult = displayLang && translatedResults[displayLang] ? translatedResults[displayLang] : finalResult;
 
   const progress = Math.round((step / (TOTAL_STEPS - 1)) * 100);
 
@@ -1497,9 +1541,30 @@ ${hebanRelation === "雙胞胎手足" ? `
     return (
       <div className="wizard-content">
         <div className="wizard-result">
-          <div className="wizard-question" style={{ marginBottom: 24 }}>{t('result.title')}</div>
+          <div className="wizard-question" style={{ marginBottom: 12 }}>{t('result.title')}</div>
+
+          {/* Translate buttons */}
+          <div className="wizard-translate-bar">
+            {Object.entries(LANG_NAMES).map(([lng, label]) => {
+              const isOriginal = lng === currentLang && !displayLang;
+              const isActive = displayLang === lng || isOriginal;
+              return (
+                <button key={lng}
+                  className={`wizard-lang-btn ${isActive ? 'active' : ''}`}
+                  disabled={translating}
+                  onClick={() => {
+                    if (lng === currentLang) { setDisplayLang(null); }
+                    else { translateResult(lng); }
+                  }}>
+                  {label}
+                </button>
+              );
+            })}
+            {translating && <span className="wizard-translate-loading">{t('result.translating') || '翻譯中...'}</span>}
+          </div>
+
           <div className="wizard-result-sections">
-            {renderFormattedResult(finalResult)}
+            {renderFormattedResult(displayResult)}
           </div>
 
           {/* ===== 合盤引導區塊 ===== */}

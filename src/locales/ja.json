@@ -124,7 +124,8 @@
     "chatSend": "送信",
     "chatLoading": "回答を作成中...",
     "moreQuestions": "質問のヒント",
-    "newAnalysis": "新しい鑑定"
+    "newAnalysis": "新しい鑑定",
+    "translating": "翻訳中..."
   },
   "relations": {
     "lover": "恋人・気になる人",

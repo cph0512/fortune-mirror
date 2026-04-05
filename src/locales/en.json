@@ -124,7 +124,8 @@
     "chatSend": "Send",
     "chatLoading": "Reading your answer...",
     "moreQuestions": "More question ideas",
-    "newAnalysis": "New Analysis"
+    "newAnalysis": "New Analysis",
+    "translating": "Translating..."
   },
   "relations": {
     "lover": "Partner / Dating",

@@ -124,7 +124,8 @@
     "chatSend": "送出",
     "chatLoading": "正在為你解讀...",
     "moreQuestions": "更多問題建議",
-    "newAnalysis": "重新分析"
+    "newAnalysis": "重新分析",
+    "translating": "翻譯中..."
   },
   "relations": {
     "lover": "情人 / 曖昧對象",
