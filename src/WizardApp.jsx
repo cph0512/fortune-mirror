@@ -276,7 +276,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [birthDay, setBirthDay] = useState(saved?.birthDay ?? "");
   const [birthHour, setBirthHour] = useState(saved?.birthHour ?? "");
   const [birthMinute, setBirthMinute] = useState(saved?.birthMinute ?? "0");
-  const [birthPlace, setBirthPlace] = useState(saved?.birthPlace ?? "桃園");
+  const [birthPlace, setBirthPlace] = useState(saved?.birthPlace || "");
   const [birthCity, setBirthCity] = useState(saved?.birthCity ?? null);
   const [citySearchResults, setCitySearchResults] = useState([]);
   const [citySearchQuery, setCitySearchQuery] = useState("");
@@ -1094,7 +1094,7 @@ ${hebanRelation === "relations.twin" ? `
           setShowAccount(false);
           setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
           setBirthYear(""); setBirthMonth(""); setBirthDay(""); setBirthHour(""); setBirthMinute("0");
-          setBirthPlace("桃園"); setFinalResult(""); setRawResults([]); setHebanResult("");
+          setBirthPlace(""); setFinalResult(""); setRawResults([]); setHebanResult("");
           setChatHistory([]); setShowHeban(false);
         }}>
           {t('welcome.logout')}
@@ -1125,7 +1125,7 @@ ${hebanRelation === "relations.twin" ? `
               localStorage.removeItem(AUTH_KEY);
               setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
               setBirthYear(""); setBirthMonth(""); setBirthDay(""); setBirthHour(""); setBirthMinute("0");
-              setBirthPlace("桃園"); setIsTwin(false); setTwinOrder(""); setTwinType("");
+              setBirthPlace(""); setIsTwin(false); setTwinOrder(""); setTwinType("");
               setFinalResult(""); setRawResults([]); setHebanResult("");
               setChatHistory([]); setShowHeban(false);
             }}>{t('welcome.logout')}</button>
@@ -1359,7 +1359,7 @@ ${hebanRelation === "relations.twin" ? `
             className="wizard-input"
             value={citySearchQuery || birthPlace}
             onChange={e => handleCitySearch(e.target.value)}
-            onFocus={() => { if (birthPlace) handleCitySearch(birthPlace); }}
+            onFocus={() => { if (birthPlace && birthPlace.length > 0) handleCitySearch(birthPlace); }}
             placeholder={t('place.search')}
             style={{ width: "100%", fontSize: 16, padding: "10px 12px" }}
             autoComplete="off"
