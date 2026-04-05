@@ -1627,6 +1627,56 @@
   color: #e8e0ff; font-weight: 600;
 }
 
+/* ===== Family Chart ===== */
+
+.family-panel {
+  padding: 24px 20px; max-width: 480px; margin: 0 auto; width: 100%; flex: 1;
+}
+.family-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+}
+.family-title {
+  font-size: 18px; font-weight: 600; color: #e8e0ff; letter-spacing: 0.5px;
+}
+.family-intro {
+  color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 20px;
+}
+.family-empty {
+  color: #64748b; font-size: 14px; text-align: center; padding: 32px 0;
+  font-style: italic;
+}
+.family-members {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.family-member-card {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(180, 160, 255, 0.06); border: 1px solid rgba(180, 160, 255, 0.12);
+  border-radius: 12px; padding: 14px;
+}
+.family-member-pick { cursor: pointer; transition: border-color 0.2s; }
+.family-member-pick:hover { border-color: rgba(124, 58, 237, 0.5); }
+.family-member-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, #312e81, #4c1d95);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: #c4b5fd; flex-shrink: 0;
+}
+.family-member-info { flex: 1; }
+.family-member-name { font-size: 15px; font-weight: 500; color: #e8e0ff; }
+.family-member-role { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+.family-member-remove {
+  background: none; border: none; color: #64748b; cursor: pointer;
+  font-size: 16px; padding: 4px 8px; border-radius: 6px;
+}
+.family-member-remove:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+.family-form-label {
+  font-size: 13px; font-weight: 600; color: #94a3b8;
+  margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.family-role-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+
 /* ===== Account Panel ===== */
 
 .wizard-account-link {

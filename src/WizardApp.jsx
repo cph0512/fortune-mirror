@@ -8,6 +8,7 @@ import { calculateAstro, formatAstro } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
 import { calculateTrueSolarTime, formatCorrectionDetails } from "./true-solar-time.js";
 import { searchCities } from "./city-search.js";
+import FamilyChart from "./FamilyChart.jsx";
 
 const LANG_NAMES = { 'zh-TW': '繁中', en: 'EN', ja: '日本語' };
 const LANG_AI = { 'zh-TW': '繁體中文', en: 'English', ja: '日本語' };
@@ -348,6 +349,9 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [translatedResults, setTranslatedResults] = useState({});
   const [translating, setTranslating] = useState(false);
   const [displayLang, setDisplayLang] = useState(null); // null = original
+
+  // Family chart state
+  const [showFamily, setShowFamily] = useState(false);
 
   // Account / payment state
   const [showAccount, setShowAccount] = useState(false);
@@ -1700,6 +1704,20 @@ ${hebanRelation === "雙胞胎手足" ? `
             </button>
           </div>
 
+          {/* ===== 家族命盤入口 ===== */}
+          <div className="wizard-heban-promo" style={{ marginTop: 32 }}>
+            <div className="wizard-heban-promo-header">
+              <span className="wizard-heban-promo-icon wizard-diamond"></span>
+              <div>
+                <div className="wizard-heban-promo-title">{currentLang === 'en' ? 'Family Chart Analysis' : currentLang === 'ja' ? '家族命盤分析' : '家族命盤分析'}</div>
+                <div className="wizard-heban-promo-desc">{currentLang === 'en' ? "Add your parents, siblings, spouse — reveal how family energy shapes your destiny" : currentLang === 'ja' ? "両親・兄弟・配偶者を追加して、家族のエネルギーが運命にどう影響するかを分析" : "加入父母、手足、配偶的命盤，揭示家庭能量如何塑造你的命運"}</div>
+              </div>
+            </div>
+            <button className="wizard-cta" style={{ marginTop: 16 }} onClick={() => requireAuth(() => setShowFamily(true))}>
+              {currentLang === 'en' ? 'Build Family Chart' : currentLang === 'ja' ? '家族命盤を作成' : '建立家族命盤'}
+            </button>
+          </div>
+
           {/* Chat follow-up */}
           <div style={{ height: 32 }} />
           <div className="wizard-chat">
@@ -1827,7 +1845,8 @@ ${hebanRelation === "雙胞胎手足" ? `
       )}
 
       {/* Content */}
-      {showAccount ? renderAccountPanel()
+      {showFamily ? <FamilyChart apiBackend={API_BACKEND} wizardUser={wizardUser} getVisitorId={getVisitorId} onClose={() => setShowFamily(false)} />
+        : showAccount ? renderAccountPanel()
         : isLoadingScreen ? renderLoading()
         : isResultScreen ? renderResult()
         : stepRenderers[step] ? stepRenderers[step]()
