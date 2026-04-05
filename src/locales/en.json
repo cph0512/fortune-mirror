@@ -1,8 +1,11 @@
 {
   "app": {
     "title": "Fortune Mirror",
-    "tagline": "Discover Your Destiny Code",
+    "tagline": "Zi Wei · BaZi · Astrology",
     "footer": "For reference only"
+  },
+  "header": {
+    "logo": "Fortune Mirror"
   },
   "welcome": {
     "greeting": "Welcome back, {{name}}",
@@ -78,7 +81,8 @@
   "place": {
     "question": "Birthplace",
     "subtitle": "Affects time zone and chart accuracy",
-    "search": "Search city..."
+    "search": "Search city...",
+    "coords": "Timezone {{timezone}} | Lng {{lng}} | Lat {{lat}}"
   },
   "confirm": {
     "question": "Confirm your info",
@@ -93,7 +97,8 @@
     "twinFirst": "Born first",
     "twinSecond": "Born second",
     "startAnalysis": "Reveal My Destiny",
-    "redo": "Start over"
+    "redo": "Start over",
+    "dateFormat": "{{month}}/{{day}}/{{year}}"
   },
   "loading": {
     "wait": "Please wait, reading your destiny...",
@@ -125,7 +130,15 @@
     "chatLoading": "Reading your answer...",
     "moreQuestions": "More question ideas",
     "newAnalysis": "New Analysis",
-    "translating": "Translating..."
+    "translating": "Translating...",
+    "analysisError": "Analysis failed",
+    "chatError": "Reply failed",
+    "hebanError": "Compatibility analysis failed",
+    "hebanLoadingMsgs": ["Charting...", "Analyzing both charts...", "Reading your connection..."],
+    "newReading": "New Reading",
+    "backHome": "Back Home",
+    "chatTitle": "Want to dig deeper?",
+    "chatSubtitle": "Pick a question or ask your own"
   },
   "relations": {
     "lover": "Partner / Dating",
@@ -147,12 +160,23 @@
     "featureDeep": "Deep Analysis (Life Phases)",
     "featureHeban": "Compatibility Reading"
   },
-  "quickQuestions": [
-    "How's my love life this year?",
-    "What career suits me best?",
-    "When will my finances peak?",
-    "Am I compatible with my partner?",
-    "What should I watch out for this year?",
-    "Where are my lucky connections?"
-  ]
+  "family": {
+    "chartTitle": "Family Chart Analysis",
+    "chartDesc": "Add your parents, siblings, spouse — reveal how family energy shapes your destiny",
+    "buildChart": "Build Family Chart"
+  },
+  "quickQuestions": {
+    "deepTitle": "Deep Dive",
+    "deepQ1": "Analyze my current 10-year life phase — where am I now?",
+    "deepQ2": "Give me a month-by-month forecast for {{year}}",
+    "followUpTitle": "Follow-up",
+    "q1": "How's my financial fortune this year?",
+    "q2": "When will I have a breakthrough in love?",
+    "q3": "Is now the right time to change jobs?",
+    "q4": "What's the most important thing in my chart?",
+    "hebanTitle": "Or explore your relationships",
+    "hebanQ1": "Who's my mentor among colleagues/boss?",
+    "hebanQ2": "Hidden ties with family — how to resolve?",
+    "hebanQ3": "The one I'm interested in — should I go for it?"
+  }
 }

@@ -1,8 +1,11 @@
 {
   "app": {
     "title": "命理三鏡",
-    "tagline": "運命の暗号を解き明かす",
+    "tagline": "紫微斗数 · 四柱推命 · 西洋占星術",
     "footer": "占いは参考程度にお考えください"
+  },
+  "header": {
+    "logo": "命 理 三 鏡"
   },
   "welcome": {
     "greeting": "{{name}}さん、おかえりなさい",
@@ -78,7 +81,8 @@
   "place": {
     "question": "出生地",
     "subtitle": "時差と鑑定精度に影響します",
-    "search": "都市を検索..."
+    "search": "都市を検索...",
+    "coords": "タイムゾーン {{timezone}} | 経度 {{lng}} | 緯度 {{lat}}"
   },
   "confirm": {
     "question": "入力内容の確認",
@@ -93,7 +97,8 @@
     "twinFirst": "先に生まれた",
     "twinSecond": "後に生まれた",
     "startAnalysis": "運命を読み解く",
-    "redo": "やり直す"
+    "redo": "やり直す",
+    "dateFormat": "{{year}}年{{month}}月{{day}}日"
   },
   "loading": {
     "wait": "しばらくお待ちください...",
@@ -125,7 +130,15 @@
     "chatLoading": "回答を作成中...",
     "moreQuestions": "質問のヒント",
     "newAnalysis": "新しい鑑定",
-    "translating": "翻訳中..."
+    "translating": "翻訳中...",
+    "analysisError": "分析に失敗しました",
+    "chatError": "返信に失敗しました",
+    "hebanError": "相性分析に失敗しました",
+    "hebanLoadingMsgs": ["命盤を作成中...", "二人の命盤を分析中...", "縁を読み解いています..."],
+    "newReading": "もう一度鑑定",
+    "backHome": "ホームに戻る",
+    "chatTitle": "もっと深く知りたいですか？",
+    "chatSubtitle": "質問を選ぶか、自由に質問してください"
   },
   "relations": {
     "lover": "恋人・気になる人",
@@ -147,12 +160,23 @@
     "featureDeep": "詳細分析（大運・流年）",
     "featureHeban": "相性診断"
   },
-  "quickQuestions": [
-    "今年の恋愛運は？",
-    "自分に合う仕事は？",
-    "金運が最も良い時期は？",
-    "パートナーとの相性は？",
-    "今年注意すべきことは？",
-    "私の貴人はどこにいる？"
-  ]
+  "family": {
+    "chartTitle": "家族命盤分析",
+    "chartDesc": "家族を追加して、家庭のエネルギーが運命にどう影響するかを解き明かします",
+    "buildChart": "家族命盤を作成"
+  },
+  "quickQuestions": {
+    "deepTitle": "深掘り分析",
+    "deepQ1": "現在の10年大運を分析して、今どの段階にいますか？",
+    "deepQ2": "{{year}}年の月別運勢を詳しく解読してください",
+    "followUpTitle": "追加質問",
+    "q1": "今年の金運はどう動きますか？",
+    "q2": "恋愛に突破口が訪れるのはいつ？",
+    "q3": "今は転職のタイミングとして正しい？",
+    "q4": "私の命盤で最も注意すべきことは？",
+    "hebanTitle": "身近な人との関係を読み解く",
+    "hebanQ1": "上司・同僚との相性、誰が貴人？",
+    "hebanQ2": "家族との見えない絆、どう解消する？",
+    "hebanQ3": "気になる人との縁、今進むべき？"
+  }
 }

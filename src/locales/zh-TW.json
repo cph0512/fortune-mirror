@@ -1,8 +1,11 @@
 {
   "app": {
     "title": "命理三鏡",
-    "tagline": "探索你的命運密碼",
+    "tagline": "紫微斗數 · 八字命理 · 西洋占星",
     "footer": "論命僅供參考"
+  },
+  "header": {
+    "logo": "命 理 三 鏡"
   },
   "welcome": {
     "greeting": "{{name}}，歡迎回來",
@@ -78,7 +81,8 @@
   "place": {
     "question": "出生地",
     "subtitle": "影響排盤的時辰判定與精確度",
-    "search": "搜尋城市（中/英/日）..."
+    "search": "搜尋城市（中/英/日）...",
+    "coords": "時區 {{timezone}} | 經度 {{lng}} | 緯度 {{lat}}"
   },
   "confirm": {
     "question": "確認你的資料",
@@ -93,7 +97,8 @@
     "twinFirst": "先出生",
     "twinSecond": "後出生",
     "startAnalysis": "開始解讀命運",
-    "redo": "重新填寫"
+    "redo": "重新填寫",
+    "dateFormat": "{{year}}年{{month}}月{{day}}日"
   },
   "loading": {
     "wait": "請稍候，正在為你深度解讀...",
@@ -125,7 +130,15 @@
     "chatLoading": "正在為你解讀...",
     "moreQuestions": "更多問題建議",
     "newAnalysis": "重新分析",
-    "translating": "翻譯中..."
+    "translating": "翻譯中...",
+    "analysisError": "分析過程發生錯誤",
+    "chatError": "抱歉，回覆失敗",
+    "hebanError": "合盤分析送出失敗",
+    "hebanLoadingMsgs": ["正在解讀兩人的緣分密碼...", "分析兩人的能量互動...", "比對命運交會點...", "推算關係走向...", "描繪你們的緣分藍圖..."],
+    "newReading": "重新算一次",
+    "backHome": "回到主頁",
+    "chatTitle": "你的命盤還藏著這些沒說完",
+    "chatSubtitle": "點選下方問題，或輸入你想問的"
   },
   "relations": {
     "lover": "情人 / 曖昧對象",
@@ -147,12 +160,24 @@
     "featureDeep": "深度分析（大運/流年）",
     "featureHeban": "合盤解讀"
   },
-  "quickQuestions": [
-    "我今年的感情運如何？",
-    "我適合什麼樣的工作？",
-    "我的財運什麼時候最好？",
-    "我跟另一半合不合？",
-    "我今年有什麼要注意的？",
-    "我的貴人在哪裡？"
-  ]
+  "family": {
+    "chartTitle": "家族命盤分析",
+    "chartDesc": "加入父母、手足、配偶的命盤，揭示家庭能量如何塑造你的命運",
+    "buildChart": "建立家族命盤",
+    "analysisError": "分析失敗"
+  },
+  "quickQuestions": {
+    "deepTitle": "深度分析",
+    "deepQ1": "幫我分析目前的 10 年大運走向，現在處於什麼階段？",
+    "deepQ2": "幫我做 {{year}} 年的流年分析，逐月解讀重點和注意事項",
+    "followUpTitle": "追問",
+    "q1": "我今年的財運怎麼走？",
+    "q2": "我的感情什麼時候會有突破？",
+    "q3": "現在換工作的時機對嗎？",
+    "q4": "我命盤最需要注意什麼？",
+    "hebanTitle": "或解讀你和身邊的人",
+    "hebanQ1": "和主管/同事的相處，誰是你的貴人？",
+    "hebanQ2": "和家人之間的隱形牽絆，如何化解？",
+    "hebanQ3": "和曖昧對象的緣分，現在該前進嗎？"
+  }
 }

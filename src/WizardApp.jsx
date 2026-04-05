@@ -26,7 +26,6 @@ const SESSION_KEY_GUEST = "wizard-session-guest";
 const AUTH_KEY = "wizard-auth";
 const VISITOR_ID_KEY = "fortune-visitor-id";
 
-// 每個訪客唯一 ID（即使未註冊也有）
 function getVisitorId() {
   let vid = localStorage.getItem(VISITOR_ID_KEY);
   if (!vid) {
@@ -36,7 +35,6 @@ function getVisitorId() {
   return vid;
 }
 
-// 活動追蹤（fire and forget）
 function trackEvent(action, detail = {}) {
   try {
     const auth = loadAuth();
@@ -68,7 +66,6 @@ function clearSession(user) {
   try { localStorage.removeItem(sessionKey(user)); } catch {}
 }
 function migrateGuestSession(user) {
-  // Move guest session to user session after registration
   try {
     const guest = localStorage.getItem(SESSION_KEY_GUEST);
     if (guest && user?.email) {
@@ -96,29 +93,31 @@ function loadKB() {
   return [];
 }
 
+// Goal/relation definitions use i18n keys (no hardcoded Chinese)
 const GOALS = [
-  { text: "感情與姻緣", key: "goal.love", prompt: "感情、姻緣、桃花、婚姻、另一半", hasSub: true },
-  { text: "事業與升遷", key: "goal.career", prompt: "事業、工作、升遷、職涯方向、貴人" },
-  { text: "財富與投資", key: "goal.wealth", prompt: "財運、投資、理財、收入、財庫" },
-  { text: "健康與養生", key: "goal.health", prompt: "健康、身體、養生、需注意的部位" },
-  { text: "全面綜合分析", key: "goal.general", prompt: "全面性格、事業、感情、財運、健康、今年運勢" },
+  { key: "goal.love", promptKey: "goal.lovePrompt", topicTag: "love", hasSub: true },
+  { key: "goal.career", promptKey: "goal.careerPrompt", topicTag: "career" },
+  { key: "goal.wealth", promptKey: "goal.wealthPrompt", topicTag: "wealth" },
+  { key: "goal.health", promptKey: "goal.healthPrompt", topicTag: "health" },
+  { key: "goal.general", promptKey: "goal.generalPrompt", topicTag: "general" },
 ];
 
 const LOVE_SUBS = [
-  { text: "未婚／單身", key: "goal.loveSingle", prompt: "感情、姻緣、桃花、戀愛、交往對象、何時遇到對的人" },
-  { text: "已婚／穩定交往中", key: "goal.loveMarried", prompt: "婚姻、夫妻關係、感情經營、另一半互動、婚後挑戰" },
+  { key: "goal.loveSingle", promptKey: "goal.loveSinglePrompt" },
+  { key: "goal.loveMarried", promptKey: "goal.loveMarriedPrompt" },
 ];
 
 const RELATIONS = [
-  { text: "情人 / 曖昧對象", key: "relations.lover" },
-  { text: "夫妻 / 伴侶", key: "relations.spouse" },
-  { text: "家人", key: "relations.family" },
-  { text: "朋友", key: "relations.friend" },
-  { text: "同事 / 上下屬", key: "relations.colleague" },
-  { text: "雙胞胎手足", key: "relations.twin" },
+  { key: "relations.lover" },
+  { key: "relations.spouse" },
+  { key: "relations.family" },
+  { key: "relations.friend" },
+  { key: "relations.colleague" },
+  { key: "relations.twin" },
 ];
 
-const HEBAN_SYSTEM_PROMPT = `你是「命理三鏡」的關係分析師。
+// System prompts are always Chinese for the AI (best quality); language instruction added dynamically
+const HEBAN_SYSTEM_PROMPT_ZH = `你是「命理三鏡」的關係分析師。
 
 核心規則：
 1. 絕對禁止提到任何命理系統名稱和專有術語。
@@ -157,18 +156,7 @@ const HEBAN_SYSTEM_PROMPT = `你是「命理三鏡」的關係分析師。
 中立原則：不可假設兩人的職業、行業、生活背景。
 語氣：溫暖有洞察力，正面為主但誠實，具體有畫面感。`;
 
-const LOADING_MSGS = [
-  "正在解讀你的命運密碼...",
-  "分析你的個人能量場...",
-  "推算今年的運勢走向...",
-  "尋找你的天賦與潛能...",
-  "比對多重命理維度...",
-  "計算流年能量變化...",
-  "描繪你的命運藍圖...",
-  "綜合分析即將完成...",
-];
-
-const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命運顧問，用溫暖自然的語氣為一般大眾解讀命運。
+const WIZARD_SYSTEM_PROMPT_ZH = `你是「命理三鏡」的命運顧問，用溫暖自然的語氣為一般大眾解讀命運。
 
 核心規則（必須嚴格遵守）：
 1. 絕對禁止提到任何命理系統名稱：不可出現「紫微斗數」「八字」「四柱」「西洋占星」「星盤」「命盤」「排盤」等詞彙。
@@ -222,39 +210,32 @@ const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命運顧問，用溫�
 
 語氣：溫暖、直接、有洞察力。正面為主但誠實。不需要加免責聲明。`;
 
-// Goal → required topic tags mapping
-const GOAL_TOPICS = {
-  "感情": ["love", "timing"],
-  "事業": ["career", "timing"],
-  "財富": ["wealth", "timing"],
-  "健康": ["health"],
+// Goal topic mapping for KB filtering (language-neutral)
+const GOAL_TOPIC_MAP = {
+  "goal.love": ["love", "timing"],
+  "goal.career": ["career", "timing"],
+  "goal.wealth": ["wealth", "timing"],
+  "goal.health": ["health"],
+  "goal.general": null, // null = return all
 };
 
-function filterKBByGoal(kbEntries, goalText) {
-  if (!goalText || goalText.includes("全面")) return kbEntries;
+function filterKBByGoal(kbEntries, goalKey) {
+  if (!goalKey || GOAL_TOPIC_MAP[goalKey] === null) return kbEntries;
 
-  // Find which topics this goal needs
-  let needTopics = [];
-  for (const [key, topics] of Object.entries(GOAL_TOPICS)) {
-    if (goalText.includes(key)) needTopics.push(...topics);
-  }
+  const needTopics = GOAL_TOPIC_MAP[goalKey] || [];
   if (needTopics.length === 0) return kbEntries;
-  // Always include personality for context
-  needTopics.push("personality");
+  const allTopics = [...needTopics, "personality"];
 
   return kbEntries.filter(e => {
     const topics = e.topics || [];
-    // Always keep core entries
     if (topics.includes("core")) return true;
-    // Keep if any topic matches
-    return needTopics.some(t => topics.includes(t));
+    return allTopics.some(t => topics.includes(t));
   });
 }
 
-function buildWizardPrompt(kbEntries, goalObj) {
-  let prompt = WIZARD_SYSTEM_PROMPT;
-  const goalText = typeof goalObj === "string" ? goalObj : (goalObj?.text || goalObj?.prompt || "");
-  const filtered = filterKBByGoal(kbEntries, goalText);
+function buildWizardPrompt(kbEntries, goalKey) {
+  let prompt = WIZARD_SYSTEM_PROMPT_ZH;
+  const filtered = filterKBByGoal(kbEntries, goalKey);
 
   if (filtered.length > 0) {
     const grouped = {};
@@ -275,18 +256,16 @@ function buildWizardPrompt(kbEntries, goalObj) {
 // WIZARD COMPONENT
 // ============================================================
 
-const TOTAL_STEPS = 5; // welcome, goal, birthday+time, place, confirm
+const TOTAL_STEPS = 5;
 
 export default function WizardApp({ auth, onBack, onLogout }) {
   const { t, i18n } = useTranslation();
   const currentLang = i18n.language || 'zh-TW';
   const changeLang = (lng) => i18n.changeLanguage(lng);
 
-  // Load auth first, then restore the correct user's session
   const savedAuth = loadAuth();
   const saved = loadSession(savedAuth);
 
-  // Always start at welcome (step 0) unless user has a completed result
   const [step, setStep] = useState(saved?.finalResult ? (saved.step ?? 0) : 0);
   const [gender, setGender] = useState(saved?.gender ?? "");
   const [goal, setGoal] = useState(saved?.goal ?? "");
@@ -298,18 +277,16 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [birthHour, setBirthHour] = useState(saved?.birthHour ?? "");
   const [birthMinute, setBirthMinute] = useState(saved?.birthMinute ?? "0");
   const [birthPlace, setBirthPlace] = useState(saved?.birthPlace ?? "桃園");
-  const [birthCity, setBirthCity] = useState(saved?.birthCity ?? null); // { lat, lng, timezone, name, nameZh }
+  const [birthCity, setBirthCity] = useState(saved?.birthCity ?? null);
   const [citySearchResults, setCitySearchResults] = useState([]);
   const [citySearchQuery, setCitySearchQuery] = useState("");
 
-  // Analysis state
   const [analyzing, setAnalyzing] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [finalResult, setFinalResult] = useState(saved?.finalResult ?? "");
   const [rawResults, setRawResults] = useState(saved?.rawResults ?? []);
   const [error, setError] = useState("");
 
-  // 合盤 state
   const [showHeban, setShowHeban] = useState(false);
   const [hebanRelation, setHebanRelation] = useState("");
   const [hebanName, setHebanName] = useState("");
@@ -320,14 +297,13 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [hebanMinute, setHebanMinute] = useState("0");
   const [hebanGender, setHebanGender] = useState("");
 
-  // Twin state
+  // Twin state — uses language-neutral values: "same"/"mixed" and "first"/"second"
   const [isTwin, setIsTwin] = useState(saved?.isTwin ?? false);
-  const [twinOrder, setTwinOrder] = useState(saved?.twinOrder ?? ""); // "先" or "後"
-  const [twinType, setTwinType] = useState(saved?.twinType ?? ""); // "同性" or "龍鳳"
+  const [twinOrder, setTwinOrder] = useState(saved?.twinOrder ?? "");
+  const [twinType, setTwinType] = useState(saved?.twinType ?? "");
   const [hebanAnalyzing, setHebanAnalyzing] = useState(false);
   const [hebanResult, setHebanResult] = useState(saved?.hebanResult ?? "");
 
-  // Chat state
   const [chatHistory, setChatHistory] = useState(saved?.chatHistory ?? []);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -335,38 +311,39 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const chatEndRef = useRef(null);
   const hebanRef = useRef(null);
 
-  // Auth state (local registration)
   const [wizardUser, setWizardUser] = useState(savedAuth);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState("login"); // "login" or "register"
+  const [authMode, setAuthMode] = useState("login");
   const [authName, setAuthName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const pendingActionRef = useRef(null);
 
-  // Translation cache: { "en": "translated text", "ja": "translated text" }
   const [translatedResults, setTranslatedResults] = useState({});
   const [translating, setTranslating] = useState(false);
-  const [displayLang, setDisplayLang] = useState(null); // null = original
+  const [displayLang, setDisplayLang] = useState(null);
 
-  // Family chart state
   const [showFamily, setShowFamily] = useState(false);
 
-  // Account / payment state
   const [showAccount, setShowAccount] = useState(false);
   const [userFeatures, setUserFeatures] = useState([]);
   const [userCredits, setUserCredits] = useState(0);
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentPlans, setPaymentPlans] = useState(null);
 
+  // Helper: get display text for gender
+  const genderDisplay = (g) => g === "男" ? t('welcome.male') : g === "女" ? t('welcome.female') : g;
+  // Helper: get display text for goal key
+  const goalDisplay = (gk) => gk ? t(gk) : "";
+  // Helper: get display text for relation key
+  const relationDisplay = (rk) => rk ? t(rk) : "";
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
-  // Save session to localStorage whenever key state changes (per-user)
   useEffect(() => {
-    // Don't save while analyzing (transient state)
     if (analyzing || hebanAnalyzing) return;
     const sessionData = {
       step, gender, goal, goalPrompt, loveSub,
@@ -377,14 +354,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     saveSession(sessionData, wizardUser);
   }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity, isTwin, twinOrder, twinType, finalResult, rawResults, hebanResult, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
 
-  // If session had a result, jump to result screen on mount
   useEffect(() => {
     if (saved?.finalResult && saved.step >= TOTAL_STEPS) {
       setStep(TOTAL_STEPS + 1);
     }
   }, []);
 
-  // Auth gate: if not logged in, show modal; if logged in, run callback
   const requireAuth = (callback) => {
     if (wizardUser) {
       callback();
@@ -396,7 +371,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   };
 
-  // Helper: restore state from a session object
   const restoreFromSession = (s) => {
     if (!s) return;
     if (s.step !== undefined) setStep(s.step);
@@ -431,7 +405,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         setAuthError(t('auth.passwordMin'));
         return;
       }
-      // Check if email already registered
       const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
       if (existingUsers[authEmail.trim()]) {
         setAuthError(t('auth.emailExists'));
@@ -439,10 +412,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         return;
       }
       user = { name: authName.trim(), email: authEmail.trim() };
-      // Save user credentials locally
       existingUsers[authEmail.trim()] = { name: authName.trim(), passwordHash: btoa(authPassword) };
       localStorage.setItem("wizard-users", JSON.stringify(existingUsers));
-      // Sync registration to backend
       try {
         fetch(API_BACKEND.replace("/fortune", "/fortune-register"), {
           method: "POST",
@@ -451,10 +422,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         });
       } catch {}
       trackEvent("register", { email: authEmail.trim(), name: authName.trim() });
-      // Migrate current guest session to this user
       migrateGuestSession(user);
     } else {
-      // Login — verify email + password
       if (!authEmail.trim() || !authPassword.trim()) {
         setAuthError(t('auth.fillEmailPw'));
         return;
@@ -470,7 +439,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         return;
       }
       user = { name: stored.name, email: authEmail.trim() };
-      // Restore user's session if exists
       const existingSession = loadSession(user);
       if (existingSession?.finalResult) {
         restoreFromSession(existingSession);
@@ -483,7 +451,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     setShowAuthModal(false);
     setAuthError("");
 
-    // Run pending action
     if (pendingActionRef.current) {
       const action = pendingActionRef.current;
       pendingActionRef.current = null;
@@ -491,7 +458,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   };
 
-  // Fetch user payment status from backend
   const fetchUserStatus = async (email) => {
     try {
       const res = await fetch(`${API_BACKEND.replace("/fortune", "/payment/status")}?email=${encodeURIComponent(email)}`);
@@ -526,7 +492,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         const data = await res.json();
         if (data.checkout_url) {
           if (data.mock) {
-            // Mock: simulate payment
             const mockRes = await fetch(API_BACKEND.replace("/fortune", "/payment/mock-complete"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -545,7 +510,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     setLoadingPayment(false);
   };
 
-  // Load user status when account panel opens
   useEffect(() => {
     if (showAccount && wizardUser?.email) {
       fetchUserStatus(wizardUser.email);
@@ -553,10 +517,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   }, [showAccount]);
 
-  // Translate result to another language (B option)
   const translateResult = async (targetLang) => {
     if (!finalResult) return;
-    // If already translated to this language, just switch display
     if (translatedResults[targetLang]) {
       setDisplayLang(targetLang);
       return;
@@ -570,7 +532,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images: [], system: `你是專業翻譯。將命理報告翻譯成${langName}，保持[SECTION]格式標記不變，保持原文的語氣和風格。`, prompt, analysis_type: "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
-      if (!submitRes.ok) throw new Error("翻譯失敗");
+      if (!submitRes.ok) throw new Error("Translation failed");
       const { job_id } = await submitRes.json();
       for (let i = 0; i < 200; i++) {
         await new Promise(r => setTimeout(r, 2000));
@@ -589,7 +551,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     setTranslating(false);
   };
 
-  // The text to display (original or translated)
   const displayResult = displayLang && translatedResults[displayLang] ? translatedResults[displayLang] : finalResult;
 
   const progress = Math.round((step / (TOTAL_STEPS - 1)) * 100);
@@ -620,18 +581,19 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   };
 
   const startAnalysis = async () => {
-    setStep(TOTAL_STEPS); // loading screen
+    setStep(TOTAL_STEPS);
     setAnalyzing(true);
     setError("");
     setFinalResult("");
     setRawResults([]);
     trackEvent("start_analysis", { gender, goal, loveSub, birth: `${birthYear}/${birthMonth}/${birthDay} ${birthHour}:${birthMinute}`, birthPlace });
 
+    const loadingMsgs = t('loading.msgs', { returnObjects: true }) || [];
     let msgIdx = 0;
-    setLoadingMsg(LOADING_MSGS[0]);
+    setLoadingMsg(loadingMsgs[0] || "...");
     const interval = setInterval(() => {
-      msgIdx = (msgIdx + 1) % LOADING_MSGS.length;
-      setLoadingMsg(LOADING_MSGS[msgIdx]);
+      msgIdx = (msgIdx + 1) % loadingMsgs.length;
+      setLoadingMsg(loadingMsgs[msgIdx]);
     }, 3000);
 
     try {
@@ -640,10 +602,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const min = parseInt(birthMinute) || 0;
       const kbEntries = loadKB();
 
-      // Step 1: 真太陽時計算 + 本地排盤
-      setLoadingMsg("正在解讀你的命運密碼...");
-
-      // 取得城市座標和時區
       let cityLat, cityLng, cityTz;
       if (birthCity && birthCity.lat) {
         cityLat = birthCity.lat;
@@ -656,10 +614,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         cityTz = "Asia/Taipei";
       }
 
-      // 計算真太陽時
       const tst = calculateTrueSolarTime(y, m, d, h, min, cityLng, cityTz);
-
-      // 用真太陽時的日期和時辰排盤
       const tstY = tst.adjustedYear, tstM = tst.adjustedMonth, tstD = tst.adjustedDay;
       const tstH = tst.trueSolarHour, tstMin = tst.trueSolarMinute;
 
@@ -667,19 +622,17 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const baziChart = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, gender, tstMin));
       const astroChart = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
 
-      // 雙胞胎：為另一位排盤（龍鳳胎用異性、同性雙胞胎用同性但附命遷互換理論）
+      // Twin: calculate sibling charts
       let twinZiweiChart = "", twinBaziChart = "", twinAstroChart = "";
       if (isTwin) {
-        const sibGender = twinType === "龍鳳" ? (gender === "男" ? "女" : "男") : gender;
+        const sibGender = twinType === "mixed" ? (gender === "男" ? "女" : "男") : gender;
         twinZiweiChart = formatChart(calculateChart(tstY, tstM, tstD, tstH, tstMin, sibGender));
         twinBaziChart = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, sibGender, tstMin));
         twinAstroChart = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
       }
 
-      // 真太陽時修正資訊（供 prompt 使用）
       const tstInfo = formatCorrectionDetails(tst);
 
-      // 保存排盤資料供合盤用
       const results = [
         { system: "紫微斗數", text: ziweiChart, result: "" },
         { system: "八字", text: baziChart, result: "" },
@@ -694,10 +647,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       }
       setRawResults(results);
 
-      // Step 2: 一次 API call — 直接送三套排盤 + 統一輸出
-      setLoadingMsg("深度分析你的個人能量...");
       const wizardSP = buildWizardPrompt(kbEntries, goal);
-      // 雙胞胎額外排盤區塊
       const twinChartBlock = isTwin ? `
 
 ===
@@ -715,24 +665,33 @@ ${twinBaziChart}
 【西洋占星排盤 — 手足】
 ${twinAstroChart}` : "";
 
+      // Twin info block for prompt (always Chinese for AI)
+      const twinTypeZh = twinType === "mixed" ? "龍鳳胎" : "同性雙胞胎";
+      const twinOrderZh = twinOrder === "first" ? "先出生（兄/姊）" : "後出生（弟/妹）";
+      const sibGenderZh = twinType === "mixed" ? (gender === "男" ? "女" : "男") : gender;
+
       const twinInfoBlock = isTwin ? `
-- ⚠️ 雙胞胎：${twinType === "龍鳳" ? "龍鳳胎" : "同性雙胞胎"}
-- 本人出生順序：${twinOrder === "先" ? "先出生（兄/姊）" : "後出生（弟/妹）"}
-- 手足性別：${twinType === "龍鳳" ? (gender === "男" ? "女" : "男") : gender}` : "";
+- ⚠️ 雙胞胎：${twinTypeZh}
+- 本人出生順序：${twinOrderZh}
+- 手足性別：${sibGenderZh}` : "";
 
       const twinTaskBlock = isTwin ? `
 
 ## 雙胞胎分析要求
-這位用戶是${twinType === "龍鳳" ? "龍鳳胎" : "同性雙胞胎"}，${twinOrder === "先" ? "先出生" : "後出生"}。以上提供了本人和手足各自的排盤。
+這位用戶是${twinTypeZh}，${twinOrder === "first" ? "先出生" : "後出生"}。以上提供了本人和手足各自的排盤。
 請務必在報告中：
 1. 先分析本人的命盤（主要報告）
 2. 加一個段落比較雙胞胎之間的差異
 3. 套用以下雙胞胎命理理論：
    - 八字：得氣深淺（先出生者得氣較淺、後出生者得氣較深）、陰陽分化規則、日主強弱判斷
-   - 紫微：${twinType === "龍鳳" ? "龍鳳胎因性別不同，大限方向相反，第二大限起命運明顯分歧" : "命遷互換法（後出生者以遷移宮為命宮）"}
+   - 紫微：${twinType === "mixed" ? "龍鳳胎因性別不同，大限方向相反，第二大限起命運明顯分歧" : "命遷互換法（後出生者以遷移宮為命宮）"}
    - 占星：上升度數微小差異、推運盤月亮位置逐年累積差異
 4. 分開描述「你們的共同基礎」和「你們的差異之處」
 5. 不要只說「你們很像」，要具體指出哪裡不同、為什麼不同` : "";
+
+      // Get translated goal and sub for prompt display
+      const goalTextZh = t(goal, { lng: 'zh-TW' }) || t(goal);
+      const loveSubTextZh = loveSub ? (t(loveSub, { lng: 'zh-TW' }) || t(loveSub)) : "";
 
       const oneCallPrompt = `以下是一位用戶的三套命理排盤資料（內部資料，不可對外揭露來源系統）：
 
@@ -754,7 +713,7 @@ ${astroChart}${twinChartBlock}
 - 出生：${birthYear}年${birthMonth}月${birthDay}日 ${h}時${min}分
 - 出生地：${birthPlace}（經度${cityLng}°, 緯度${cityLat}°）
 - 真太陽時：${tst.trueSolarTimeStr}（${tst.shichen}時）${tst.nearBoundary ? `\n- ⚠️ ${tst.nearBoundary.message}` : ""}${tst.isEarlyZi ? "\n- ⚠️ 早子時，日柱用當日" : ""}${twinInfoBlock}
-- 關注方向：${goal}${loveSub ? `（${loveSub}）` : ""}
+- 關注方向：${goalTextZh}${loveSubTextZh ? `（${loveSubTextZh}）` : ""}
 
 ## 任務
 請綜合以上三套排盤資料，直接產出一份統一的命理報告。
@@ -767,7 +726,7 @@ ${astroChart}${twinChartBlock}
 
 ⚠️ 嚴格遵守系統規則：不提任何命理系統名稱和專有術語，用自然語言表達所有洞見。
 ⚠️ 按照指定的輸出格式（天賦特質 → 主題深度解析 → 年運勢 → 建議 → 近期提醒）組織內容。
-⚠️ 重點針對用戶關注的「${goal}${loveSub ? `（${loveSub}）` : ""}」方向深入分析。
+⚠️ 重點針對用戶關注的「${goalTextZh}${loveSubTextZh ? `（${loveSubTextZh}）` : ""}」方向深入分析。
 ⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。${twinTaskBlock}
 ⚠️ 你必須用「${LANG_AI[currentLang] || '繁體中文'}」撰寫整份報告。所有標題、內容、建議都必須使用「${LANG_AI[currentLang] || '繁體中文'}」。`;
 
@@ -776,10 +735,9 @@ ${astroChart}${twinChartBlock}
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
-      if (!submitRes.ok) throw new Error("分析失敗");
+      if (!submitRes.ok) throw new Error(t('result.analysisError'));
       const { job_id } = await submitRes.json();
 
-      setLoadingMsg("描繪你的命運藍圖...");
       for (let i = 0; i < 300; i++) {
         await new Promise(r => setTimeout(r, 3000));
         try {
@@ -795,11 +753,11 @@ ${astroChart}${twinChartBlock}
 
       setAnalyzing(false);
       setLoadingMsg("");
-      setStep(TOTAL_STEPS + 1); // result screen
+      setStep(TOTAL_STEPS + 1);
       setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
       trackEvent("analysis_complete", { goal, loveSub, resultLength: finalResult?.length || 0 });
     } catch (err) {
-      setError("分析過程發生錯誤：" + err.message);
+      setError(t('result.analysisError') + ": " + err.message);
       setAnalyzing(false);
     } finally {
       clearInterval(interval);
@@ -818,14 +776,13 @@ ${astroChart}${twinChartBlock}
       const wizardSP = buildWizardPrompt(kbEntries, goal);
       const recentChat = chatHistory.slice(-10).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
       const prompt = `之前的完整分析報告：\n${finalResult}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先以紫微斗數的宮位、飛化、星曜組合進行深度推論，給出具體而非籠統的回答\n3. 引用分析報告中的相關內容，結合命盤資訊給出精確判斷\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
-      // Deep analysis for 大運/流年 questions → Opus; others → Sonnet
-      const isDeep = /大運|流年|逐月|十年|運勢走向/.test(question);
+      const isDeep = /大運|流年|逐月|十年|運勢走向|life phase|month.by.month/i.test(question);
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images: [], system: wizardSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
-      if (!submitRes.ok) throw new Error("送出失敗");
+      if (!submitRes.ok) throw new Error(t('result.chatError'));
       const { job_id } = await submitRes.json();
       for (let i = 0; i < 200; i++) {
         await new Promise(r => setTimeout(r, 3000));
@@ -838,25 +795,25 @@ ${astroChart}${twinChartBlock}
         }
       }
     } catch (e) {
-      setChatHistory(prev => [...prev, { role: "assistant", text: "抱歉，回覆失敗：" + e.message }]);
+      setChatHistory(prev => [...prev, { role: "assistant", text: t('result.chatError') + ": " + e.message }]);
     } finally {
       setChatLoading(false);
     }
   };
 
-  // ---- 合盤分析 ----
+  // ---- Heban (compatibility) analysis ----
   const startHeban = async () => {
     setHebanAnalyzing(true);
     setHebanResult("");
     setError("");
     trackEvent("start_heban", { relation: hebanRelation, partnerGender: hebanGender, partnerName: hebanName });
 
+    const hebanLoadingMsgs = t('result.hebanLoadingMsgs', { returnObjects: true }) || [];
     let msgIdx = 0;
-    setLoadingMsg("正在解讀兩人的緣分密碼...");
+    setLoadingMsg(hebanLoadingMsgs[0] || "...");
     const interval = setInterval(() => {
-      const msgs = ["分析兩人的能量互動...", "比對命運交會點...", "推算關係走向...", "描繪你們的緣分藍圖..."];
-      msgIdx = (msgIdx + 1) % msgs.length;
-      setLoadingMsg(msgs[msgIdx]);
+      msgIdx = (msgIdx + 1) % hebanLoadingMsgs.length;
+      setLoadingMsg(hebanLoadingMsgs[msgIdx]);
     }, 3000);
 
     try {
@@ -867,23 +824,22 @@ ${astroChart}${twinChartBlock}
       const hasPartnerTime = hebanHour !== "";
       const kbEntries = loadKB();
 
-      // 用戶自己的紫微排盤（合盤只用紫微）
       const myZiwei = rawResults.find(r => r.system === "紫微斗數");
       const myCharts = myZiwei ? `【紫微斗數】\n${myZiwei.text}` : "";
 
-      // 對方紫微排盤
       const partnerGender = hebanGender || (gender === "男" ? "女" : "男");
       let partnerCharts = "";
 
       if (hasPartnerTime) {
-        // 有出生時間：完整紫微排盤
         const pZiwei = formatChart(calculateChart(y2, m2, d2, h2, 0, partnerGender));
         partnerCharts = `【紫微斗數】\n${pZiwei}`;
       } else {
-        // 沒有出生時間：用天干推算宮位影響（不硬套時辰）
         const tianGanChart = formatChartByTianGan(y2, m2, d2, partnerGender);
         partnerCharts = tianGanChart;
       }
+
+      // Resolve relation display text (always Chinese for AI prompt)
+      const hebanRelationZh = t(hebanRelation, { lng: 'zh-TW' }) || t(hebanRelation);
 
       const hebanPrompt = `以下是兩個人的命理資料（內部資料，不可對外揭露來源系統）：
 
@@ -895,7 +851,7 @@ ${astroChart}${twinChartBlock}
 ${myCharts}
 
 ## 對方（${hebanName || "對方"}）
-- 關係：${hebanRelation}
+- 關係：${hebanRelationZh}
 - 性別：${partnerGender}
 - 出生：${hebanYear}年${hebanMonth}月${hebanDay}日${hasPartnerTime ? ` ${h2}時${min2}分` : "（未知出生時間）"}
 ${hasPartnerTime ? "（有完整出生時間，可做完整飛化交叉分析）" : "（無出生時間，以生年天干四化和主星分佈推算宮位影響，命宮位置不確定）"}
@@ -903,24 +859,24 @@ ${hasPartnerTime ? "（有完整出生時間，可做完整飛化交叉分析）
 ${partnerCharts}
 
 ## 任務
-請根據兩人的紫微斗數命盤分析這兩人作為「${hebanRelation}」的關係。
+請根據兩人的紫微斗數命盤分析這兩人作為「${hebanRelationZh}」的關係。
 ${hasPartnerTime
   ? "重點分析：雙方命盤的宮位飛化互動、四化交叉影響、主星搭配的互補或衝突。"
   : "對方無出生時間，請以對方的生年天干四化為核心，分析其四化星落入哪些宮位的主星、這些能量如何與本人的命盤產生互動。重點看生年四化的祿忌落宮與本人的對應宮位關係。"}
-${hebanRelation === "夫妻 / 伴侶" ? `
+${hebanRelation === "relations.spouse" ? `
 ## 夫妻合盤重點
 除了一般互動分析外，請特別深入以下面向：
 - 婚姻長期經營：磨合模式、溝通盲點、容易起衝突的觸發點
 - 財務共管：兩人的理財觀念是否互補或衝突、家庭財務適合誰主導
 - 子女緣：兩人的子女宮交叉分析、適合的教養分工
 - 家庭角色：各自在家庭中自然扮演的角色、責任分配建議` : ""}
-${hebanRelation === "家人" ? `
+${hebanRelation === "relations.family" ? `
 ## 家人合盤重點
 請特別分析：
 - 親子/手足的天然互動模式與代際差異
 - 溝通上容易產生的誤解和化解方式
 - 彼此在家庭中的角色定位和期望落差` : ""}
-${hebanRelation === "雙胞胎手足" ? `
+${hebanRelation === "relations.twin" ? `
 ## 雙胞胎合盤特殊分析
 這是雙胞胎手足的合盤，請套用以下理論：
 1. 八字：兩人四柱相同或極相似。先出生者得氣較淺、後出生者得氣較深（《三命通會》得氣深淺理論）
@@ -934,7 +890,7 @@ ${hebanRelation === "雙胞胎手足" ? `
 ⚠️ 按照指定輸出格式。
 ⚠️ 你必須用「${LANG_AI[currentLang] || '繁體中文'}」撰寫整份報告。`;
 
-      let sp = HEBAN_SYSTEM_PROMPT;
+      let sp = HEBAN_SYSTEM_PROMPT_ZH;
       if (kbEntries.length > 0) {
         sp += "\n\n## 內部知識庫（推理用，不可對外提及）\n";
         kbEntries.forEach(e => { sp += `- ${e.title}: ${e.content.slice(0, 200)}\n`; });
@@ -945,7 +901,7 @@ ${hebanRelation === "雙胞胎手足" ? `
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
-      if (!submitRes.ok) throw new Error("合盤分析送出失敗");
+      if (!submitRes.ok) throw new Error(t('result.hebanError'));
       const { job_id } = await submitRes.json();
 
       for (let i = 0; i < 300; i++) {
@@ -961,7 +917,7 @@ ${hebanRelation === "雙胞胎手足" ? `
         } catch { continue; }
       }
     } catch (err) {
-      setError("合盤分析錯誤：" + err.message);
+      setError(t('result.hebanError') + ": " + err.message);
     } finally {
       setHebanAnalyzing(false);
       setLoadingMsg("");
@@ -973,36 +929,31 @@ ${hebanRelation === "雙胞胎手足" ? `
   const renderFormattedResult = (text) => {
     if (!text) return null;
 
-    // Aggressively clean markdown and emoji
     let cleaned = text
-      .replace(/^#{1,6}\s*/gm, '')           // # headers
-      .replace(/\*\*([^*]+)\*\*/g, '$1')     // **bold** → text
-      .replace(/\*([^*]+)\*/g, '$1')         // *italic* → text
-      .replace(/__([^_]+)__/g, '$1')         // __bold__
-      .replace(/_([^_]+)_/g, '$1')           // _italic_
-      .replace(/```[\s\S]*?```/g, '')        // code blocks
-      .replace(/`([^`]+)`/g, '$1')           // inline code
-      .replace(/^\|.*\|$/gm, '')             // table rows
-      .replace(/^[-|:]+$/gm, '')             // table separators
-      .replace(/^>\s*/gm, '')                // blockquotes
-      .replace(/^[-*+]\s+/gm, '')            // list bullets
-      .replace(/^\d+\.\s+/gm, '')            // numbered lists
-      // Remove all emoji/emoticons
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^\|.*\|$/gm, '')
+      .replace(/^[-|:]+$/gm, '')
+      .replace(/^>\s*/gm, '')
+      .replace(/^[-*+]\s+/gm, '')
+      .replace(/^\d+\.\s+/gm, '')
       .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{2702}-\u{27B0}\u{200D}\u{20E3}\u{FE0F}\u{E0020}-\u{E007F}✦✧★☆♠♣♥♦⚡❌✅✓✔❤️‍♀️♂️☀️☁️⭐️❄️☯️⚠️]/gu, '')
-      .replace(/\n{3,}/g, '\n\n')            // collapse multiple blank lines
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // Normalize all [SECTION] variants before splitting
     cleaned = cleaned
-      .replace(/【\s*SECTION\s*】/gi, '[SECTION]')           // 【SECTION】
-      .replace(/\[\s*SECTION\s*\]\s*[:：\-—]/gi, '[SECTION]') // [SECTION]: or [SECTION]—
-      .replace(/\[\s*SECTION\s*\]/gi, '[SECTION]')           // [ SECTION ] with extra spaces
+      .replace(/【\s*SECTION\s*】/gi, '[SECTION]')
+      .replace(/\[\s*SECTION\s*\]\s*[:：\-—]/gi, '[SECTION]')
+      .replace(/\[\s*SECTION\s*\]/gi, '[SECTION]')
 
-    // Split by [SECTION] markers
     const parts = cleaned.split(/\[SECTION\]\s*/);
     const sections = [];
 
-    // Helper: strip any leftover [SECTION]-like text from content
     const cleanSectionTags = (s) => s
       .replace(/\[?\s*SECTION\s*\]?\s*[:：\-—]?\s*/gi, '')
       .replace(/【\s*SECTION\s*】\s*/gi, '')
@@ -1012,7 +963,6 @@ ${hebanRelation === "雙胞胎手足" ? `
       const trimmed = part.trim();
       if (!trimmed) continue;
 
-      // First line is the title, rest is body
       const lines = trimmed.split('\n');
       const title = cleanSectionTags(lines[0].trim());
       const body = cleanSectionTags(lines.slice(1).join('\n').trim());
@@ -1020,15 +970,12 @@ ${hebanRelation === "雙胞胎手足" ? `
       if (body) {
         sections.push({ title, body });
       } else if (sections.length === 0) {
-        // Intro text before any section
         sections.push({ title: "", body: title });
       } else {
-        // Title with no body
         sections.push({ title, body: "" });
       }
     }
 
-    // Fallback: if no [SECTION] tags found, try splitting by blank-line-separated paragraphs with a leading title-like line
     if (sections.length <= 1 && cleaned.length > 200) {
       const blocks = cleaned.split(/\n\n+/);
       if (blocks.length >= 3) {
@@ -1045,20 +992,16 @@ ${hebanRelation === "雙胞胎手足" ? `
     }
 
     return sections.map((sec, i) => {
-      // Auto-detect summary: last sentence of each section body
       let mainBody = sec.body || "";
       let summary = "";
-      // Check for explicit markers first
       const explicitMatch = mainBody.match(/[【\[](?:總結|小結|結論|重點)[】\]]\s*[:：]?\s*([\s\S]*?)$/);
       if (explicitMatch) {
         summary = explicitMatch[1].trim();
         mainBody = mainBody.slice(0, explicitMatch.index).trim();
       } else if (mainBody.length > 100) {
-        // Auto-extract: last line as summary if body is long enough
         const lines = mainBody.trim().split('\n').filter(l => l.trim());
         if (lines.length >= 3) {
           const lastLine = lines[lines.length - 1].trim();
-          // Only use as summary if it looks like a concluding sentence (short, not a question)
           if (lastLine.length >= 10 && lastLine.length <= 80 && !lastLine.includes('？')) {
             summary = lastLine;
             mainBody = lines.slice(0, -1).join('\n').trim();
@@ -1081,8 +1024,6 @@ ${hebanRelation === "雙胞胎手足" ? `
 
   // ---- RENDER STEPS ----
 
-  // Step 0: Welcome + gender
-  // Account management panel
   const renderAccountPanel = () => {
     const FEATURE_NAMES = { deep: t('account.featureDeep'), heban: t('account.featureHeban') };
     const PLAN_ICONS = { deep_analysis: "深", heban: "合", bundle: "全" };
@@ -1182,7 +1123,6 @@ ${hebanRelation === "雙胞胎手足" ? `
             <button className="wizard-logout-link" onClick={() => {
               setWizardUser(null);
               localStorage.removeItem(AUTH_KEY);
-              // Reset to clean state
               setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
               setBirthYear(""); setBirthMonth(""); setBirthDay(""); setBirthHour(""); setBirthMinute("0");
               setBirthPlace("桃園"); setIsTwin(false); setTwinOrder(""); setTwinType("");
@@ -1204,7 +1144,6 @@ ${hebanRelation === "雙胞胎手足" ? `
         </>
       ) : (
         <div className="wizard-welcome-auth">
-          {/* Guest try-first section */}
           <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>{t('welcome.tryFirst')}</div>
           <div className="wizard-gender-cards">
             <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); trackEvent("select_gender", { gender: "男" }); setTimeout(() => setStep(1), 300); }}>
@@ -1222,7 +1161,6 @@ ${hebanRelation === "雙胞胎手足" ? `
             <span>{t('welcome.hasAccount')}</span>
           </div>
 
-          {/* Login/Register form */}
           <div className="wizard-welcome-auth-card">
             <div className="wizard-welcome-auth-tabs">
               <button className={`wizard-welcome-auth-tab ${authMode === "login" ? "active" : ""}`}
@@ -1255,14 +1193,14 @@ ${hebanRelation === "雙胞胎手足" ? `
   // Step 1: Goal
   const renderGoal = () => (
     <div className="wizard-content">
-      <div className="wizard-question">{goal === "感情與姻緣" && loveSub === "" ? t('goal.loveStatus') : t('goal.question')}</div>
-      <div className="wizard-subtitle">{goal === "感情與姻緣" && loveSub === "" ? t('goal.loveStatusSub') : t('goal.subtitle')}</div>
+      <div className="wizard-question">{goal === "goal.love" && loveSub === "" ? t('goal.loveStatus') : t('goal.question')}</div>
+      <div className="wizard-subtitle">{goal === "goal.love" && loveSub === "" ? t('goal.loveStatusSub') : t('goal.subtitle')}</div>
       <div className="wizard-options">
-        {goal === "感情與姻緣" && loveSub === "" ? (
+        {goal === "goal.love" && loveSub === "" ? (
           <>
             {LOVE_SUBS.map(s => (
-              <div key={s.text} className="wizard-option"
-                onClick={() => { setLoveSub(s.text); setGoalPrompt(s.prompt); trackEvent("select_goal", { goal: "感情與姻緣", sub: s.text }); setTimeout(() => setStep(2), 300); }}>
+              <div key={s.key} className="wizard-option"
+                onClick={() => { setLoveSub(s.key); setGoalPrompt(s.promptKey); trackEvent("select_goal", { goal: "love", sub: s.key }); setTimeout(() => setStep(2), 300); }}>
                 <span className="wizard-option-text">{t(s.key)}</span>
                 <span className="wizard-option-arrow">›</span>
               </div>
@@ -1274,14 +1212,14 @@ ${hebanRelation === "雙胞胎手足" ? `
           </>
         ) : (
           GOALS.map(g => (
-            <div key={g.text} className={`wizard-option ${goal === g.text ? "selected" : ""}`}
+            <div key={g.key} className={`wizard-option ${goal === g.key ? "selected" : ""}`}
               onClick={() => {
-                setGoal(g.text);
+                setGoal(g.key);
                 if (g.hasSub) {
                   setLoveSub("");
                 } else {
-                  setGoalPrompt(g.prompt);
-                  trackEvent("select_goal", { goal: g.text });
+                  setGoalPrompt(g.promptKey);
+                  trackEvent("select_goal", { goal: g.key });
                   setTimeout(() => setStep(2), 300);
                 }
               }}>
@@ -1294,7 +1232,7 @@ ${hebanRelation === "雙胞胎手足" ? `
     </div>
   );
 
-  // Step 2: Birthday + Time (merged)
+  // Step 2: Birthday + Time
   const renderBirthday = () => {
     const years = [];
     for (let y = new Date().getFullYear() + 1; y >= 1940; y--) years.push(y);
@@ -1312,7 +1250,6 @@ ${hebanRelation === "雙胞胎手足" ? `
           <span className="wizard-hint-text">{t('birth.hint')}</span>
         </div>
 
-        {/* Date row */}
         <div className="wizard-date-row">
           <div className="wizard-select-wrap">
             <label>{t('birth.year')}</label>
@@ -1339,7 +1276,6 @@ ${hebanRelation === "雙胞胎手足" ? `
 
         <div style={{ height: 20 }} />
 
-        {/* Time row */}
         <div className="wizard-date-row">
           <div className="wizard-select-wrap">
             <label>{t('birth.hour')}</label>
@@ -1356,7 +1292,6 @@ ${hebanRelation === "雙胞胎手足" ? `
           </div>
         </div>
 
-        {/* Twin toggle */}
         <div style={{ height: 20 }} />
         <div className="wizard-twin-toggle">
           <label className="wizard-twin-check">
@@ -1370,15 +1305,15 @@ ${hebanRelation === "雙胞胎手足" ? `
             <div className="wizard-twin-row">
               <div className="wizard-twin-label">{t('birth.twinSibGender')}</div>
               <div className="wizard-twin-btns">
-                <button className={`wizard-twin-btn ${twinType === "同性" ? "selected" : ""}`} onClick={() => setTwinType("同性")}>{t('birth.twinSameGender', { gender: gender === "男" ? t('welcome.male') : t('welcome.female') })}</button>
-                <button className={`wizard-twin-btn ${twinType === "龍鳳" ? "selected" : ""}`} onClick={() => setTwinType("龍鳳")}>{t('birth.twinDiffGender', { otherGender: gender === "男" ? t('welcome.female') : t('welcome.male') })}</button>
+                <button className={`wizard-twin-btn ${twinType === "same" ? "selected" : ""}`} onClick={() => setTwinType("same")}>{t('birth.twinSameGender', { gender: gender === "男" ? t('welcome.male') : t('welcome.female') })}</button>
+                <button className={`wizard-twin-btn ${twinType === "mixed" ? "selected" : ""}`} onClick={() => setTwinType("mixed")}>{t('birth.twinDiffGender', { otherGender: gender === "男" ? t('welcome.female') : t('welcome.male') })}</button>
               </div>
             </div>
             <div className="wizard-twin-row">
               <div className="wizard-twin-label">{t('birth.twinOrder')}</div>
               <div className="wizard-twin-btns">
-                <button className={`wizard-twin-btn ${twinOrder === "先" ? "selected" : ""}`} onClick={() => setTwinOrder("先")}>{t('birth.twinFirst')}</button>
-                <button className={`wizard-twin-btn ${twinOrder === "後" ? "selected" : ""}`} onClick={() => setTwinOrder("後")}>{t('birth.twinSecond')}</button>
+                <button className={`wizard-twin-btn ${twinOrder === "first" ? "selected" : ""}`} onClick={() => setTwinOrder("first")}>{t('birth.twinFirst')}</button>
+                <button className={`wizard-twin-btn ${twinOrder === "second" ? "selected" : ""}`} onClick={() => setTwinOrder("second")}>{t('birth.twinSecond')}</button>
               </div>
             </div>
           </div>
@@ -1408,7 +1343,7 @@ ${hebanRelation === "雙胞胎手足" ? `
   };
 
   const handleCitySelect = (city) => {
-    setBirthPlace(city.nameZh !== city.name ? `${city.nameZh} (${city.name})` : city.name);
+    setBirthPlace(currentLang === 'zh-TW' && city.nameZh !== city.name ? `${city.nameZh} (${city.name})` : city.name);
     setBirthCity({ lat: city.lat, lng: city.lng, timezone: city.timezone, name: city.name, nameZh: city.nameZh });
     setCitySearchResults([]);
     setCitySearchQuery("");
@@ -1447,8 +1382,8 @@ ${hebanRelation === "雙胞胎手足" ? `
                   onMouseLeave={e => e.target.style.background = "transparent"}
                 >
                   <span>
-                    <strong>{city.nameZh !== city.name ? city.nameZh : city.name}</strong>
-                    {city.nameZh !== city.name && <span style={{ opacity: 0.6, marginLeft: 6 }}>{city.name}</span>}
+                    <strong>{currentLang === 'zh-TW' && city.nameZh !== city.name ? city.nameZh : city.name}</strong>
+                    {currentLang === 'zh-TW' && city.nameZh !== city.name && <span style={{ opacity: 0.6, marginLeft: 6 }}>{city.name}</span>}
                   </span>
                   <span style={{ opacity: 0.5, fontSize: 12 }}>{city.country}</span>
                 </div>
@@ -1458,7 +1393,7 @@ ${hebanRelation === "雙胞胎手足" ? `
           {birthCity && (
             <div className="wizard-hint" style={{ marginTop: 8, textAlign: "left" }}>
               <span className="wizard-hint-text">
-                {birthCity.timezone} | 經度 {birthCity.lng}° 緯度 {birthCity.lat}°
+                {t('place.coords', { timezone: birthCity.timezone, lng: birthCity.lng, lat: birthCity.lat })}
               </span>
             </div>
           )}
@@ -1479,15 +1414,15 @@ ${hebanRelation === "雙胞胎手足" ? `
         <div className="wizard-confirm-card">
           <div className="wizard-confirm-row">
             <span className="wizard-confirm-label">{t('confirm.gender')}</span>
-            <span className="wizard-confirm-value">{gender}</span>
+            <span className="wizard-confirm-value">{genderDisplay(gender)}</span>
           </div>
           <div className="wizard-confirm-row">
             <span className="wizard-confirm-label">{t('confirm.focus')}</span>
-            <span className="wizard-confirm-value">{goal}{loveSub ? `（${loveSub}）` : ""}</span>
+            <span className="wizard-confirm-value">{goalDisplay(goal)}{loveSub ? ` (${goalDisplay(loveSub)})` : ""}</span>
           </div>
           <div className="wizard-confirm-row">
             <span className="wizard-confirm-label">{t('confirm.birthDate')}</span>
-            <span className="wizard-confirm-value">{birthYear}年{birthMonth}月{birthDay}日</span>
+            <span className="wizard-confirm-value">{t('confirm.dateFormat', { year: birthYear, month: birthMonth, day: birthDay })}</span>
           </div>
           <div className="wizard-confirm-row">
             <span className="wizard-confirm-label">{t('confirm.birthTime')}</span>
@@ -1500,7 +1435,7 @@ ${hebanRelation === "雙胞胎手足" ? `
           {isTwin && (
             <div className="wizard-confirm-row">
               <span className="wizard-confirm-label">{t('confirm.twinLabel')}</span>
-              <span className="wizard-confirm-value">{twinType === "同性" ? t('confirm.twinSame') : t('confirm.twinDiff')}・{twinOrder === "先" ? t('confirm.twinFirst') : t('confirm.twinSecond')}</span>
+              <span className="wizard-confirm-value">{twinType === "same" ? t('confirm.twinSame') : t('confirm.twinDiff')}{' / '}{twinOrder === "first" ? t('confirm.twinFirst') : t('confirm.twinSecond')}</span>
             </div>
           )}
         </div>
@@ -1531,7 +1466,7 @@ ${hebanRelation === "雙胞胎手足" ? `
     </div>
   );
 
-  // Result screen — unified, no system names
+  // Result screen
   const renderResult = () => {
     const years = [];
     for (let y = new Date().getFullYear() + 1; y >= 1940; y--) years.push(y);
@@ -1547,7 +1482,6 @@ ${hebanRelation === "雙胞胎手足" ? `
         <div className="wizard-result">
           <div className="wizard-question" style={{ marginBottom: 12 }}>{t('result.title')}</div>
 
-          {/* Translate buttons */}
           <div className="wizard-translate-bar">
             {Object.entries(LANG_NAMES).map(([lng, label]) => {
               const isOriginal = lng === currentLang && !displayLang;
@@ -1564,14 +1498,14 @@ ${hebanRelation === "雙胞胎手足" ? `
                 </button>
               );
             })}
-            {translating && <span className="wizard-translate-loading">{t('result.translating') || '翻譯中...'}</span>}
+            {translating && <span className="wizard-translate-loading">{t('result.translating')}</span>}
           </div>
 
           <div className="wizard-result-sections">
             {renderFormattedResult(displayResult)}
           </div>
 
-          {/* ===== 合盤引導區塊 ===== */}
+          {/* Heban promo */}
           {!hebanResult && !hebanAnalyzing && (
             <div className="wizard-heban-promo" ref={hebanRef}>
               <div className="wizard-heban-promo-header">
@@ -1587,19 +1521,17 @@ ${hebanRelation === "雙胞胎手足" ? `
                 </button>
               ) : (
                 <div className="wizard-heban-form">
-                  {/* Relation */}
                   <div className="wizard-heban-label">{t('result.hebanRelation')}</div>
                   <div className="wizard-heban-relations">
                     {RELATIONS.map(r => (
-                      <button key={r.text}
-                        className={`wizard-heban-rel-btn ${hebanRelation === r.text ? "selected" : ""}`}
-                        onClick={() => setHebanRelation(r.text)}>
+                      <button key={r.key}
+                        className={`wizard-heban-rel-btn ${hebanRelation === r.key ? "selected" : ""}`}
+                        onClick={() => setHebanRelation(r.key)}>
                         {t(r.key)}
                       </button>
                     ))}
                   </div>
 
-                  {/* Gender */}
                   <div className="wizard-heban-label">{t('result.hebanGender')}</div>
                   <div className="wizard-heban-relations">
                     <button className={`wizard-heban-rel-btn ${hebanGender === "男" ? "selected" : ""}`}
@@ -1608,12 +1540,10 @@ ${hebanRelation === "雙胞胎手足" ? `
                       onClick={() => setHebanGender("女")}>{t('welcome.female')}</button>
                   </div>
 
-                  {/* Name (optional) */}
                   <div className="wizard-heban-label">{t('result.hebanName')}</div>
                   <input className="wizard-input" value={hebanName} onChange={e => setHebanName(e.target.value)}
                     placeholder={t('result.hebanNamePlaceholder')} style={{ maxWidth: 300, marginBottom: 16 }} />
 
-                  {/* Birthday */}
                   <div className="wizard-heban-label">{t('result.hebanBirth')}</div>
                   <div className="wizard-date-row" style={{ marginBottom: 16 }}>
                     <div className="wizard-select-wrap">
@@ -1639,7 +1569,6 @@ ${hebanRelation === "雙胞胎手足" ? `
                     </div>
                   </div>
 
-                  {/* Time (optional) */}
                   <div className="wizard-heban-label">{t('result.hebanTime')}</div>
                   <div className="wizard-date-row" style={{ maxWidth: 250, marginBottom: 24 }}>
                     <div className="wizard-select-wrap">
@@ -1665,7 +1594,7 @@ ${hebanRelation === "雙胞胎手足" ? `
             </div>
           )}
 
-          {/* 合盤 Loading */}
+          {/* Heban Loading */}
           {hebanAnalyzing && (
             <div className="wizard-result-card" style={{ textAlign: "center", padding: 40 }}>
               <div className="wizard-loading-anim" style={{ margin: "0 auto 20px", width: 80, height: 80 }}>
@@ -1678,7 +1607,7 @@ ${hebanRelation === "雙胞胎手足" ? `
             </div>
           )}
 
-          {/* 合盤結果 */}
+          {/* Heban Result */}
           {hebanResult && (
             <div className="wizard-heban-result">
               <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>
@@ -1697,67 +1626,64 @@ ${hebanRelation === "雙胞胎手足" ? `
               setShowHeban(false); setHebanResult(""); setHebanRelation(""); setHebanName("");
               setHebanYear(""); setHebanMonth(""); setHebanDay(""); setHebanHour(""); setHebanGender("");
             }}>
-              重新算一次
+              {t('result.newReading')}
             </button>
             <button className="wizard-result-btn secondary" onClick={onBack}>
-              回到主頁
+              {t('result.backHome')}
             </button>
           </div>
 
-          {/* ===== 家族命盤入口 ===== */}
+          {/* Family Chart entry */}
           <div className="wizard-heban-promo" style={{ marginTop: 32 }}>
             <div className="wizard-heban-promo-header">
               <span className="wizard-heban-promo-icon wizard-diamond"></span>
               <div>
-                <div className="wizard-heban-promo-title">{currentLang === 'en' ? 'Family Chart Analysis' : currentLang === 'ja' ? '家族命盤分析' : '家族命盤分析'}</div>
-                <div className="wizard-heban-promo-desc">{currentLang === 'en' ? "Add your parents, siblings, spouse — reveal how family energy shapes your destiny" : currentLang === 'ja' ? "両親・兄弟・配偶者を追加して、家族のエネルギーが運命にどう影響するかを分析" : "加入父母、手足、配偶的命盤，揭示家庭能量如何塑造你的命運"}</div>
+                <div className="wizard-heban-promo-title">{t('family.chartTitle')}</div>
+                <div className="wizard-heban-promo-desc">{t('family.chartDesc')}</div>
               </div>
             </div>
             <button className="wizard-cta" style={{ marginTop: 16 }} onClick={() => requireAuth(() => setShowFamily(true))}>
-              {currentLang === 'en' ? 'Build Family Chart' : currentLang === 'ja' ? '家族命盤を作成' : '建立家族命盤'}
+              {t('family.buildChart')}
             </button>
           </div>
 
           {/* Chat follow-up */}
           <div style={{ height: 32 }} />
           <div className="wizard-chat">
-            <div className="wizard-question" style={{ fontSize: 18, marginBottom: 8 }}>你的命盤還藏著這些沒說完</div>
-            <div className="wizard-subtitle" style={{ marginTop: 0, marginBottom: 20 }}>點選下方問題，或輸入你想問的</div>
+            <div className="wizard-question" style={{ fontSize: 18, marginBottom: 8 }}>{t('result.chatTitle')}</div>
+            <div className="wizard-subtitle" style={{ marginTop: 0, marginBottom: 20 }}>{t('result.chatSubtitle')}</div>
 
-            {/* Quick question buttons */}
             {showQuickQ && (
               <div className="wizard-quick-questions">
-                {/* 深度分析選項 */}
-                <div className="wizard-quick-q-divider">深度分析</div>
+                <div className="wizard-quick-q-divider">{t('quickQuestions.deepTitle')}</div>
                 {[
-                  "幫我分析目前的 10 年大運走向，現在處於什麼階段？",
-                  `幫我做 ${new Date().getFullYear()} 年的流年分析，逐月解讀重點和注意事項`,
+                  t('quickQuestions.deepQ1'),
+                  t('quickQuestions.deepQ2', { year: new Date().getFullYear() }),
                 ].map((q, i) => (
                   <button key={`deep-${i}`} className="wizard-quick-q-btn wizard-quick-q-deep" onClick={() => requireAuth(() => sendChat(q))} disabled={chatLoading}>
                     {q}
                   </button>
                 ))}
 
-                <div className="wizard-quick-q-divider">追問</div>
+                <div className="wizard-quick-q-divider">{t('quickQuestions.followUpTitle')}</div>
                 {[
-                  "我今年的財運怎麼走？",
-                  "我的感情什麼時候會有突破？",
-                  "現在換工作的時機對嗎？",
-                  "我命盤最需要注意什麼？",
+                  t('quickQuestions.q1'),
+                  t('quickQuestions.q2'),
+                  t('quickQuestions.q3'),
+                  t('quickQuestions.q4'),
                 ].map((q, i) => (
                   <button key={i} className="wizard-quick-q-btn" onClick={() => requireAuth(() => sendChat(q))} disabled={chatLoading}>
                     {q}
                   </button>
                 ))}
 
-                {/* Heban-trigger buttons */}
                 {!hebanResult && !hebanAnalyzing && (
                   <>
-                    <div className="wizard-quick-q-divider">或解讀你和身邊的人</div>
+                    <div className="wizard-quick-q-divider">{t('quickQuestions.hebanTitle')}</div>
                     {[
-                      { label: "和主管/同事的相處，誰是你的貴人？", relation: "同事 / 上下屬" },
-                      { label: "和家人之間的隱形牽絆，如何化解？", relation: "家人" },
-                      { label: "和曖昧對象的緣分，現在該前進嗎？", relation: "情人 / 曖昧對象" },
+                      { label: t('quickQuestions.hebanQ1'), relation: "relations.colleague" },
+                      { label: t('quickQuestions.hebanQ2'), relation: "relations.family" },
+                      { label: t('quickQuestions.hebanQ3'), relation: "relations.lover" },
                     ].map((item, i) => (
                       <button key={`heban-${i}`} className="wizard-quick-q-btn wizard-quick-q-heban" onClick={() => requireAuth(() => {
                         setShowHeban(true);
@@ -1772,7 +1698,6 @@ ${hebanRelation === "雙胞胎手足" ? `
               </div>
             )}
 
-            {/* Toggle button to re-show quick questions */}
             {!showQuickQ && chatHistory.length > 0 && (
               <button className="wizard-quick-q-toggle" onClick={() => setShowQuickQ(true)}>
                 {t('result.moreQuestions')}
@@ -1820,7 +1745,6 @@ ${hebanRelation === "雙胞胎手足" ? `
     <div className="wizard">
       <div className="wizard-bg" />
 
-      {/* Header — hide on welcome page, show back on other pages */}
       {step > 0 && (
       <div className="wizard-header">
         <button className="wizard-back" onClick={() => {
@@ -1829,12 +1753,11 @@ ${hebanRelation === "雙胞胎手足" ? `
         }}>
           ‹
         </button>
-        <div className="wizard-logo">命 理 三 鏡</div>
+        <div className="wizard-logo">{t('header.logo')}</div>
         <div className="wizard-menu" />
       </div>
       )}
 
-      {/* Progress — only show during questions */}
       {step > 0 && step < TOTAL_STEPS && (
         <div className="wizard-progress">
           <div className="wizard-progress-track">
@@ -1844,7 +1767,6 @@ ${hebanRelation === "雙胞胎手足" ? `
         </div>
       )}
 
-      {/* Content */}
       {showFamily ? <FamilyChart apiBackend={API_BACKEND} wizardUser={wizardUser} getVisitorId={getVisitorId} onClose={() => setShowFamily(false)} />
         : showAccount ? renderAccountPanel()
         : isLoadingScreen ? renderLoading()
@@ -1854,7 +1776,6 @@ ${hebanRelation === "雙胞胎手足" ? `
 
       <div className="wizard-footer">{t('app.footer')}</div>
 
-      {/* Auth Modal */}
       {showAuthModal && (
         <div className="wizard-auth-overlay" onClick={() => setShowAuthModal(false)}>
           <div className="wizard-auth-modal" onClick={e => e.stopPropagation()}>
