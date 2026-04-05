@@ -4,6 +4,8 @@ import { calculateChart, formatChart, formatChartByTianGan } from "./ziwei-calc.
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
+import { calculateTrueSolarTime, formatCorrectionDetails } from "./true-solar-time.js";
+import { searchCities } from "./city-search.js";
 
 // ============================================================
 // CONSTANTS
@@ -175,7 +177,13 @@ const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命運顧問，用溫�
 輸出結構：
 
 [SECTION] 你是這樣的人
-（用 2-3 段生動描述性格亮點和天賦，讓人覺得「對！就是我」）
+（用 3-4 段深入描述核心性格、天賦才華、思維方式和行為模式。要具體到讓人覺得「對！就是我」。不是籠統的「你很聰明」，而是描述具體的性格特質、做事風格、與人相處的方式。包含優勢和需要注意的盲點。）
+
+[SECTION] 你走過的路——過去十年的人生階段
+（根據上一個大運的格局，回顧過去這段時間的人生主調。這段時期的重心在哪裡？經歷了什麼樣的成長或挑戰？讓用戶感覺「確實是這樣」，建立信任感。要具體描述這段時期的生活重心、情感狀態、事業走向。）
+
+[SECTION] 你正在經歷的——現在這個人生階段
+（根據目前大運的格局，描述現階段的主題和能量走向。跟上一個階段有什麼不同？重心轉移到哪裡？目前的機會和挑戰是什麼？讓用戶理解「為什麼最近感覺不一樣了」。）
 
 [SECTION] [用戶關注的主題]——你的現況與趨勢
 （直接告訴用戶目前的狀態、即將發生的變化，具體有畫面感）
@@ -206,11 +214,43 @@ const WIZARD_SYSTEM_PROMPT = `你是「命理三鏡」的命運顧問，用溫�
 
 語氣：溫暖、直接、有洞察力。正面為主但誠實。不需要加免責聲明。`;
 
+// Goal → required topic tags mapping
+const GOAL_TOPICS = {
+  "感情": ["love", "timing"],
+  "事業": ["career", "timing"],
+  "財富": ["wealth", "timing"],
+  "健康": ["health"],
+};
+
+function filterKBByGoal(kbEntries, goalText) {
+  if (!goalText || goalText.includes("全面")) return kbEntries;
+
+  // Find which topics this goal needs
+  let needTopics = [];
+  for (const [key, topics] of Object.entries(GOAL_TOPICS)) {
+    if (goalText.includes(key)) needTopics.push(...topics);
+  }
+  if (needTopics.length === 0) return kbEntries;
+  // Always include personality for context
+  needTopics.push("personality");
+
+  return kbEntries.filter(e => {
+    const topics = e.topics || [];
+    // Always keep core entries
+    if (topics.includes("core")) return true;
+    // Keep if any topic matches
+    return needTopics.some(t => topics.includes(t));
+  });
+}
+
 function buildWizardPrompt(kbEntries, goalObj) {
   let prompt = WIZARD_SYSTEM_PROMPT;
-  if (kbEntries.length > 0) {
+  const goalText = typeof goalObj === "string" ? goalObj : (goalObj?.text || goalObj?.prompt || "");
+  const filtered = filterKBByGoal(kbEntries, goalText);
+
+  if (filtered.length > 0) {
     const grouped = {};
-    kbEntries.forEach(e => {
+    filtered.forEach(e => {
       if (!grouped[e.category]) grouped[e.category] = [];
       grouped[e.category].push(e);
     });
@@ -246,6 +286,9 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [birthHour, setBirthHour] = useState(saved?.birthHour ?? "");
   const [birthMinute, setBirthMinute] = useState(saved?.birthMinute ?? "0");
   const [birthPlace, setBirthPlace] = useState(saved?.birthPlace ?? "桃園");
+  const [birthCity, setBirthCity] = useState(saved?.birthCity ?? null); // { lat, lng, timezone, name, nameZh }
+  const [citySearchResults, setCitySearchResults] = useState([]);
+  const [citySearchQuery, setCitySearchQuery] = useState("");
 
   // Analysis state
   const [analyzing, setAnalyzing] = useState(false);
@@ -264,6 +307,11 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [hebanHour, setHebanHour] = useState("");
   const [hebanMinute, setHebanMinute] = useState("0");
   const [hebanGender, setHebanGender] = useState("");
+
+  // Twin state
+  const [isTwin, setIsTwin] = useState(saved?.isTwin ?? false);
+  const [twinOrder, setTwinOrder] = useState(saved?.twinOrder ?? ""); // "先" or "後"
+  const [twinType, setTwinType] = useState(saved?.twinType ?? ""); // "同性" or "龍鳳"
   const [hebanAnalyzing, setHebanAnalyzing] = useState(false);
   const [hebanResult, setHebanResult] = useState(saved?.hebanResult ?? "");
 
@@ -285,6 +333,13 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [authError, setAuthError] = useState("");
   const pendingActionRef = useRef(null);
 
+  // Account / payment state
+  const [showAccount, setShowAccount] = useState(false);
+  const [userFeatures, setUserFeatures] = useState([]);
+  const [userCredits, setUserCredits] = useState(0);
+  const [loadingPayment, setLoadingPayment] = useState(false);
+  const [paymentPlans, setPaymentPlans] = useState(null);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
@@ -295,11 +350,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     if (analyzing || hebanAnalyzing) return;
     const sessionData = {
       step, gender, goal, goalPrompt, loveSub,
-      birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace,
+      birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity,
+      isTwin, twinOrder, twinType,
       finalResult, rawResults, hebanResult, chatHistory,
     };
     saveSession(sessionData, wizardUser);
-  }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, finalResult, rawResults, hebanResult, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
+  }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity, isTwin, twinOrder, twinType, finalResult, rawResults, hebanResult, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
 
   // If session had a result, jump to result screen on mount
   useEffect(() => {
@@ -415,6 +471,68 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   };
 
+  // Fetch user payment status from backend
+  const fetchUserStatus = async (email) => {
+    try {
+      const res = await fetch(`${API_BACKEND.replace("/fortune", "/payment/status")}?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserFeatures(data.paid_features || []);
+        setUserCredits(data.credits || 0);
+      }
+    } catch {}
+  };
+
+  const fetchPlans = async () => {
+    try {
+      const res = await fetch(API_BACKEND.replace("/fortune", "/payment/plans"));
+      if (res.ok) {
+        const data = await res.json();
+        setPaymentPlans(data.plans || {});
+      }
+    } catch {}
+  };
+
+  const handleCheckout = async (planId) => {
+    if (!wizardUser?.email) return;
+    setLoadingPayment(true);
+    try {
+      const res = await fetch(API_BACKEND.replace("/fortune", "/payment/checkout"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: planId, email: wizardUser.email }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.checkout_url) {
+          if (data.mock) {
+            // Mock: simulate payment
+            const mockRes = await fetch(API_BACKEND.replace("/fortune", "/payment/mock-complete"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ order_id: data.order_id }),
+            });
+            if (mockRes.ok) {
+              const result = await mockRes.json();
+              setUserFeatures(result.unlocked || []);
+            }
+          } else {
+            window.location.href = data.checkout_url;
+          }
+        }
+      }
+    } catch {}
+    setLoadingPayment(false);
+  };
+
+  // Load user status when account panel opens
+  useEffect(() => {
+    if (showAccount && wizardUser?.email) {
+      fetchUserStatus(wizardUser.email);
+      if (!paymentPlans) fetchPlans();
+    }
+  }, [showAccount]);
+
   const progress = Math.round((step / (TOTAL_STEPS - 1)) * 100);
 
   // ---- API calls ----
@@ -463,25 +581,100 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const min = parseInt(birthMinute) || 0;
       const kbEntries = loadKB();
 
-      // Step 1: 本地排盤（瞬間完成，不需 API）
+      // Step 1: 真太陽時計算 + 本地排盤
       setLoadingMsg("正在解讀你的命運密碼...");
-      const ziweiChart = formatChart(calculateChart(y, m, d, h, 0, gender));
-      const baziChart = formatBazi(calculateBazi(y, m, d, h, gender));
-      const cityMatch = findCity(birthPlace);
-      const astroLat = cityMatch ? cityMatch.lat : 24.9936;
-      const astroLng = cityMatch ? cityMatch.lng : 121.3130;
-      const astroChart = formatAstro(calculateAstro(y, m, d, h, min, astroLat, astroLng));
+
+      // 取得城市座標和時區
+      let cityLat, cityLng, cityTz;
+      if (birthCity && birthCity.lat) {
+        cityLat = birthCity.lat;
+        cityLng = birthCity.lng;
+        cityTz = birthCity.timezone;
+      } else {
+        const cityMatch = findCity(birthPlace);
+        cityLat = cityMatch ? cityMatch.lat : 24.9936;
+        cityLng = cityMatch ? cityMatch.lng : 121.3130;
+        cityTz = "Asia/Taipei";
+      }
+
+      // 計算真太陽時
+      const tst = calculateTrueSolarTime(y, m, d, h, min, cityLng, cityTz);
+
+      // 用真太陽時的日期和時辰排盤
+      const tstY = tst.adjustedYear, tstM = tst.adjustedMonth, tstD = tst.adjustedDay;
+      const tstH = tst.trueSolarHour, tstMin = tst.trueSolarMinute;
+
+      const ziweiChart = formatChart(calculateChart(tstY, tstM, tstD, tstH, tstMin, gender));
+      const baziChart = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, gender, tstMin));
+      const astroChart = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
+
+      // 雙胞胎：為另一位排盤（龍鳳胎用異性、同性雙胞胎用同性但附命遷互換理論）
+      let twinZiweiChart = "", twinBaziChart = "", twinAstroChart = "";
+      if (isTwin) {
+        const sibGender = twinType === "龍鳳" ? (gender === "男" ? "女" : "男") : gender;
+        twinZiweiChart = formatChart(calculateChart(tstY, tstM, tstD, tstH, tstMin, sibGender));
+        twinBaziChart = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, sibGender, tstMin));
+        twinAstroChart = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
+      }
+
+      // 真太陽時修正資訊（供 prompt 使用）
+      const tstInfo = formatCorrectionDetails(tst);
 
       // 保存排盤資料供合盤用
-      setRawResults([
+      const results = [
         { system: "紫微斗數", text: ziweiChart, result: "" },
         { system: "八字", text: baziChart, result: "" },
         { system: "西洋占星", text: astroChart, result: "" },
-      ]);
+      ];
+      if (isTwin) {
+        results.push(
+          { system: "紫微斗數（手足）", text: twinZiweiChart, result: "" },
+          { system: "八字（手足）", text: twinBaziChart, result: "" },
+          { system: "西洋占星（手足）", text: twinAstroChart, result: "" },
+        );
+      }
+      setRawResults(results);
 
       // Step 2: 一次 API call — 直接送三套排盤 + 統一輸出
       setLoadingMsg("深度分析你的個人能量...");
       const wizardSP = buildWizardPrompt(kbEntries, goal);
+      // 雙胞胎額外排盤區塊
+      const twinChartBlock = isTwin ? `
+
+===
+
+【紫微斗數排盤 — 手足】
+${twinZiweiChart}
+
+===
+
+【八字排盤 — 手足】
+${twinBaziChart}
+
+===
+
+【西洋占星排盤 — 手足】
+${twinAstroChart}` : "";
+
+      const twinInfoBlock = isTwin ? `
+- ⚠️ 雙胞胎：${twinType === "龍鳳" ? "龍鳳胎" : "同性雙胞胎"}
+- 本人出生順序：${twinOrder === "先" ? "先出生（兄/姊）" : "後出生（弟/妹）"}
+- 手足性別：${twinType === "龍鳳" ? (gender === "男" ? "女" : "男") : gender}` : "";
+
+      const twinTaskBlock = isTwin ? `
+
+## 雙胞胎分析要求
+這位用戶是${twinType === "龍鳳" ? "龍鳳胎" : "同性雙胞胎"}，${twinOrder === "先" ? "先出生" : "後出生"}。以上提供了本人和手足各自的排盤。
+請務必在報告中：
+1. 先分析本人的命盤（主要報告）
+2. 加一個段落比較雙胞胎之間的差異
+3. 套用以下雙胞胎命理理論：
+   - 八字：得氣深淺（先出生者得氣較淺、後出生者得氣較深）、陰陽分化規則、日主強弱判斷
+   - 紫微：${twinType === "龍鳳" ? "龍鳳胎因性別不同，大限方向相反，第二大限起命運明顯分歧" : "命遷互換法（後出生者以遷移宮為命宮）"}
+   - 占星：上升度數微小差異、推運盤月亮位置逐年累積差異
+4. 分開描述「你們的共同基礎」和「你們的差異之處」
+5. 不要只說「你們很像」，要具體指出哪裡不同、為什麼不同` : "";
+
       const oneCallPrompt = `以下是一位用戶的三套命理排盤資料（內部資料，不可對外揭露來源系統）：
 
 【紫微斗數排盤】
@@ -495,12 +688,13 @@ ${baziChart}
 ===
 
 【西洋占星排盤】
-${astroChart}
+${astroChart}${twinChartBlock}
 
 ## 用戶資料
 - 性別：${gender}
 - 出生：${birthYear}年${birthMonth}月${birthDay}日 ${h}時${min}分
-- 出生地：${birthPlace}
+- 出生地：${birthPlace}（經度${cityLng}°, 緯度${cityLat}°）
+- 真太陽時：${tst.trueSolarTimeStr}（${tst.shichen}時）${tst.nearBoundary ? `\n- ⚠️ ${tst.nearBoundary.message}` : ""}${tst.isEarlyZi ? "\n- ⚠️ 早子時，日柱用當日" : ""}${twinInfoBlock}
 - 關注方向：${goal}${loveSub ? `（${loveSub}）` : ""}
 
 ## 任務
@@ -515,7 +709,7 @@ ${astroChart}
 ⚠️ 嚴格遵守系統規則：不提任何命理系統名稱和專有術語，用自然語言表達所有洞見。
 ⚠️ 按照指定的輸出格式（天賦特質 → 主題深度解析 → 年運勢 → 建議 → 近期提醒）組織內容。
 ⚠️ 重點針對用戶關注的「${goal}${loveSub ? `（${loveSub}）` : ""}」方向深入分析。
-⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。`;
+⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。${twinTaskBlock}`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
@@ -542,6 +736,7 @@ ${astroChart}
       setAnalyzing(false);
       setLoadingMsg("");
       setStep(TOTAL_STEPS + 1); // result screen
+      setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
       trackEvent("analysis_complete", { goal, loveSub, resultLength: finalResult?.length || 0 });
     } catch (err) {
       setError("分析過程發生錯誤：" + err.message);
@@ -561,8 +756,8 @@ ${astroChart}
     try {
       const kbEntries = loadKB();
       const wizardSP = buildWizardPrompt(kbEntries, goal);
-      const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
-      const prompt = `之前的分析報告：\n${finalResult.slice(0, 2000)}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答時嚴格遵守規則：不提任何命理系統名稱和專有術語，用自然語言回覆。`;
+      const recentChat = chatHistory.slice(-10).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
+      const prompt = `之前的完整分析報告：\n${finalResult}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先以紫微斗數的宮位、飛化、星曜組合進行深度推論，給出具體而非籠統的回答\n3. 引用分析報告中的相關內容，結合命盤資訊給出精確判斷\n4. 如果問題涉及時間點，要具體到年份或時期`;
       // Deep analysis for 大運/流年 questions → Opus; others → Sonnet
       const isDeep = /大運|流年|逐月|十年|運勢走向/.test(question);
       const submitRes = await fetch(API_BACKEND, {
@@ -805,6 +1000,86 @@ ${hasPartnerTime
   // ---- RENDER STEPS ----
 
   // Step 0: Welcome + gender
+  // Account management panel
+  const renderAccountPanel = () => {
+    const FEATURE_NAMES = { deep: "深度分析（大運/流年）", heban: "合盤解讀" };
+    const PLAN_ICONS = { deep_analysis: "深", heban: "合", bundle: "全" };
+
+    return (
+      <div className="wizard-account-panel">
+        <div className="wizard-account-header">
+          <button className="wizard-back" onClick={() => setShowAccount(false)}>‹</button>
+          <div className="wizard-account-title">我的帳號</div>
+        </div>
+
+        <div className="wizard-account-info">
+          <div className="wizard-account-avatar">{wizardUser?.name?.[0] || "U"}</div>
+          <div className="wizard-account-detail">
+            <div className="wizard-account-name">{wizardUser?.name}</div>
+            <div className="wizard-account-email">{wizardUser?.email}</div>
+          </div>
+        </div>
+
+        <div className="wizard-account-section">
+          <div className="wizard-account-section-title">已解鎖功能</div>
+          {userFeatures.length > 0 ? (
+            <div className="wizard-account-features">
+              {userFeatures.map(f => (
+                <div key={f} className="wizard-account-feature-badge">{FEATURE_NAMES[f] || f}</div>
+              ))}
+            </div>
+          ) : (
+            <div className="wizard-account-empty">尚未解鎖付費功能</div>
+          )}
+        </div>
+
+        <div className="wizard-account-section">
+          <div className="wizard-account-section-title">付費方案</div>
+          {paymentPlans ? (
+            <div className="wizard-account-plans">
+              {Object.entries(paymentPlans).map(([id, plan]) => {
+                const owned = plan.feature === "all"
+                  ? userFeatures.includes("deep") && userFeatures.includes("heban")
+                  : userFeatures.includes(plan.feature);
+                return (
+                  <div key={id} className={`wizard-account-plan ${owned ? "owned" : ""}`}>
+                    <div className="wizard-account-plan-icon">{PLAN_ICONS[id] || "+"}</div>
+                    <div className="wizard-account-plan-info">
+                      <div className="wizard-account-plan-name">{plan.name}</div>
+                      <div className="wizard-account-plan-price">NT$ {plan.price}</div>
+                    </div>
+                    {owned ? (
+                      <div className="wizard-account-plan-owned">已解鎖</div>
+                    ) : (
+                      <button className="wizard-account-plan-btn" disabled={loadingPayment}
+                        onClick={() => handleCheckout(id)}>
+                        {loadingPayment ? "處理中..." : "購買"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="wizard-account-empty">載入中...</div>
+          )}
+        </div>
+
+        <button className="wizard-cta-secondary" style={{ marginTop: 24 }} onClick={() => {
+          setWizardUser(null);
+          localStorage.removeItem(AUTH_KEY);
+          setShowAccount(false);
+          setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
+          setBirthYear(""); setBirthMonth(""); setBirthDay(""); setBirthHour(""); setBirthMinute("0");
+          setBirthPlace("桃園"); setFinalResult(""); setRawResults([]); setHebanResult("");
+          setChatHistory([]); setShowHeban(false);
+        }}>
+          登出
+        </button>
+      </div>
+    );
+  };
+
   const renderWelcome = () => (
     <div className="wizard-welcome">
       <div className="wizard-welcome-icon wizard-diamond"></div>
@@ -815,13 +1090,15 @@ ${hasPartnerTime
         <>
           <div className="wizard-user-greeting">
             {wizardUser.name}，歡迎回來
+            <button className="wizard-account-link" onClick={() => setShowAccount(true)}>我的帳號</button>
             <button className="wizard-logout-link" onClick={() => {
               setWizardUser(null);
               localStorage.removeItem(AUTH_KEY);
               // Reset to clean state
               setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
               setBirthYear(""); setBirthMonth(""); setBirthDay(""); setBirthHour(""); setBirthMinute("0");
-              setBirthPlace("桃園"); setFinalResult(""); setRawResults([]); setHebanResult("");
+              setBirthPlace("桃園"); setIsTwin(false); setTwinOrder(""); setTwinType("");
+              setFinalResult(""); setRawResults([]); setHebanResult("");
               setChatHistory([]); setShowHeban(false);
             }}>登出</button>
           </div>
@@ -932,7 +1209,7 @@ ${hasPartnerTime
   // Step 2: Birthday + Time (merged)
   const renderBirthday = () => {
     const years = [];
-    for (let y = 2010; y >= 1940; y--) years.push(y);
+    for (let y = new Date().getFullYear() + 1; y >= 1940; y--) years.push(y);
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
     const days = Array.from({ length: 31 }, (_, i) => i + 1);
     const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -991,8 +1268,36 @@ ${hasPartnerTime
           </div>
         </div>
 
+        {/* Twin toggle */}
+        <div style={{ height: 20 }} />
+        <div className="wizard-twin-toggle">
+          <label className="wizard-twin-check">
+            <input type="checkbox" checked={isTwin} onChange={e => { setIsTwin(e.target.checked); if (!e.target.checked) { setTwinOrder(""); setTwinType(""); } }} />
+            <span>我是雙胞胎 / 龍鳳胎</span>
+          </label>
+        </div>
+
+        {isTwin && (
+          <div className="wizard-twin-options">
+            <div className="wizard-twin-row">
+              <div className="wizard-twin-label">手足性別</div>
+              <div className="wizard-twin-btns">
+                <button className={`wizard-twin-btn ${twinType === "同性" ? "selected" : ""}`} onClick={() => setTwinType("同性")}>同性（都是{gender}生）</button>
+                <button className={`wizard-twin-btn ${twinType === "龍鳳" ? "selected" : ""}`} onClick={() => setTwinType("龍鳳")}>{gender === "男" ? "手足是女生" : "手足是男生"}</button>
+              </div>
+            </div>
+            <div className="wizard-twin-row">
+              <div className="wizard-twin-label">你的出生順序</div>
+              <div className="wizard-twin-btns">
+                <button className={`wizard-twin-btn ${twinOrder === "先" ? "selected" : ""}`} onClick={() => setTwinOrder("先")}>我先出生</button>
+                <button className={`wizard-twin-btn ${twinOrder === "後" ? "selected" : ""}`} onClick={() => setTwinOrder("後")}>我後出生</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ height: 32 }} />
-        <button className="wizard-cta" disabled={!canProceed} onClick={() => setStep(3)}>
+        <button className="wizard-cta" disabled={!canProceed || (isTwin && (!twinOrder || !twinType))} onClick={() => setStep(3)}>
           繼續
         </button>
         <button className="wizard-cta-secondary" onClick={() => { setBirthHour("12"); setBirthMinute("0"); setStep(3); }}>
@@ -1003,55 +1308,75 @@ ${hasPartnerTime
   };
 
   // Step 3: Birth place
-  const renderPlace = () => {
-    const groups = getCityGroups();
-    const groupOrder = ["台灣", "中國", "港澳", "東亞", "東南亞", "北美", "歐洲", "大洋洲"];
-    const isCustom = birthPlace && !findCity(birthPlace);
+  const handleCitySearch = async (query) => {
+    setCitySearchQuery(query);
+    setBirthPlace(query);
+    if (query.length >= 1) {
+      const results = await searchCities(query, 8);
+      setCitySearchResults(results);
+    } else {
+      setCitySearchResults([]);
+    }
+  };
 
+  const handleCitySelect = (city) => {
+    setBirthPlace(city.nameZh !== city.name ? `${city.nameZh} (${city.name})` : city.name);
+    setBirthCity({ lat: city.lat, lng: city.lng, timezone: city.timezone, name: city.name, nameZh: city.nameZh });
+    setCitySearchResults([]);
+    setCitySearchQuery("");
+  };
+
+  const renderPlace = () => {
     return (
       <div className="wizard-content">
         <div className="wizard-question">出生地</div>
-        <div className="wizard-subtitle">影響占星排盤的精確度</div>
-        <div className="wizard-select-wrap" style={{ maxWidth: 300 }}>
-          <select
-            className="wizard-select"
-            value={isCustom ? "__custom__" : birthPlace}
-            onChange={e => {
-              if (e.target.value === "__custom__") {
-                setBirthPlace("");
-              } else {
-                setBirthPlace(e.target.value);
-              }
-            }}
+        <div className="wizard-subtitle">影響排盤的時辰判定與精確度</div>
+        <div style={{ maxWidth: 340, margin: "0 auto", position: "relative" }}>
+          <input
+            className="wizard-input"
+            value={citySearchQuery || birthPlace}
+            onChange={e => handleCitySearch(e.target.value)}
+            onFocus={() => { if (birthPlace) handleCitySearch(birthPlace); }}
+            placeholder="搜尋城市（中/英/日）..."
             style={{ width: "100%", fontSize: 16, padding: "10px 12px" }}
-          >
-            <option value="">-- 選擇城市 --</option>
-            {groupOrder.map(g => groups[g] && (
-              <optgroup key={g} label={g}>
-                {groups[g].map(c => (
-                  <option key={c.name} value={c.name}>{c.name}</option>
-                ))}
-              </optgroup>
-            ))}
-            <option value="__custom__">其他城市（手動輸入）</option>
-          </select>
-        </div>
-        {(isCustom || birthPlace === "") && findCity(birthPlace) === null && birthPlace !== "" && (
-          <div style={{ marginTop: 8 }}>
-            <input
-              className="wizard-input"
-              value={birthPlace}
-              onChange={e => setBirthPlace(e.target.value)}
-              placeholder="輸入城市名稱..."
-              style={{ maxWidth: 300 }}
-            />
-            <div className="wizard-hint" style={{ marginTop: 4 }}>
-              <span className="wizard-hint-text">手動輸入的城市將使用預設座標，可能略有偏差</span>
+            autoComplete="off"
+          />
+          {citySearchResults.length > 0 && (
+            <div style={{
+              position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
+              background: "var(--card-bg, #1a1a2e)", border: "1px solid var(--border, #333)",
+              borderRadius: 8, maxHeight: 280, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
+            }}>
+              {citySearchResults.map(city => (
+                <div
+                  key={city.id}
+                  onClick={() => handleCitySelect(city)}
+                  style={{
+                    padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border, #222)",
+                    fontSize: 14, display: "flex", justifyContent: "space-between", alignItems: "center"
+                  }}
+                  onMouseEnter={e => e.target.style.background = "var(--hover-bg, #252545)"}
+                  onMouseLeave={e => e.target.style.background = "transparent"}
+                >
+                  <span>
+                    <strong>{city.nameZh !== city.name ? city.nameZh : city.name}</strong>
+                    {city.nameZh !== city.name && <span style={{ opacity: 0.6, marginLeft: 6 }}>{city.name}</span>}
+                  </span>
+                  <span style={{ opacity: 0.5, fontSize: 12 }}>{city.country}</span>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+          )}
+          {birthCity && (
+            <div className="wizard-hint" style={{ marginTop: 8, textAlign: "left" }}>
+              <span className="wizard-hint-text">
+                {birthCity.timezone} | 經度 {birthCity.lng}° 緯度 {birthCity.lat}°
+              </span>
+            </div>
+          )}
+        </div>
         <div style={{ height: 32 }} />
-        <button className="wizard-cta" disabled={!birthPlace.trim()} onClick={() => setStep(4)}>
+        <button className="wizard-cta" disabled={!birthPlace.trim()} onClick={() => { setCitySearchResults([]); setStep(4); }}>
           繼續
         </button>
       </div>
@@ -1084,6 +1409,12 @@ ${hasPartnerTime
             <span className="wizard-confirm-label">出生地</span>
             <span className="wizard-confirm-value">{birthPlace}</span>
           </div>
+          {isTwin && (
+            <div className="wizard-confirm-row">
+              <span className="wizard-confirm-label">雙胞胎</span>
+              <span className="wizard-confirm-value">{twinType}・{twinOrder === "先" ? "先出生" : "後出生"}</span>
+            </div>
+          )}
         </div>
         <button className="wizard-cta" onClick={startAnalysis}>
           開始解讀命運
@@ -1115,7 +1446,7 @@ ${hasPartnerTime
   // Result screen — unified, no system names
   const renderResult = () => {
     const years = [];
-    for (let y = 2010; y >= 1940; y--) years.push(y);
+    for (let y = new Date().getFullYear() + 1; y >= 1940; y--) years.push(y);
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
     const days = Array.from({ length: 31 }, (_, i) => i + 1);
     const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -1366,18 +1697,19 @@ ${hasPartnerTime
     <div className="wizard">
       <div className="wizard-bg" />
 
-      {/* Header — hide logo on welcome page to avoid duplication */}
+      {/* Header — hide on welcome page, show back on other pages */}
+      {step > 0 && (
       <div className="wizard-header">
         <button className="wizard-back" onClick={() => {
-          if (step === 0) onBack();
-          else if (isResultScreen) { /* stay */ }
+          if (isResultScreen) setStep(0);
           else setStep(s => Math.max(0, s - 1));
         }}>
-          {step === 0 ? "✕" : "‹"}
+          ‹
         </button>
-        {step > 0 && <div className="wizard-logo">命 理 三 鏡</div>}
+        <div className="wizard-logo">命 理 三 鏡</div>
         <div className="wizard-menu" />
       </div>
+      )}
 
       {/* Progress — only show during questions */}
       {step > 0 && step < TOTAL_STEPS && (
@@ -1390,7 +1722,8 @@ ${hasPartnerTime
       )}
 
       {/* Content */}
-      {isLoadingScreen ? renderLoading()
+      {showAccount ? renderAccountPanel()
+        : isLoadingScreen ? renderLoading()
         : isResultScreen ? renderResult()
         : stepRenderers[step] ? stepRenderers[step]()
         : renderLoading()}

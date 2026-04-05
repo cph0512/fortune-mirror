@@ -50,10 +50,10 @@ function countWuXing(ba) {
   return count;
 }
 
-export function calculateBazi(solarYear, solarMonth, solarDay, hour, gender) {
+export function calculateBazi(solarYear, solarMonth, solarDay, hour, gender, minute = 0) {
   const shiChenIdx = hourToShiChenIdx(hour);
   // lunar-javascript 的八字根據節氣定月柱，需要用 Solar 精確時間
-  const solar = Solar.fromYmdHms(solarYear, solarMonth, solarDay, hour, 0, 0);
+  const solar = Solar.fromYmdHms(solarYear, solarMonth, solarDay, hour, minute, 0);
   const lunar = solar.getLunar();
   const ba = lunar.getEightChar();
 
