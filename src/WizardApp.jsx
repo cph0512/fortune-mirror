@@ -17,10 +17,8 @@ const LANG_AI = { 'zh-TW': '繁體中文', en: 'English', ja: '日本語' };
 // CONSTANTS
 // ============================================================
 
-const IS_TEST = window.location.hostname === "test.destinytelling.life";
-const API_BACKEND = IS_TEST
-  ? "https://fortune-sandbox-352618635098.asia-east1.run.app/api/fortune"
-  : "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
+const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
+const API_SANDBOX = "https://fortune-sandbox-352618635098.asia-east1.run.app/api";
 const API_TRACK = API_BACKEND.replace("/fortune", "/fortune-track");
 const STORAGE_KEY_KB = "fortune-app-kb";
 const KB_VERSION = "20260402d";
@@ -463,7 +461,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
 
   const fetchUserStatus = async (email) => {
     try {
-      const res = await fetch(`${API_BACKEND.replace("/fortune", "/payment/status")}?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`${API_SANDBOX}/payment/status?email=${encodeURIComponent(email)}`);
       if (res.ok) {
         const data = await res.json();
         setUserFeatures(data.paid_features || []);
@@ -474,7 +472,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
 
   const fetchPlans = async () => {
     try {
-      const res = await fetch(API_BACKEND.replace("/fortune", "/payment/plans"));
+      const res = await fetch(`${API_SANDBOX}/payment/plans`);
       if (res.ok) {
         const data = await res.json();
         setPaymentPlans(data.plans || {});
@@ -486,7 +484,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     if (!wizardUser?.email) return;
     setLoadingPayment(true);
     try {
-      const res = await fetch(API_BACKEND.replace("/fortune", "/payment/checkout"), {
+      const res = await fetch(`${API_SANDBOX}/payment/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan_id: planId, email: wizardUser.email }),
@@ -495,7 +493,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         const data = await res.json();
         if (data.checkout_url) {
           if (data.mock) {
-            const mockRes = await fetch(API_BACKEND.replace("/fortune", "/payment/mock-complete"), {
+            const mockRes = await fetch(`${API_SANDBOX}/payment/mock-complete`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ order_id: data.order_id }),

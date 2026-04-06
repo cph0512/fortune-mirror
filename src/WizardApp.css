@@ -1688,7 +1688,7 @@
 
 .wizard-account-panel {
   padding: 24px 20px; max-width: 480px; margin: 0 auto; width: 100%;
-  flex: 1;
+  flex: 1; z-index: 1; position: relative;
 }
 .wizard-account-header {
   display: flex; align-items: center; gap: 12px; margin-bottom: 32px;
