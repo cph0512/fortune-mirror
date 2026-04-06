@@ -22,7 +22,7 @@ const ROLES = [
 ];
 
 const FAMILY_STORAGE_KEY = "fortune-family-data";
-const FAMILY_SERVER_KEY = "fortune-family-server";
+const FAMILY_HISTORY_KEY = "fortune-family-history";
 const API_SAVE_PATH = "/api/fortune-save";
 
 function loadFamilyLocal() {
@@ -30,6 +30,17 @@ function loadFamilyLocal() {
 }
 function saveFamilyLocal(data) {
   try { localStorage.setItem(FAMILY_STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+function loadFamilyHistory() {
+  try { const d = localStorage.getItem(FAMILY_HISTORY_KEY); return d ? JSON.parse(d) : []; } catch { return []; }
+}
+function saveFamilyHistoryEntry(entry) {
+  try {
+    const history = loadFamilyHistory();
+    history.unshift(entry);
+    if (history.length > 20) history.length = 20;
+    localStorage.setItem(FAMILY_HISTORY_KEY, JSON.stringify(history));
+  } catch {}
 }
 
 // Save family data to server — both the analysis result AND the family structure
@@ -46,7 +57,7 @@ async function saveFamilyToServer(apiBackend, user, data) {
     birth: data.protagonist ? `${data.protagonist.year}/${data.protagonist.month}/${data.protagonist.day}` : "",
     birthData: data.protagonist || {},
     rawResults: data.members?.map(m => ({ system: `${getRoleLabel(m.role, 'zh-TW')}（${m.name}）`, text: `${m.charts?.ziwei || ""}\n\n${m.charts?.bazi || ""}\n\n${m.charts?.astro || ""}` })) || [],
-    chat: [],
+    chat: data.chat || [],
     monthHighlights: [],
     source: "b2c",
     familyData: { familyName: data.familyName, members: data.members, protagonist: data.protagonist },
@@ -128,6 +139,8 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
   const [chatHistory, setChatHistory] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [familyHistoryList, setFamilyHistoryList] = useState(loadFamilyHistory());
+  const [showHistory, setShowHistory] = useState(false);
 
   // Add member form
   const [addRole, setAddRole] = useState("");
@@ -152,24 +165,43 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
   // Load from server on mount (server-first)
   useEffect(() => {
     if (wizardUser?.email && !serverLoaded) {
-      loadFamilyFromServer(apiBackend, wizardUser).then(serverData => {
-        setServerLoaded(true);
-        if (serverData && serverData.members?.length > 0) {
-          // Server has data — use it if local is empty or older
-          if (!local?.members?.length) {
-            setFamilyName(serverData.familyName);
-            setMembers(serverData.members);
-            setProtagonist(serverData.protagonist);
-            if (serverData.result) {
-              setResult(serverData.result);
-              setPhase("result");
-            } else {
-              setPhase("list");
+      const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
+      // Load all family saves from server
+      fetch(`${saveUrl}?user=${encodeURIComponent(wizardUser.email)}`)
+        .then(r => r.json())
+        .then(saves => {
+          setServerLoaded(true);
+          const familySaves = (Array.isArray(saves) ? saves : []).filter(s => s.goal === "family" && (s.finalResult || s.familyData));
+          // Build server history
+          if (familySaves.length > 0) {
+            const serverHistory = familySaves.map(s => ({
+              id: s.time,
+              time: s.time,
+              familyName: s.familyData?.familyName || s.goalPrompt || "",
+              protagonistName: s.familyData?.protagonist?.name || "",
+              protagonistRole: s.familyData?.protagonist?.role || "",
+              result: s.finalResult || "",
+              members: s.familyData?.members,
+              protagonist: s.familyData?.protagonist,
+            }));
+            setFamilyHistoryList(serverHistory);
+            // Restore latest if local is empty
+            const latest = familySaves[0];
+            if (!local?.members?.length && latest.familyData?.members?.length) {
+              setFamilyName(latest.familyData.familyName || "");
+              setMembers(latest.familyData.members);
+              setProtagonist(latest.familyData.protagonist);
+              if (latest.finalResult) {
+                setResult(latest.finalResult);
+                setPhase("result");
+              } else {
+                setPhase("list");
+              }
+              saveFamilyLocal({ familyName: latest.familyData.familyName, members: latest.familyData.members, result: latest.finalResult, protagonist: latest.familyData.protagonist });
             }
-            saveFamilyLocal(serverData);
           }
-        }
-      });
+        })
+        .catch(() => setServerLoaded(true));
     }
   }, [wizardUser]);
 
@@ -369,8 +401,21 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
           const data = await pollRes.json();
           if (data.status === "done") {
             setResult(data.result);
-            // Save to server + localStorage
-            saveFamilyData({ familyName, members, result: data.result, protagonist: proto });
+            setChatHistory([]);
+            // Save current state to localStorage
+            saveFamilyLocal({ familyName, members, result: data.result, protagonist: proto });
+            // Save to history (each analysis is a separate entry)
+            const historyEntry = {
+              id: job_id,
+              time: new Date().toISOString(),
+              familyName,
+              protagonistName: proto.name,
+              protagonistRole: proto.role,
+              result: data.result,
+            };
+            saveFamilyHistoryEntry(historyEntry);
+            setFamilyHistoryList(loadFamilyHistory());
+            // Save to server
             saveFamilyToServer(apiBackend, wizardUser, {
               result: data.result, familyName, members, protagonist: proto,
             });
@@ -414,7 +459,12 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
         if (!pollRes.ok) continue;
         const data = await pollRes.json();
         if (data.status === "done") {
+          const newChat = [...chatHistory, { role: "user", text: question }, { role: "assistant", text: data.result }];
           setChatHistory(prev => [...prev, { role: "assistant", text: data.result }]);
+          // Save chat to server
+          saveFamilyToServer(apiBackend, wizardUser, {
+            result, familyName, members, protagonist, chat: newChat,
+          });
           break;
         }
       }
@@ -712,6 +762,34 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
           </div>
         </div>
 
+        {/* Past family analyses */}
+        {familyHistoryList.length > 1 && (
+          <div style={{ marginTop: 28 }}>
+            <button className="wizard-history-btn" onClick={() => setShowHistory(!showHistory)}>
+              {currentLang === 'en' ? `Past Analyses (${familyHistoryList.length})` : currentLang === 'ja' ? `過去の分析 (${familyHistoryList.length})` : `歷史分析 (${familyHistoryList.length})`}
+            </button>
+            {showHistory && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {familyHistoryList.map((h, i) => (
+                  <div key={h.id || i} className="wizard-dashboard-card" onClick={() => {
+                    setResult(h.result);
+                    if (h.protagonist) setProtagonist(h.protagonist);
+                    if (h.members) setMembers(h.members);
+                    setChatHistory([]);
+                    setShowHistory(false);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}>
+                    <div className="wizard-dashboard-card-date">{new Date(h.time).toLocaleDateString()}</div>
+                    <div className="wizard-dashboard-card-title">
+                      {h.familyName} — {getRoleLabel(h.protagonistRole, currentLang)}（{h.protagonistName}）
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
           <button className="wizard-cta-secondary" style={{ flex: 1 }} onClick={() => { setPhase("pick"); setChatHistory([]); }}>
             {currentLang === 'en' ? 'Switch Protagonist' : currentLang === 'ja' ? '主役を変更' : '切換主角'}
@@ -720,7 +798,7 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             {currentLang === 'en' ? 'Edit Members' : currentLang === 'ja' ? 'メンバー編集' : '編輯成員'}
           </button>
           <button className="wizard-cta-secondary" style={{ flex: 1 }} onClick={() => {
-            saveFamilyData(null); localStorage.removeItem(FAMILY_STORAGE_KEY);
+            saveFamilyLocal(null); localStorage.removeItem(FAMILY_STORAGE_KEY);
             setFamilyName(""); setMembers([]); setResult(""); setProtagonist(null); setChatHistory([]);
             setPhase("name");
           }}>
