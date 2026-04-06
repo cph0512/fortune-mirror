@@ -63,6 +63,94 @@ function saveSession(data, user) {
 function loadSession(user) {
   try { const d = localStorage.getItem(sessionKey(user)); return d ? JSON.parse(d) : null; } catch { return null; }
 }
+
+// ============================================================
+// READING HISTORY (localStorage per user, max 20 readings)
+// ============================================================
+const READINGS_KEY_PREFIX = "wizard-readings-";
+function readingsKey(user) {
+  return user?.email ? `${READINGS_KEY_PREFIX}${user.email}` : `${READINGS_KEY_PREFIX}guest`;
+}
+function loadReadings(user) {
+  try { const d = localStorage.getItem(readingsKey(user)); return d ? JSON.parse(d) : []; } catch { return []; }
+}
+function saveReading(user, reading) {
+  try {
+    const readings = loadReadings(user);
+    readings.unshift(reading);
+    if (readings.length > 20) readings.length = 20;
+    localStorage.setItem(readingsKey(user), JSON.stringify(readings));
+  } catch {}
+}
+
+// Parse month highlights from analysis result text
+function parseMonthHighlights(resultText) {
+  if (!resultText) return [];
+  const months = [];
+  // Find the section about key months
+  const monthSectionMatch = resultText.match(/\[SECTION\]\s*.*(?:重點月份|Key Months|月份|Month)[\s\S]*?(?=\[SECTION\]|$)/i);
+  if (!monthSectionMatch) return months;
+  const section = monthSectionMatch[0];
+
+  // Extract month mentions with context
+  const monthPatterns = [
+    /(\d{1,2})\s*[~\-～至到]\s*(\d{1,2})\s*月[：:]*\s*([^\n]+)/g,
+    /(\d{1,2})\s*月[：:]*\s*([^\n]+)/g,
+    /(January|February|March|April|May|June|July|August|September|October|November|December)[：:]*\s*([^\n]+)/gi,
+  ];
+
+  const monthNames = { january:1, february:2, march:3, april:4, may:5, june:6, july:7, august:8, september:9, october:10, november:11, december:12 };
+  const seen = new Set();
+
+  // Range pattern first (e.g. "3-5月")
+  let m;
+  const rangeRx = /(\d{1,2})\s*[~\-～至到]\s*(\d{1,2})\s*月[：:]*\s*([^\n]+)/g;
+  while ((m = rangeRx.exec(section)) !== null) {
+    const start = parseInt(m[1]), end = parseInt(m[2]);
+    const desc = m[3].trim();
+    const tone = detectTone(desc);
+    for (let i = start; i <= end; i++) {
+      if (i >= 1 && i <= 12 && !seen.has(i)) {
+        months.push({ month: i, description: desc, tone });
+        seen.add(i);
+      }
+    }
+  }
+
+  // Single month pattern
+  const singleRx = /(?<!\d[~\-～至到])(\d{1,2})\s*月[：:]*\s*([^\n]+)/g;
+  while ((m = singleRx.exec(section)) !== null) {
+    const mon = parseInt(m[1]);
+    if (mon >= 1 && mon <= 12 && !seen.has(mon)) {
+      const desc = m[2].trim();
+      months.push({ month: mon, description: desc, tone: detectTone(desc) });
+      seen.add(mon);
+    }
+  }
+
+  // English month pattern
+  const engRx = /(January|February|March|April|May|June|July|August|September|October|November|December)[：:]*\s*([^\n]+)/gi;
+  while ((m = engRx.exec(section)) !== null) {
+    const mon = monthNames[m[1].toLowerCase()];
+    if (mon && !seen.has(mon)) {
+      const desc = m[2].trim();
+      months.push({ month: mon, description: desc, tone: detectTone(desc) });
+      seen.add(mon);
+    }
+  }
+
+  return months.sort((a, b) => a.month - b.month);
+}
+
+function detectTone(text) {
+  const positive = /好時機|突破|機會|順利|高峰|大好|有利|貴人|收穫|豐收|成果|favorable|opportunity|breakthrough|peak|harvest/i;
+  const negative = /小心|謹慎|注意|風險|低潮|挑戰|阻礙|衝突|避免|caution|careful|risk|challenge|avoid|friction/i;
+  const neutral = /轉換|過渡|調整|準備|穩定|反思|規劃|transition|shift|adjust|steady|reflect/i;
+  if (negative.test(text)) return "caution";
+  if (positive.test(text)) return "positive";
+  if (neutral.test(text)) return "neutral";
+  return "neutral";
+}
 function clearSession(user) {
   try { localStorage.removeItem(sessionKey(user)); } catch {}
 }
@@ -766,6 +854,17 @@ ${astroChart}${twinChartBlock}
           const data = await pollRes.json();
           if (data.status === "done") {
             setFinalResult(data.result);
+            // Save to reading history
+            saveReading(wizardUser, {
+              id: job_id,
+              date: new Date().toISOString(),
+              goal: goal,
+              goalPrompt: goalPrompt,
+              loveSub: loveSub,
+              birth: `${birthYear}/${birthMonth}/${birthDay}`,
+              result: data.result,
+              monthHighlights: parseMonthHighlights(data.result),
+            });
             break;
           }
         } catch { continue; }
@@ -1521,6 +1620,40 @@ ${hebanRelation === "relations.twin" ? `
             {translating && <span className="wizard-translate-loading">{t('result.translating')}</span>}
           </div>
 
+          {/* Month Quick Reference */}
+          {(() => {
+            const highlights = parseMonthHighlights(displayResult);
+            if (highlights.length === 0) return null;
+            const year = new Date().getFullYear();
+            const allMonths = Array.from({ length: 12 }, (_, i) => {
+              const found = highlights.find(h => h.month === i + 1);
+              return { month: i + 1, tone: found?.tone || "default", description: found?.description || "" };
+            });
+            const toneColors = { positive: "#4caf50", caution: "#ff9800", neutral: "#90caf9", default: "rgba(255,255,255,0.1)" };
+            const toneLabels = { positive: "Good", caution: "!", neutral: "", default: "" };
+            return (
+              <div className="wizard-month-overview">
+                <div className="wizard-month-overview-title">{year} Year at a Glance</div>
+                <div className="wizard-month-grid">
+                  {allMonths.map(m => (
+                    <div key={m.month}
+                      className={`wizard-month-cell ${m.tone}`}
+                      title={m.description}
+                      style={{ borderBottom: `3px solid ${toneColors[m.tone]}` }}>
+                      <span className="wizard-month-num">{m.month}</span>
+                      {toneLabels[m.tone] && <span className="wizard-month-badge">{toneLabels[m.tone]}</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="wizard-month-legend">
+                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.positive }} className="wizard-month-dot" /> Favorable</span>
+                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.caution }} className="wizard-month-dot" /> Caution</span>
+                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.neutral }} className="wizard-month-dot" /> Transition</span>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="wizard-result-sections">
             {renderFormattedResult(displayResult)}
           </div>
@@ -1652,6 +1785,41 @@ ${hebanRelation === "relations.twin" ? `
               {t('result.backHome')}
             </button>
           </div>
+
+          {/* Past Readings History */}
+          {(() => {
+            const readings = loadReadings(wizardUser);
+            if (readings.length <= 1) return null;
+            return (
+              <>
+                <button className="wizard-history-btn" onClick={() => {
+                  const panel = document.getElementById("wizard-history-panel");
+                  if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+                }}>
+                  Past Readings ({readings.length})
+                </button>
+                <div id="wizard-history-panel" className="wizard-history-panel" style={{ display: "none" }}>
+                  {readings.map((r, i) => (
+                    <div key={r.id || i} className="wizard-history-card" onClick={() => {
+                      setFinalResult(r.result);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}>
+                      <div className="wizard-history-card-date">{new Date(r.date).toLocaleDateString()}</div>
+                      <div className="wizard-history-card-title">{r.goalPrompt || r.goal || "Analysis"} — {r.birth}</div>
+                      {r.monthHighlights?.length > 0 && (
+                        <div className="wizard-history-months">
+                          {Array.from({ length: 12 }, (_, mi) => {
+                            const found = r.monthHighlights.find(h => h.month === mi + 1);
+                            return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
 
           {/* Family Chart entry */}
           <div className="wizard-heban-promo" style={{ marginTop: 32 }}>

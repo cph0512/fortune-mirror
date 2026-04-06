@@ -573,6 +573,135 @@
   animation: wizardFadeIn 0.5s ease;
 }
 
+/* Month Quick Reference */
+.wizard-month-overview {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.wizard-month-overview-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 16px;
+  text-align: center;
+}
+.wizard-month-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.wizard-month-cell {
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px 4px;
+  text-align: center;
+  position: relative;
+  cursor: default;
+  transition: transform 0.15s, background 0.15s;
+}
+.wizard-month-cell:hover {
+  transform: scale(1.08);
+  background: rgba(255,255,255,0.12);
+}
+.wizard-month-cell.positive { background: rgba(76,175,80,0.12); }
+.wizard-month-cell.caution { background: rgba(255,152,0,0.12); }
+.wizard-month-cell.neutral { background: rgba(144,202,249,0.08); }
+.wizard-month-num {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
+}
+.wizard-month-badge {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 2px;
+  color: rgba(255,255,255,0.6);
+}
+.wizard-month-cell.positive .wizard-month-badge { color: #81c784; }
+.wizard-month-cell.caution .wizard-month-badge { color: #ffb74d; }
+.wizard-month-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+.wizard-month-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wizard-month-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Reading History */
+.wizard-history-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  margin: 12px auto 0;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  color: rgba(255,255,255,0.65);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wizard-history-btn:hover { background: rgba(255,255,255,0.1); }
+
+.wizard-history-panel {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: 16px;
+}
+.wizard-history-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wizard-history-card:hover { background: rgba(255,255,255,0.08); }
+.wizard-history-card-date {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 6px;
+}
+.wizard-history-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  margin-bottom: 8px;
+}
+.wizard-history-months {
+  display: flex;
+  gap: 3px;
+}
+.wizard-history-month-dot {
+  width: 16px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.1);
+}
+.wizard-history-month-dot.positive { background: #4caf50; }
+.wizard-history-month-dot.caution { background: #ff9800; }
+.wizard-history-month-dot.neutral { background: #90caf9; }
+
 .wizard-result-card h3 {
   font-family: var(--font-serif);
   font-size: 18px;
@@ -1465,6 +1594,10 @@
 
   .wizard-system-cards {
     grid-template-columns: 1fr;
+  }
+
+  .wizard-month-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .wizard-welcome h1 {
