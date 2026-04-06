@@ -19,7 +19,7 @@ const LANG_AI = { 'zh-TW': '繁體中文', en: 'English', ja: '日本語' };
 
 const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
 const API_SANDBOX = "https://fortune-sandbox-352618635098.asia-east1.run.app/api";
-const API_TRACK = API_BACKEND.replace("/fortune", "/fortune-track");
+const API_TRACK = API_BACKEND.replace("/api/fortune", "/api/fortune-track");
 const STORAGE_KEY_KB = "fortune-app-kb";
 const KB_VERSION = "20260402d";
 const SESSION_KEY_PREFIX = "wizard-session-";
@@ -514,7 +514,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         return;
       }
       try {
-        const res = await fetch(API_BACKEND.replace("/fortune", "/fortune-register"), {
+        const res = await fetch(API_BACKEND.replace("/api/fortune", "/api/fortune-register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: authEmail.trim(), password: authPassword, name: authName.trim(), visitor_id: getVisitorId(), source: "b2c" }),
@@ -540,7 +540,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       }
       // Try API login first
       try {
-        const res = await fetch(API_BACKEND.replace("/fortune", "/fortune-login"), {
+        const res = await fetch(API_BACKEND.replace("/api/fortune", "/api/fortune-login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: authEmail.trim(), password: authPassword }),
