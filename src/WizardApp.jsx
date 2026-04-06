@@ -88,7 +88,7 @@ function parseMonthHighlights(resultText) {
   if (!resultText) return [];
   const months = [];
   // Find the section about key months
-  const monthSectionMatch = resultText.match(/\[SECTION\]\s*.*(?:重點月份|Key Months|月份|Month)[\s\S]*?(?=\[SECTION\]|$)/i);
+  const monthSectionMatch = resultText.match(/\[SECTION\]\s*.*(?:重點月份|Key Months|月份|Month|月別運勢|月別)[\s\S]*?(?=\[SECTION\]|$)/i);
   if (!monthSectionMatch) return months;
   const section = monthSectionMatch[0];
 
@@ -143,9 +143,9 @@ function parseMonthHighlights(resultText) {
 }
 
 function detectTone(text) {
-  const positive = /好時機|突破|機會|順利|高峰|大好|有利|貴人|收穫|豐收|成果|favorable|opportunity|breakthrough|peak|harvest/i;
-  const negative = /小心|謹慎|注意|風險|低潮|挑戰|阻礙|衝突|避免|caution|careful|risk|challenge|avoid|friction/i;
-  const neutral = /轉換|過渡|調整|準備|穩定|反思|規劃|transition|shift|adjust|steady|reflect/i;
+  const positive = /好時機|突破|機會|順利|高峰|大好|有利|貴人|收穫|豐收|成果|favorable|opportunity|breakthrough|peak|harvest|好調|チャンス|飛躍|順風|吉/i;
+  const negative = /小心|謹慎|注意|風險|低潮|挑戰|阻礙|衝突|避免|caution|careful|risk|challenge|avoid|friction|要注意|警戒|リスク|困難|障害|凶/i;
+  const neutral = /轉換|過渡|調整|準備|穩定|反思|規劃|transition|shift|adjust|steady|reflect|転換|準備|安定|見直し|調整/i;
   if (negative.test(text)) return "caution";
   if (positive.test(text)) return "positive";
   if (neutral.test(text)) return "neutral";
@@ -421,6 +421,32 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [userCredits, setUserCredits] = useState(0);
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentPlans, setPaymentPlans] = useState(null);
+
+  // Restore a past reading into current state (for dashboard)
+  const restoreReading = (reading) => {
+    setFinalResult(reading.result);
+    if (reading.rawResults) setRawResults(reading.rawResults);
+    if (reading.goal) setGoal(reading.goal);
+    if (reading.goalPrompt) setGoalPrompt(reading.goalPrompt);
+    if (reading.gender) setGender(reading.gender);
+    if (reading.birthData) {
+      setBirthYear(reading.birthData.year || "");
+      setBirthMonth(reading.birthData.month || "");
+      setBirthDay(reading.birthData.day || "");
+      setBirthHour(reading.birthData.hour || "");
+      setBirthMinute(reading.birthData.minute || "0");
+      if (reading.birthData.place) setBirthPlace(reading.birthData.place);
+      if (reading.birthData.city) setBirthCity(reading.birthData.city);
+    }
+    setChatHistory([]);
+    setHebanResult("");
+    setShowHeban(false);
+    setDisplayLang(null);
+    setTranslatedResults({});
+    setShowQuickQ(true);
+    setStep(TOTAL_STEPS + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Helper: get display text for gender
   const genderDisplay = (g) => g === "男" ? t('welcome.male') : g === "女" ? t('welcome.female') : g;
@@ -888,8 +914,11 @@ ${astroChart}${twinChartBlock}
               goal: goal,
               goalPrompt: goalPrompt,
               loveSub: loveSub,
+              gender: gender,
               birth: `${birthYear}/${birthMonth}/${birthDay}`,
+              birthData: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace, city: birthCity },
               result: data.result,
+              rawResults: rawResults,
               monthHighlights: parseMonthHighlights(data.result),
             });
             break;
@@ -1287,6 +1316,34 @@ ${hebanRelation === "relations.twin" ? `
               <div className="wizard-gender-label"><span>{t('welcome.female')}</span><span>›</span></div>
             </div>
           </div>
+
+          {/* Dashboard — past readings */}
+          {(() => {
+            const readings = loadReadings(wizardUser);
+            if (readings.length === 0) return null;
+            return (
+              <div className="wizard-dashboard">
+                <div className="wizard-dashboard-title">{t('history.pastReadings', { count: readings.length })}</div>
+                <div className="wizard-dashboard-list">
+                  {readings.map((r, i) => (
+                    <div key={r.id || i} className="wizard-dashboard-card" onClick={() => restoreReading(r)}>
+                      <div className="wizard-dashboard-card-date">{new Date(r.date).toLocaleDateString()}</div>
+                      <div className="wizard-dashboard-card-title">{r.goalPrompt || r.goal || t('history.analysis')}</div>
+                      <div className="wizard-dashboard-card-birth">{r.birth}</div>
+                      {r.monthHighlights?.length > 0 && (
+                        <div className="wizard-history-months">
+                          {Array.from({ length: 12 }, (_, mi) => {
+                            const found = r.monthHighlights.find(h => h.month === mi + 1);
+                            return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </>
       ) : (
         <div className="wizard-welcome-auth">
@@ -1647,8 +1704,10 @@ ${hebanRelation === "relations.twin" ? `
             {translating && <span className="wizard-translate-loading">{t('result.translating')}</span>}
           </div>
 
-          {/* Month Quick Reference */}
+          {/* Month Quick Reference — only for 流年/monthly analysis */}
           {(() => {
+            const isMonthlyAnalysis = /流年|逐月|月份|每月|month.by.month|monthly|year.*forecast|月別/i.test(displayResult);
+            if (!isMonthlyAnalysis) return null;
             const highlights = parseMonthHighlights(displayResult);
             if (highlights.length === 0) return null;
             const year = new Date().getFullYear();
@@ -1657,25 +1716,26 @@ ${hebanRelation === "relations.twin" ? `
               return { month: i + 1, tone: found?.tone || "default", description: found?.description || "" };
             });
             const toneColors = { positive: "#4caf50", caution: "#ff9800", neutral: "#90caf9", default: "rgba(255,255,255,0.1)" };
-            const toneLabels = { positive: "Good", caution: "!", neutral: "", default: "" };
+            const toneLabels = { positive: t('calendar.good'), caution: "!", neutral: "", default: "" };
+            const monthNames = t('calendar.months', { returnObjects: true });
             return (
               <div className="wizard-month-overview">
-                <div className="wizard-month-overview-title">{year} Year at a Glance</div>
+                <div className="wizard-month-overview-title">{t('calendar.title', { year })}</div>
                 <div className="wizard-month-grid">
                   {allMonths.map(m => (
                     <div key={m.month}
                       className={`wizard-month-cell ${m.tone}`}
                       title={m.description}
                       style={{ borderBottom: `3px solid ${toneColors[m.tone]}` }}>
-                      <span className="wizard-month-num">{m.month}</span>
+                      <span className="wizard-month-num">{monthNames[m.month - 1]}</span>
                       {toneLabels[m.tone] && <span className="wizard-month-badge">{toneLabels[m.tone]}</span>}
                     </div>
                   ))}
                 </div>
                 <div className="wizard-month-legend">
-                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.positive }} className="wizard-month-dot" /> Favorable</span>
-                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.caution }} className="wizard-month-dot" /> Caution</span>
-                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.neutral }} className="wizard-month-dot" /> Transition</span>
+                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.positive }} className="wizard-month-dot" /> {t('calendar.favorable')}</span>
+                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.caution }} className="wizard-month-dot" /> {t('calendar.caution')}</span>
+                  <span className="wizard-month-legend-item"><span style={{ background: toneColors.neutral }} className="wizard-month-dot" /> {t('calendar.transition')}</span>
                 </div>
               </div>
             );
@@ -1823,16 +1883,13 @@ ${hebanRelation === "relations.twin" ? `
                   const panel = document.getElementById("wizard-history-panel");
                   if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
                 }}>
-                  Past Readings ({readings.length})
+                  {t('history.pastReadings', { count: readings.length })}
                 </button>
                 <div id="wizard-history-panel" className="wizard-history-panel" style={{ display: "none" }}>
                   {readings.map((r, i) => (
-                    <div key={r.id || i} className="wizard-history-card" onClick={() => {
-                      setFinalResult(r.result);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}>
+                    <div key={r.id || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                       <div className="wizard-history-card-date">{new Date(r.date).toLocaleDateString()}</div>
-                      <div className="wizard-history-card-title">{r.goalPrompt || r.goal || "Analysis"} — {r.birth}</div>
+                      <div className="wizard-history-card-title">{r.goalPrompt || r.goal || t('history.analysis')} — {r.birth}</div>
                       {r.monthHighlights?.length > 0 && (
                         <div className="wizard-history-months">
                           {Array.from({ length: 12 }, (_, mi) => {

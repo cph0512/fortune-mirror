@@ -165,6 +165,18 @@
     "chartDesc": "Add your parents, siblings, spouse — reveal how family energy shapes your destiny",
     "buildChart": "Build Family Chart"
   },
+  "calendar": {
+    "title": "{{year}} Year at a Glance",
+    "favorable": "Favorable",
+    "caution": "Caution",
+    "transition": "Transition",
+    "good": "Good",
+    "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  },
+  "history": {
+    "pastReadings": "Past Readings ({{count}})",
+    "analysis": "Analysis"
+  },
   "quickQuestions": {
     "deepTitle": "Deep Dive",
     "deepQ1": "Analyze my current 10-year life phase — where am I now?",

@@ -165,6 +165,18 @@
     "chartDesc": "家族を追加して、家庭のエネルギーが運命にどう影響するかを解き明かします",
     "buildChart": "家族命盤を作成"
   },
+  "calendar": {
+    "title": "{{year}}年 月別運勢一覧",
+    "favorable": "好調",
+    "caution": "注意",
+    "transition": "転換",
+    "good": "◎",
+    "months": ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
+  },
+  "history": {
+    "pastReadings": "過去の鑑定 ({{count}})",
+    "analysis": "鑑定"
+  },
   "quickQuestions": {
     "deepTitle": "深掘り分析",
     "deepQ1": "現在の10年大運を分析して、今どの段階にいますか？",

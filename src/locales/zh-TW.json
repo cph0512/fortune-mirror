@@ -166,6 +166,18 @@
     "buildChart": "建立家族命盤",
     "analysisError": "分析失敗"
   },
+  "calendar": {
+    "title": "{{year}} 年度月份總覽",
+    "favorable": "順利",
+    "caution": "留意",
+    "transition": "轉換",
+    "good": "佳",
+    "months": ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
+  },
+  "history": {
+    "pastReadings": "歷史紀錄 ({{count}})",
+    "analysis": "分析"
+  },
   "quickQuestions": {
     "deepTitle": "深度分析",
     "deepQ1": "幫我分析目前的 10 年大運走向，現在處於什麼階段？",

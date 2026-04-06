@@ -702,6 +702,54 @@
 .wizard-history-month-dot.caution { background: #ff9800; }
 .wizard-history-month-dot.neutral { background: #90caf9; }
 
+/* Dashboard on welcome page */
+.wizard-dashboard {
+  margin-top: 36px;
+  width: 100%;
+  max-width: 480px;
+}
+.wizard-dashboard-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 14px;
+  text-align: left;
+}
+.wizard-dashboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wizard-dashboard-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-align: left;
+}
+.wizard-dashboard-card:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(196,181,253,0.3);
+}
+.wizard-dashboard-card-date {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 4px;
+}
+.wizard-dashboard-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  margin-bottom: 4px;
+}
+.wizard-dashboard-card-birth {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 8px;
+}
+
 .wizard-result-card h3 {
   font-family: var(--font-serif);
   font-size: 18px;
