@@ -17,7 +17,10 @@ const LANG_AI = { 'zh-TW': '繁體中文', en: 'English', ja: '日本語' };
 // CONSTANTS
 // ============================================================
 
-const API_BACKEND = "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
+const IS_TEST = window.location.hostname === "test.destinytelling.life";
+const API_BACKEND = IS_TEST
+  ? "https://fortune-sandbox-352618635098.asia-east1.run.app/api/fortune"
+  : "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
 const API_TRACK = API_BACKEND.replace("/fortune", "/fortune-track");
 const STORAGE_KEY_KB = "fortune-app-kb";
 const KB_VERSION = "20260402d";
