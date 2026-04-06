@@ -22,39 +22,64 @@ const ROLES = [
 ];
 
 const FAMILY_STORAGE_KEY = "fortune-family-data";
+const FAMILY_SERVER_KEY = "fortune-family-server";
 const API_SAVE_PATH = "/api/fortune-save";
 
-function loadFamilyData() {
+function loadFamilyLocal() {
   try { const d = localStorage.getItem(FAMILY_STORAGE_KEY); return d ? JSON.parse(d) : null; } catch { return null; }
 }
-function saveFamilyData(data) {
+function saveFamilyLocal(data) {
   try { localStorage.setItem(FAMILY_STORAGE_KEY, JSON.stringify(data)); } catch {}
 }
 
+// Save family data to server — both the analysis result AND the family structure
 async function saveFamilyToServer(apiBackend, user, data) {
   if (!user?.email) return;
   const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
+  const payload = {
+    user: user.email,
+    time: new Date().toISOString(),
+    finalResult: data.result || "",
+    goal: "family",
+    goalPrompt: `家族命盤 — ${data.familyName || ""}（主角：${data.protagonist?.name || ""})`,
+    gender: data.protagonist?.gender || "",
+    birth: data.protagonist ? `${data.protagonist.year}/${data.protagonist.month}/${data.protagonist.day}` : "",
+    birthData: data.protagonist || {},
+    rawResults: data.members?.map(m => ({ system: `${getRoleLabel(m.role, 'zh-TW')}（${m.name}）`, text: `${m.charts?.ziwei || ""}\n\n${m.charts?.bazi || ""}\n\n${m.charts?.astro || ""}` })) || [],
+    chat: [],
+    monthHighlights: [],
+    source: "b2c",
+    familyData: { familyName: data.familyName, members: data.members, protagonist: data.protagonist },
+  };
   try {
     await fetch(saveUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user: user.email,
-        time: new Date().toISOString(),
-        finalResult: data.result || "",
-        goal: "family",
-        goalPrompt: `家族命盤 — ${data.familyName || ""}（主角：${data.protagonist?.name || ""})`,
-        gender: data.protagonist?.gender || "",
-        birth: data.protagonist ? `${data.protagonist.year}/${data.protagonist.month}/${data.protagonist.day}` : "",
-        birthData: data.protagonist || {},
-        rawResults: data.members?.map(m => ({ system: `${getRoleLabel(m.role, 'zh-TW')}（${m.name}）`, text: `${m.charts?.ziwei || ""}\n\n${m.charts?.bazi || ""}\n\n${m.charts?.astro || ""}` })) || [],
-        chat: [],
-        monthHighlights: [],
-        source: "b2c",
-        familyData: { familyName: data.familyName, members: data.members, protagonist: data.protagonist },
-      }),
+      body: JSON.stringify(payload),
     });
   } catch {}
+}
+
+// Load family data from server saves (find latest family-type save)
+async function loadFamilyFromServer(apiBackend, user) {
+  if (!user?.email) return null;
+  const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
+  try {
+    const res = await fetch(`${saveUrl}?user=${encodeURIComponent(user.email)}`);
+    if (!res.ok) return null;
+    const saves = await res.json();
+    // Find the latest family save
+    const familySave = saves.find(s => s.goal === "family" && s.familyData);
+    if (familySave?.familyData) {
+      return {
+        familyName: familySave.familyData.familyName || "",
+        members: familySave.familyData.members || [],
+        protagonist: familySave.familyData.protagonist || null,
+        result: familySave.finalResult || "",
+      };
+    }
+  } catch {}
+  return null;
 }
 
 function getRoleLabel(roleId, lang) {
@@ -90,13 +115,14 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
   const { t, i18n } = useTranslation();
   const currentLang = i18n.language || 'zh-TW';
 
-  const saved = loadFamilyData();
-  const [familyName, setFamilyName] = useState(saved?.familyName || "");
-  const [members, setMembers] = useState(saved?.members || []);
-  const hasResult = !!(saved?.result);
-  const [phase, setPhase] = useState(hasResult ? "result" : (saved?.members?.length > 0 ? "list" : "name")); // name, list, add, pick, analyzing, result
-  const [protagonist, setProtagonist] = useState(saved?.protagonist || null);
-  const [result, setResult] = useState(saved?.result || "");
+  const local = loadFamilyLocal();
+  const [familyName, setFamilyName] = useState(local?.familyName || "");
+  const [members, setMembers] = useState(local?.members || []);
+  const hasLocalResult = !!(local?.result);
+  const [phase, setPhase] = useState(hasLocalResult ? "result" : (local?.members?.length > 0 ? "list" : "name")); // name, list, add, pick, analyzing, result
+  const [protagonist, setProtagonist] = useState(local?.protagonist || null);
+  const [result, setResult] = useState(local?.result || "");
+  const [serverLoaded, setServerLoaded] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
@@ -119,9 +145,33 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
   // Save to localStorage when members change
   useEffect(() => {
     if (familyName || members.length > 0) {
-      saveFamilyData({ familyName, members });
+      saveFamilyLocal({ familyName, members, result, protagonist });
     }
-  }, [familyName, members]);
+  }, [familyName, members, result, protagonist]);
+
+  // Load from server on mount (server-first)
+  useEffect(() => {
+    if (wizardUser?.email && !serverLoaded) {
+      loadFamilyFromServer(apiBackend, wizardUser).then(serverData => {
+        setServerLoaded(true);
+        if (serverData && serverData.members?.length > 0) {
+          // Server has data — use it if local is empty or older
+          if (!local?.members?.length) {
+            setFamilyName(serverData.familyName);
+            setMembers(serverData.members);
+            setProtagonist(serverData.protagonist);
+            if (serverData.result) {
+              setResult(serverData.result);
+              setPhase("result");
+            } else {
+              setPhase("list");
+            }
+            saveFamilyLocal(serverData);
+          }
+        }
+      });
+    }
+  }, [wizardUser]);
 
   const resetAddForm = () => {
     setAddRole(""); setAddName(""); setAddGender(""); setAddYear(""); setAddMonth("");
