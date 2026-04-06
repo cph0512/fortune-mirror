@@ -69,6 +69,27 @@ function loadSession(user) {
   try { const d = localStorage.getItem(sessionKey(user)); return d ? JSON.parse(d) : null; } catch { return null; }
 }
 
+// Save chat history to server (as part of latest reading)
+async function saveChatToServer(user, chatHistory, finalResult, goal, goalPrompt, birthData) {
+  if (!user?.email || chatHistory.length === 0) return;
+  try {
+    await fetch(API_SAVE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: user.email,
+        time: new Date().toISOString(),
+        finalResult: finalResult || "",
+        goal: goal || "",
+        goalPrompt: goalPrompt ? `${goalPrompt} (chat)` : "chat",
+        birthData: birthData || {},
+        chat: chatHistory,
+        source: "b2c",
+      }),
+    });
+  } catch {}
+}
+
 // ============================================================
 // READING HISTORY (server-first, localStorage fallback)
 // ============================================================
@@ -221,13 +242,32 @@ function loadAuth() {
   try { const d = localStorage.getItem(AUTH_KEY); return d ? JSON.parse(d) : null; } catch { return null; }
 }
 
+// KB: server-first (fetch default-kb.json), localStorage as cache
+let _kbCache = null;
 function loadKB() {
+  if (_kbCache) return _kbCache;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_KB);
     const savedVer = localStorage.getItem("fortune-kb-version");
-    if (raw && savedVer === KB_VERSION) return JSON.parse(raw);
+    if (raw && savedVer === KB_VERSION) {
+      _kbCache = JSON.parse(raw);
+      return _kbCache;
+    }
   } catch {}
   return [];
+}
+async function fetchKB() {
+  try {
+    const res = await fetch("./default-kb.json");
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      _kbCache = data;
+      localStorage.setItem(STORAGE_KEY_KB, JSON.stringify(data));
+      localStorage.setItem("fortune-kb-version", KB_VERSION);
+      return data;
+    }
+  } catch {}
+  return loadKB();
 }
 
 // Goal/relation definitions use i18n keys (no hardcoded Chinese)
@@ -494,7 +534,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       if (reading.birthData.place) setBirthPlace(reading.birthData.place);
       if (reading.birthData.city) setBirthCity(reading.birthData.city);
     }
-    setChatHistory([]);
+    setChatHistory(Array.isArray(reading.chat) && reading.chat.length > 0 ? reading.chat : []);
     setHebanResult("");
     setShowHeban(false);
     setDisplayLang(null);
@@ -514,6 +554,9 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // Fetch KB from server on mount
+  useEffect(() => { fetchKB(); }, []);
 
   // Load readings from server when user changes
   useEffect(() => {
@@ -1034,7 +1077,11 @@ ${astroChart}${twinChartBlock}
         if (!pollRes.ok) continue;
         const data = await pollRes.json();
         if (data.status === "done") {
+          const newChat = [...chatHistory, { role: "user", text: question }, { role: "assistant", text: data.result }];
           setChatHistory(prev => [...prev, { role: "assistant", text: data.result }]);
+          // Save chat to server
+          saveChatToServer(wizardUser, newChat, finalResult, goal, goalPrompt,
+            { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace });
           break;
         }
       }
