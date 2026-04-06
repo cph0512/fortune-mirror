@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /pro/
+Disallow: /assets/
+
+Sitemap: https://destinytelling.life/sitemap.xml
