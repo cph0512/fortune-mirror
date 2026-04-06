@@ -1821,6 +1821,7 @@
 
 .family-panel {
   padding: 24px 20px; max-width: 480px; margin: 0 auto; width: 100%; flex: 1;
+  position: relative; z-index: 1;
 }
 .family-header {
   display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
