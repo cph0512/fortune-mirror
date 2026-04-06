@@ -34,6 +34,7 @@
   inset: 0;
   background: linear-gradient(165deg, #1a1040 0%, #241650 30%, #2d1b5e 60%, #1a1040 100%);
   z-index: 0;
+  pointer-events: none;
 }
 
 .wizard-bg::before {
