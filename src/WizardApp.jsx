@@ -1460,6 +1460,13 @@ ${hebanRelation === "relations.twin" ? `
               </div>
             );
           })()}
+
+          {/* Family Chart entry on welcome page */}
+          <div className="wizard-dashboard-card" style={{ marginTop: 20, maxWidth: 480, width: '100%', textAlign: 'center', padding: 20 }}
+            onClick={() => setShowFamily(true)}>
+            <div className="wizard-heban-promo-title" style={{ marginBottom: 6 }}>{t('family.chartTitle')}</div>
+            <div style={{ fontSize: 13, opacity: 0.6 }}>{t('family.chartDesc')}</div>
+          </div>
         </>
       ) : (
         <div className="wizard-welcome-auth">
