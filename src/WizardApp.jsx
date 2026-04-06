@@ -498,7 +498,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     if (s.chatHistory) setChatHistory(s.chatHistory);
   };
 
-  const handleAuthSubmit = () => {
+  const handleAuthSubmit = async () => {
     let user;
     if (authMode === "register") {
       if (!authName.trim() || !authEmail.trim() || !authPassword.trim()) {
@@ -513,22 +513,24 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         setAuthError(t('auth.passwordMin'));
         return;
       }
-      const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
-      if (existingUsers[authEmail.trim()]) {
-        setAuthError(t('auth.emailExists'));
-        setAuthMode("login");
-        return;
-      }
-      user = { name: authName.trim(), email: authEmail.trim() };
-      existingUsers[authEmail.trim()] = { name: authName.trim(), passwordHash: btoa(authPassword) };
-      localStorage.setItem("wizard-users", JSON.stringify(existingUsers));
       try {
-        fetch(API_BACKEND.replace("/fortune", "/fortune-register"), {
+        const res = await fetch(API_BACKEND.replace("/fortune", "/fortune-register"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username: authEmail.trim(), password: authPassword, name: authName.trim(), visitor_id: getVisitorId(), source: "b2c" }),
         });
-      } catch {}
+        const data = await res.json();
+        if (!res.ok) {
+          setAuthError(data.error || t('auth.emailExists'));
+          setAuthMode("login");
+          return;
+        }
+      } catch { setAuthError(t('auth.emailExists')); return; }
+      // Also save locally for offline fallback
+      const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
+      existingUsers[authEmail.trim()] = { name: authName.trim(), passwordHash: btoa(authPassword) };
+      localStorage.setItem("wizard-users", JSON.stringify(existingUsers));
+      user = { name: authName.trim(), email: authEmail.trim() };
       trackEvent("register", { email: authEmail.trim(), name: authName.trim() });
       migrateGuestSession(user);
     } else {
@@ -536,17 +538,42 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         setAuthError(t('auth.fillEmailPw'));
         return;
       }
-      const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
-      const stored = existingUsers[authEmail.trim()];
-      if (!stored) {
-        setAuthError(t('auth.notFound'));
-        return;
+      // Try API login first
+      try {
+        const res = await fetch(API_BACKEND.replace("/fortune", "/fortune-login"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: authEmail.trim(), password: authPassword }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          user = { name: data.name || authEmail.trim(), email: authEmail.trim(), role: data.role };
+          // Cache locally
+          const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
+          existingUsers[authEmail.trim()] = { name: data.name, passwordHash: btoa(authPassword) };
+          localStorage.setItem("wizard-users", JSON.stringify(existingUsers));
+        } else {
+          // Fallback to localStorage
+          const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
+          const stored = existingUsers[authEmail.trim()];
+          if (!stored) {
+            setAuthError(t('auth.notFound'));
+            return;
+          }
+          if (stored.passwordHash !== btoa(authPassword)) {
+            setAuthError(t('auth.wrongPassword'));
+            return;
+          }
+          user = { name: stored.name, email: authEmail.trim() };
+        }
+      } catch {
+        // Offline fallback
+        const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
+        const stored = existingUsers[authEmail.trim()];
+        if (!stored) { setAuthError(t('auth.notFound')); return; }
+        if (stored.passwordHash !== btoa(authPassword)) { setAuthError(t('auth.wrongPassword')); return; }
+        user = { name: stored.name, email: authEmail.trim() };
       }
-      if (stored.passwordHash !== btoa(authPassword)) {
-        setAuthError(t('auth.wrongPassword'));
-        return;
-      }
-      user = { name: stored.name, email: authEmail.trim() };
       const existingSession = loadSession(user);
       if (existingSession?.finalResult) {
         restoreFromSession(existingSession);
