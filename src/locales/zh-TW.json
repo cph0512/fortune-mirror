@@ -82,7 +82,7 @@
     "question": "出生地",
     "subtitle": "影響排盤的時辰判定與精確度",
     "search": "搜尋城市（中/英/日）...",
-    "coords": "時區 {{timezone}} | 經度 {{lng}} | 緯度 {{lat}}"
+    "coords": "時區 {{timezone}} | 經度 {{longitude}} | 緯度 {{latitude}}"
   },
   "confirm": {
     "question": "確認你的資料",

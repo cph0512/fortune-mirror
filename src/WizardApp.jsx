@@ -1539,7 +1539,7 @@ ${hebanRelation === "relations.twin" ? `
           {birthCity && (
             <div className="wizard-hint" style={{ marginTop: 8, textAlign: "left" }}>
               <span className="wizard-hint-text">
-                {t('place.coords', { timezone: birthCity.timezone, lng: birthCity.lng, lat: birthCity.lat })}
+                {t('place.coords', { timezone: birthCity.timezone, longitude: birthCity.lng, latitude: birthCity.lat })}
               </span>
             </div>
           )}

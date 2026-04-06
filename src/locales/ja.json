@@ -82,7 +82,7 @@
     "question": "出生地",
     "subtitle": "時差と鑑定精度に影響します",
     "search": "都市を検索...",
-    "coords": "タイムゾーン {{timezone}} | 経度 {{lng}} | 緯度 {{lat}}"
+    "coords": "タイムゾーン {{timezone}} | 経度 {{longitude}} | 緯度 {{latitude}}"
   },
   "confirm": {
     "question": "入力内容の確認",

@@ -82,7 +82,7 @@
     "question": "Birthplace",
     "subtitle": "Affects time zone and chart accuracy",
     "search": "Search city...",
-    "coords": "Timezone {{timezone}} | Lng {{lng}} | Lat {{lat}}"
+    "coords": "Timezone {{timezone}} | Lng {{longitude}} | Lat {{latitude}}"
   },
   "confirm": {
     "question": "Confirm your info",
