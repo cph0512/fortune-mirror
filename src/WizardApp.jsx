@@ -1489,9 +1489,19 @@ ${hebanRelation === "relations.twin" ? `
           </div>
           <div className="wizard-select-wrap">
             <label>{t('birth.minute')}</label>
-            <select className="wizard-select" value={birthMinute} onChange={e => setBirthMinute(e.target.value)}>
-              {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}{t('birth.minuteSuffix')}</option>)}
-            </select>
+            <input type="number" className="wizard-select wizard-minute-input" min="0" max="59"
+              value={birthMinute} placeholder="00"
+              onChange={e => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+                const n = parseInt(v);
+                if (v === '' || (n >= 0 && n <= 59)) setBirthMinute(v);
+              }}
+              onBlur={e => {
+                const n = parseInt(e.target.value);
+                if (isNaN(n)) setBirthMinute("0");
+                else setBirthMinute(String(Math.min(59, Math.max(0, n))));
+              }}
+            />
           </div>
         </div>
 
@@ -1820,9 +1830,19 @@ ${hebanRelation === "relations.twin" ? `
                     </div>
                     <div className="wizard-select-wrap">
                       <label>{t('birth.minute')}</label>
-                      <select className="wizard-select" value={hebanMinute} onChange={e => setHebanMinute(e.target.value)}>
-                        {minutes.map(m => <option key={m} value={m}>{String(m).padStart(2, '0')}{t('birth.minuteSuffix')}</option>)}
-                      </select>
+                      <input type="number" className="wizard-select wizard-minute-input" min="0" max="59"
+                        value={hebanMinute} placeholder="00"
+                        onChange={e => {
+                          const v = e.target.value.replace(/\D/g, '').slice(0, 2);
+                          const n = parseInt(v);
+                          if (v === '' || (n >= 0 && n <= 59)) setHebanMinute(v);
+                        }}
+                        onBlur={e => {
+                          const n = parseInt(e.target.value);
+                          if (isNaN(n)) setHebanMinute("0");
+                          else setHebanMinute(String(Math.min(59, Math.max(0, n))));
+                        }}
+                      />
                     </div>
                   </div>
 

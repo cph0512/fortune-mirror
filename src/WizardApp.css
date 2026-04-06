@@ -330,6 +330,14 @@
   background: #2d1b5e;
   color: #fff;
 }
+.wizard-minute-input {
+  -moz-appearance: textfield;
+}
+.wizard-minute-input::-webkit-inner-spin-button,
+.wizard-minute-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 
 /* Info hint card */
 .wizard-hint {
