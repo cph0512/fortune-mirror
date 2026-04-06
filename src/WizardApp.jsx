@@ -65,22 +65,65 @@ function loadSession(user) {
 }
 
 // ============================================================
-// READING HISTORY (localStorage per user, max 20 readings)
+// READING HISTORY (server-first, localStorage fallback)
 // ============================================================
+const API_SAVE = API_BACKEND.replace("/api/fortune", "/api/fortune-save");
 const READINGS_KEY_PREFIX = "wizard-readings-";
 function readingsKey(user) {
   return user?.email ? `${READINGS_KEY_PREFIX}${user.email}` : `${READINGS_KEY_PREFIX}guest`;
 }
-function loadReadings(user) {
+function loadReadingsLocal(user) {
   try { const d = localStorage.getItem(readingsKey(user)); return d ? JSON.parse(d) : []; } catch { return []; }
 }
-function saveReading(user, reading) {
+async function loadReadings(user) {
+  // Server-first for logged-in users
+  if (user?.email) {
+    try {
+      const res = await fetch(`${API_SAVE}?user=${encodeURIComponent(user.email)}`);
+      if (res.ok) {
+        const saves = await res.json();
+        if (Array.isArray(saves) && saves.length > 0) {
+          // Cache to localStorage
+          try { localStorage.setItem(readingsKey(user), JSON.stringify(saves)); } catch {}
+          return saves;
+        }
+      }
+    } catch {}
+  }
+  // Fallback to localStorage
+  return loadReadingsLocal(user);
+}
+async function saveReading(user, reading) {
+  // Always save to localStorage first (immediate)
   try {
-    const readings = loadReadings(user);
+    const readings = loadReadingsLocal(user);
     readings.unshift(reading);
-    if (readings.length > 20) readings.length = 20;
+    if (readings.length > 50) readings.length = 50;
     localStorage.setItem(readingsKey(user), JSON.stringify(readings));
   } catch {}
+  // Then save to server for logged-in users
+  if (user?.email) {
+    try {
+      await fetch(API_SAVE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user: user.email,
+          time: reading.date || new Date().toISOString(),
+          finalResult: reading.result || "",
+          gender: reading.gender || "",
+          goal: reading.goal || "",
+          goalPrompt: reading.goalPrompt || "",
+          birth: reading.birth || "",
+          birthData: reading.birthData || {},
+          rawResults: reading.rawResults || [],
+          chat: [],
+          monthHighlights: reading.monthHighlights || [],
+          source: "b2c",
+        }),
+      });
+    } catch {}
+  }
 }
 
 // Parse month highlights from analysis result text
@@ -372,6 +415,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
 
   const [analyzing, setAnalyzing] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
+  const [serverReadings, setServerReadings] = useState([]);
   const [finalResult, setFinalResult] = useState(saved?.finalResult ?? "");
   const [rawResults, setRawResults] = useState(saved?.rawResults ?? []);
   const [error, setError] = useState("");
@@ -424,7 +468,14 @@ export default function WizardApp({ auth, onBack, onLogout }) {
 
   // Restore a past reading into current state (for dashboard)
   const restoreReading = (reading) => {
-    setFinalResult(reading.result);
+    // Server saves use "finalResult", local saves use "result"
+    const resultText = reading.result || reading.finalResult || "";
+    // Server saves may have results array from pro format
+    if (!resultText && reading.results?.length > 0) {
+      setFinalResult(reading.results.map(r => r.result).join("\n\n"));
+    } else {
+      setFinalResult(resultText);
+    }
     if (reading.rawResults) setRawResults(reading.rawResults);
     if (reading.goal) setGoal(reading.goal);
     if (reading.goalPrompt) setGoalPrompt(reading.goalPrompt);
@@ -458,6 +509,15 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  // Load readings from server when user changes
+  useEffect(() => {
+    if (wizardUser?.email) {
+      loadReadings(wizardUser).then(readings => setServerReadings(readings));
+    } else {
+      setServerReadings(loadReadingsLocal(wizardUser));
+    }
+  }, [wizardUser]);
 
   // Save session to localStorage whenever ANY user data changes (per-user, including guest)
   useEffect(() => {
@@ -908,7 +968,7 @@ ${astroChart}${twinChartBlock}
           if (data.status === "done") {
             setFinalResult(data.result);
             // Save to reading history
-            saveReading(wizardUser, {
+            const newReading = {
               id: job_id,
               date: new Date().toISOString(),
               goal: goal,
@@ -920,7 +980,9 @@ ${astroChart}${twinChartBlock}
               result: data.result,
               rawResults: rawResults,
               monthHighlights: parseMonthHighlights(data.result),
-            });
+            };
+            saveReading(wizardUser, newReading);
+            setServerReadings(prev => [newReading, ...prev].slice(0, 50));
             break;
           }
         } catch { continue; }
@@ -1319,17 +1381,17 @@ ${hebanRelation === "relations.twin" ? `
 
           {/* Dashboard — past readings */}
           {(() => {
-            const readings = loadReadings(wizardUser);
+            const readings = serverReadings;
             if (readings.length === 0) return null;
             return (
               <div className="wizard-dashboard">
                 <div className="wizard-dashboard-title">{t('history.pastReadings', { count: readings.length })}</div>
                 <div className="wizard-dashboard-list">
                   {readings.map((r, i) => (
-                    <div key={r.id || i} className="wizard-dashboard-card" onClick={() => restoreReading(r)}>
-                      <div className="wizard-dashboard-card-date">{new Date(r.date).toLocaleDateString()}</div>
+                    <div key={r.id || r.time || i} className="wizard-dashboard-card" onClick={() => restoreReading(r)}>
+                      <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                       <div className="wizard-dashboard-card-title">{r.goalPrompt || r.goal || t('history.analysis')}</div>
-                      <div className="wizard-dashboard-card-birth">{r.birth}</div>
+                      <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
                       {r.monthHighlights?.length > 0 && (
                         <div className="wizard-history-months">
                           {Array.from({ length: 12 }, (_, mi) => {
@@ -1895,7 +1957,7 @@ ${hebanRelation === "relations.twin" ? `
 
           {/* Past Readings History */}
           {(() => {
-            const readings = loadReadings(wizardUser);
+            const readings = serverReadings;
             if (readings.length <= 1) return null;
             return (
               <>
@@ -1907,9 +1969,9 @@ ${hebanRelation === "relations.twin" ? `
                 </button>
                 <div id="wizard-history-panel" className="wizard-history-panel" style={{ display: "none" }}>
                   {readings.map((r, i) => (
-                    <div key={r.id || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
-                      <div className="wizard-history-card-date">{new Date(r.date).toLocaleDateString()}</div>
-                      <div className="wizard-history-card-title">{r.goalPrompt || r.goal || t('history.analysis')} — {r.birth}</div>
+                    <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
+                      <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
+                      <div className="wizard-history-card-title">{r.goalPrompt || r.goal || t('history.analysis')} — {typeof r.birth === 'string' ? r.birth : ''}</div>
                       {r.monthHighlights?.length > 0 && (
                         <div className="wizard-history-months">
                           {Array.from({ length: 12 }, (_, mi) => {
