@@ -1002,7 +1002,7 @@ ${astroChart}${twinChartBlock}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, notify_email: wizardUser?.email || "" }),
       });
       if (!submitRes.ok) throw new Error(t('result.analysisError'));
       const { job_id } = await submitRes.json();

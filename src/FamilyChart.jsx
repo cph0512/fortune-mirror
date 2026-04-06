@@ -389,9 +389,10 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           images: [], system: systemPrompt, prompt,
-          analysis_type: "deep",
+          analysis_type: "family",
           visitor_id: getVisitorId(),
           user: wizardUser?.email || null,
+          notify_email: wizardUser?.email || "",
         }),
       });
       if (!submitRes.ok) throw new Error("分析失敗");
@@ -772,7 +773,7 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
   // ===== Phase: Analyzing =====
   if (phase === "analyzing") {
     return (
-      <div className="family-panel" style={{ textAlign: "center", paddingTop: 80 }}>
+      <div className="family-panel" style={{ textAlign: "center", paddingTop: 60 }}>
         <div className="wizard-loading-anim">
           <div className="wizard-loading-ring" />
           <div className="wizard-loading-ring" />
@@ -781,8 +782,24 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
         </div>
         <div className="wizard-loading-text">{loadingMsg}</div>
         <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 8 }}>
-          {currentLang === 'en' ? `Analyzing ${members.length} family members...` : `正在分析 ${members.length} 位家庭成員...`}
+          {currentLang === 'en' ? `Analyzing ${members.length} family members... This may take 5-10 minutes.`
+            : currentLang === 'ja' ? `${members.length}人を分析中... 5〜10分かかる場合があります。`
+            : `正在分析 ${members.length} 位家庭成員... 可能需要 5-10 分鐘。`}
         </div>
+        {wizardUser?.email && (
+          <div style={{ marginTop: 24, padding: '16px 20px', background: 'rgba(124,58,237,0.1)', borderRadius: 12 }}>
+            <div style={{ fontSize: 13, color: '#c4b5fd', marginBottom: 8 }}>
+              {currentLang === 'en' ? "You can close this page. We'll email you when it's done."
+                : currentLang === 'ja' ? "ページを閉じても大丈夫。完了したらメールでお知らせします。"
+                : "你可以先離開，分析完成後會 email 通知你。"}
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>
+              {currentLang === 'en' ? `Notification will be sent to: ${wizardUser.email}`
+                : currentLang === 'ja' ? `通知先: ${wizardUser.email}`
+                : `通知信箱：${wizardUser.email}`}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
