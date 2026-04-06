@@ -1012,7 +1012,9 @@ ${astroChart}${twinChartBlock}
       const kbEntries = loadKB();
       const wizardSP = buildWizardPrompt(kbEntries, goal);
       const recentChat = chatHistory.slice(-10).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
-      const prompt = `之前的完整分析報告：\n${finalResult}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先以紫微斗數的宮位、飛化、星曜組合進行深度推論，給出具體而非籠統的回答\n3. 引用分析報告中的相關內容，結合命盤資訊給出精確判斷\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
+      // Build raw chart data block for accurate follow-up
+      const chartBlock = rawResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
+      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n===== 分析報告 =====\n` : ""}之前的完整分析報告：\n${finalResult}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先根據原始排盤資料中的宮位、飛化、星曜組合、四柱十神、行星相位進行深度推論，給出具體而非籠統的回答\n3. 排盤資料是精確計算的結果，必須以此為依據，不可編造或猜測命盤中不存在的星曜、宮位、相位\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
       const isDeep = /大運|流年|逐月|十年|運勢走向|life phase|month.by.month/i.test(question);
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
