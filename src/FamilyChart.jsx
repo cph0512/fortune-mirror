@@ -141,6 +141,8 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
   const [chatLoading, setChatLoading] = useState(false);
   const [familyHistoryList, setFamilyHistoryList] = useState(loadFamilyHistory());
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState(new Set());
+  const [pickStep, setPickStep] = useState("protagonist"); // "protagonist" | "members"
 
   // Add member form
   const [addRole, setAddRole] = useState("");
@@ -240,8 +242,10 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
     }
   };
 
-  const startFamilyAnalysis = async (proto) => {
+  const startFamilyAnalysis = async (proto, analysisMembers) => {
+    const membersToAnalyze = analysisMembers || members;
     setProtagonist(proto);
+    setPickStep("protagonist");
     setPhase("analyzing");
     setAnalyzing(true);
     setResult("");
@@ -261,9 +265,9 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
     try {
       const langName = LANG_AI[currentLang] || '繁體中文';
 
-      // Build charts section for all members
+      // Build charts section for selected members
       let chartsBlock = "";
-      for (const m of members) {
+      for (const m of membersToAnalyze) {
         const roleLabel = getRoleLabel(m.role, 'zh-TW'); // Always Chinese for AI
         chartsBlock += `\n\n### ${roleLabel}（${m.name}）
 - 性別：${m.gender}
@@ -282,7 +286,7 @@ ${m.charts.astro}
       }
 
       const protoRole = getRoleLabel(proto.role, 'zh-TW');
-      const otherMembers = members.filter(m => m.id !== proto.id);
+      const otherMembers = membersToAnalyze.filter(m => m.id !== proto.id);
 
       // Build relationship context
       const parentMembers = otherMembers.filter(m => m.role === "father" || m.role === "mother");
@@ -417,7 +421,7 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             setFamilyHistoryList(loadFamilyHistory());
             // Save to server
             saveFamilyToServer(apiBackend, wizardUser, {
-              result: data.result, familyName, members, protagonist: proto,
+              result: data.result, familyName, members: membersToAnalyze, protagonist: proto,
             });
             break;
           }
@@ -673,33 +677,94 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
     );
   }
 
-  // ===== Phase: Pick protagonist =====
+  // ===== Phase: Pick protagonist + select members =====
   if (phase === "pick") {
+    if (pickStep === "protagonist") {
+      return (
+        <div className="family-panel">
+          <div className="family-header">
+            <button className="wizard-back" onClick={() => setPhase("list")}>‹</button>
+            <div className="family-title">{currentLang === 'en' ? 'Who is the protagonist?' : currentLang === 'ja' ? '誰を主役にしますか？' : '以誰為主角？'}</div>
+          </div>
+          <div className="family-intro">
+            {currentLang === 'en'
+              ? "Choose a family member as the focus of the analysis."
+              : currentLang === 'ja'
+              ? "分析の主役を選んでください。"
+              : "選擇一位家庭成員為分析焦點。"}
+          </div>
+          <div className="family-members">
+            {members.map(m => (
+              <div key={m.id} className="family-member-card family-member-pick" onClick={() => {
+                setProtagonist(m);
+                // Default: select all other members
+                setSelectedMembers(new Set(members.filter(x => x.id !== m.id).map(x => x.id)));
+                setPickStep("members");
+              }}>
+                <div className="family-member-avatar">{m.name[0]}</div>
+                <div className="family-member-info">
+                  <div className="family-member-name">{m.name}</div>
+                  <div className="family-member-role">{getRoleLabel(m.role, currentLang)}</div>
+                </div>
+                <span style={{ color: '#7c3aed', fontSize: 20 }}>›</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    // pickStep === "members"
+    const otherMembers = members.filter(m => m.id !== protagonist?.id);
     return (
       <div className="family-panel">
         <div className="family-header">
-          <button className="wizard-back" onClick={() => setPhase("list")}>‹</button>
-          <div className="family-title">{currentLang === 'en' ? 'Who is the protagonist?' : currentLang === 'ja' ? '誰を主役にしますか？' : '以誰為主角？'}</div>
+          <button className="wizard-back" onClick={() => setPickStep("protagonist")}>‹</button>
+          <div className="family-title">
+            {currentLang === 'en' ? `Analyze with ${protagonist?.name}` : currentLang === 'ja' ? `${protagonist?.name}の分析` : `${protagonist?.name} 的分析`}
+          </div>
         </div>
         <div className="family-intro">
           {currentLang === 'en'
-            ? "Choose a family member as the focus. We'll analyze how everyone else's energy influences them."
+            ? "Select which family members to include in the analysis. You don't have to include everyone."
             : currentLang === 'ja'
-            ? "主役を選んでください。他の家族のエネルギーが主役にどう影響するかを分析します。"
-            : "選擇一位家庭成員為焦點。我們會分析其他人的能量如何影響他/她。"}
+            ? "分析に含めるメンバーを選んでください。全員でなくても構いません。"
+            : "選擇要納入分析的成員。不一定要全選。"}
         </div>
         <div className="family-members">
-          {members.map(m => (
-            <div key={m.id} className="family-member-card family-member-pick" onClick={() => startFamilyAnalysis(m)}>
-              <div className="family-member-avatar">{m.name[0]}</div>
-              <div className="family-member-info">
-                <div className="family-member-name">{m.name}</div>
-                <div className="family-member-role">{getRoleLabel(m.role, currentLang)}</div>
+          {otherMembers.map(m => {
+            const checked = selectedMembers.has(m.id);
+            return (
+              <div key={m.id} className={`family-member-card ${checked ? 'family-member-selected' : ''}`}
+                style={{ cursor: 'pointer', opacity: checked ? 1 : 0.5 }}
+                onClick={() => {
+                  setSelectedMembers(prev => {
+                    const next = new Set(prev);
+                    if (next.has(m.id)) next.delete(m.id);
+                    else next.add(m.id);
+                    return next;
+                  });
+                }}>
+                <div style={{ width: 24, height: 24, borderRadius: 6, border: '2px solid #7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10, background: checked ? '#7c3aed' : 'transparent', flexShrink: 0 }}>
+                  {checked && <span style={{ color: '#fff', fontSize: 14 }}>✓</span>}
+                </div>
+                <div className="family-member-avatar">{m.name[0]}</div>
+                <div className="family-member-info">
+                  <div className="family-member-name">{m.name}</div>
+                  <div className="family-member-role">{getRoleLabel(m.role, currentLang)}</div>
+                </div>
               </div>
-              <span style={{ color: '#7c3aed', fontSize: 20 }}>›</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
+        <button className="wizard-cta" style={{ marginTop: 20 }}
+          disabled={selectedMembers.size === 0}
+          onClick={() => {
+            // Filter members: protagonist + selected
+            const analysisMembers = members.filter(m => m.id === protagonist.id || selectedMembers.has(m.id));
+            startFamilyAnalysis(protagonist, analysisMembers);
+          }}>
+          {currentLang === 'en' ? `Start Analysis (${selectedMembers.size + 1} people)` : currentLang === 'ja' ? `分析開始（${selectedMembers.size + 1}人）` : `開始分析（${selectedMembers.size + 1} 人）`}
+        </button>
       </div>
     );
   }
