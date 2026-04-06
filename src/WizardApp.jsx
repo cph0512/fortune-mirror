@@ -2170,6 +2170,27 @@ ${hebanRelation === "relations.twin" ? `
             }}>
               {authMode === "register" ? t('auth.hasAccountLogin') : t('auth.noAccountRegister')}
             </button>
+            {authMode === "login" && (
+              <button className="wizard-auth-switch" style={{ marginTop: 4, fontSize: 12, opacity: 0.6 }} onClick={async () => {
+                const email = authEmail.trim();
+                if (!email) { setAuthError(t('auth.fillEmailPw')); return; }
+                try {
+                  const res = await fetch(API_BACKEND.replace("/api/fortune", "/api/fortune-users"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "reset_password", username: email, password: "fortune2026" }),
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    setAuthError(t('auth.resetSent'));
+                  } else {
+                    setAuthError(data.error || t('auth.notFound'));
+                  }
+                } catch { setAuthError(t('auth.notFound')); }
+              }}>
+                {t('auth.forgotPassword')}
+              </button>
+            )}
           </div>
         </div>
       )}

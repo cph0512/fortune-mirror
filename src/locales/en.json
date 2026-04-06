@@ -37,7 +37,9 @@
     "emailExists": "This email is already registered, please login",
     "fillEmailPw": "Please enter email and password",
     "notFound": "Account not found, please sign up",
-    "wrongPassword": "Incorrect password"
+    "wrongPassword": "Incorrect password",
+    "forgotPassword": "Forgot password?",
+    "resetSent": "Password reset to fortune2026. Please login and change it."
   },
   "goal": {
     "question": "What would you like to know?",

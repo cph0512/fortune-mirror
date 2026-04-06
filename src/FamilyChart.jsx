@@ -22,12 +22,39 @@ const ROLES = [
 ];
 
 const FAMILY_STORAGE_KEY = "fortune-family-data";
+const API_SAVE_PATH = "/api/fortune-save";
 
 function loadFamilyData() {
   try { const d = localStorage.getItem(FAMILY_STORAGE_KEY); return d ? JSON.parse(d) : null; } catch { return null; }
 }
 function saveFamilyData(data) {
   try { localStorage.setItem(FAMILY_STORAGE_KEY, JSON.stringify(data)); } catch {}
+}
+
+async function saveFamilyToServer(apiBackend, user, data) {
+  if (!user?.email) return;
+  const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
+  try {
+    await fetch(saveUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: user.email,
+        time: new Date().toISOString(),
+        finalResult: data.result || "",
+        goal: "family",
+        goalPrompt: `家族命盤 — ${data.familyName || ""}（主角：${data.protagonist?.name || ""})`,
+        gender: data.protagonist?.gender || "",
+        birth: data.protagonist ? `${data.protagonist.year}/${data.protagonist.month}/${data.protagonist.day}` : "",
+        birthData: data.protagonist || {},
+        rawResults: data.members?.map(m => ({ system: `${getRoleLabel(m.role, 'zh-TW')}（${m.name}）`, text: `${m.charts?.ziwei || ""}\n\n${m.charts?.bazi || ""}\n\n${m.charts?.astro || ""}` })) || [],
+        chat: [],
+        monthHighlights: [],
+        source: "b2c",
+        familyData: { familyName: data.familyName, members: data.members, protagonist: data.protagonist },
+      }),
+    });
+  } catch {}
 }
 
 function getRoleLabel(roleId, lang) {
@@ -66,11 +93,15 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
   const saved = loadFamilyData();
   const [familyName, setFamilyName] = useState(saved?.familyName || "");
   const [members, setMembers] = useState(saved?.members || []);
-  const [phase, setPhase] = useState(saved?.members?.length > 0 ? "list" : "name"); // name, list, add, pick, analyzing, result
-  const [protagonist, setProtagonist] = useState(null);
-  const [result, setResult] = useState("");
+  const hasResult = !!(saved?.result);
+  const [phase, setPhase] = useState(hasResult ? "result" : (saved?.members?.length > 0 ? "list" : "name")); // name, list, add, pick, analyzing, result
+  const [protagonist, setProtagonist] = useState(saved?.protagonist || null);
+  const [result, setResult] = useState(saved?.result || "");
   const [analyzing, setAnalyzing] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
 
   // Add member form
   const [addRole, setAddRole] = useState("");
@@ -288,6 +319,11 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
           const data = await pollRes.json();
           if (data.status === "done") {
             setResult(data.result);
+            // Save to server + localStorage
+            saveFamilyData({ familyName, members, result: data.result, protagonist: proto });
+            saveFamilyToServer(apiBackend, wizardUser, {
+              result: data.result, familyName, members, protagonist: proto,
+            });
             break;
           }
         } catch { continue; }
@@ -298,6 +334,44 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
       clearInterval(interval);
       setAnalyzing(false);
       setPhase("result");
+    }
+  };
+
+  const sendFamilyChat = async (question) => {
+    if (!question.trim() || chatLoading) return;
+    setChatHistory(prev => [...prev, { role: "user", text: question }]);
+    setChatInput("");
+    setChatLoading(true);
+    try {
+      const langName = LANG_AI[currentLang] || '繁體中文';
+      const chartBlock = members.map(m => {
+        const role = getRoleLabel(m.role, 'zh-TW');
+        return `【${role}（${m.name}）排盤】\n${m.charts?.ziwei || ""}\n${m.charts?.bazi || ""}\n${m.charts?.astro || ""}`;
+      }).join("\n\n===\n\n");
+      const recentChat = chatHistory.slice(-10).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
+      const prompt = `===== 家族命盤原始排盤資料 =====\n${chartBlock}\n\n===== 之前的家族分析報告 =====\n${result}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提命理系統名稱和術語，用自然語言\n2. 根據排盤資料精確回答，不可編造\n3. 家族分析要指出具體是哪位成員的哪個特質影響\n4. 用「${langName}」回覆`;
+      const sp = `你是「命理三鏡」的家族命盤分析師。根據已有的家族命盤排盤資料和分析報告回答追問。`;
+      const submitRes = await fetch(apiBackend, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: [], system: sp, prompt, analysis_type: "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
+      });
+      if (!submitRes.ok) throw new Error("回覆失敗");
+      const { job_id } = await submitRes.json();
+      for (let i = 0; i < 200; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const pollRes = await fetch(`${apiBackend}/${job_id}`);
+        if (!pollRes.ok) continue;
+        const data = await pollRes.json();
+        if (data.status === "done") {
+          setChatHistory(prev => [...prev, { role: "assistant", text: data.result }]);
+          break;
+        }
+      }
+    } catch (e) {
+      setChatHistory(prev => [...prev, { role: "assistant", text: "回覆失敗: " + e.message }]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -561,12 +635,46 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
         <div className="wizard-result-sections">
           {renderSections(result)}
         </div>
+        {/* Follow-up chat */}
+        <div className="wizard-chat" style={{ marginTop: 32 }}>
+          <div className="wizard-question" style={{ fontSize: 18, marginBottom: 12 }}>
+            {currentLang === 'en' ? 'Ask about your family chart' : currentLang === 'ja' ? '家族命盤について質問' : '針對家族命盤追問'}
+          </div>
+          {chatHistory.length > 0 && (
+            <div className="wizard-chat-history">
+              {chatHistory.map((msg, i) => (
+                <div key={i} className={`wizard-chat-msg ${msg.role}`}>
+                  <div className="wizard-chat-bubble">{msg.text}</div>
+                </div>
+              ))}
+              {chatLoading && <div className="wizard-chat-msg assistant"><div className="wizard-chat-bubble wizard-loading-dots">...</div></div>}
+            </div>
+          )}
+          <div className="wizard-chat-input-row">
+            <input className="wizard-input" value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) sendFamilyChat(chatInput); }}
+              placeholder={currentLang === 'en' ? 'Ask a follow-up question...' : currentLang === 'ja' ? '追加質問...' : '輸入你的問題...'}
+              disabled={chatLoading} />
+            <button onClick={() => sendFamilyChat(chatInput)} disabled={chatLoading || !chatInput.trim()} className="wizard-cta" style={{ padding: '12px 20px' }}>
+              {currentLang === 'en' ? 'Send' : currentLang === 'ja' ? '送信' : '送出'}
+            </button>
+          </div>
+        </div>
+
         <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
-          <button className="wizard-cta-secondary" style={{ flex: 1 }} onClick={() => setPhase("pick")}>
+          <button className="wizard-cta-secondary" style={{ flex: 1 }} onClick={() => { setPhase("pick"); setChatHistory([]); }}>
             {currentLang === 'en' ? 'Switch Protagonist' : currentLang === 'ja' ? '主役を変更' : '切換主角'}
           </button>
-          <button className="wizard-cta-secondary" style={{ flex: 1 }} onClick={() => setPhase("list")}>
+          <button className="wizard-cta-secondary" style={{ flex: 1 }} onClick={() => { setPhase("list"); setChatHistory([]); }}>
             {currentLang === 'en' ? 'Edit Members' : currentLang === 'ja' ? 'メンバー編集' : '編輯成員'}
+          </button>
+          <button className="wizard-cta-secondary" style={{ flex: 1 }} onClick={() => {
+            saveFamilyData(null); localStorage.removeItem(FAMILY_STORAGE_KEY);
+            setFamilyName(""); setMembers([]); setResult(""); setProtagonist(null); setChatHistory([]);
+            setPhase("name");
+          }}>
+            {currentLang === 'en' ? 'New Chart' : currentLang === 'ja' ? '新規作成' : '重新建立'}
           </button>
         </div>
       </div>
