@@ -1203,6 +1203,20 @@ ${hebanRelation === "relations.twin" ? `
           const data = await pollRes.json();
           if (data.status === "done") {
             setHebanResult(data.result);
+            // Save heban result to server
+            const hebanSave = {
+              date: new Date().toISOString(),
+              goal: "heban",
+              goalPrompt: `合盤 — ${hebanName || t(hebanRelation)} (${hebanYear}/${hebanMonth}/${hebanDay})`,
+              gender: gender,
+              birth: `${birthYear}/${birthMonth}/${birthDay}`,
+              birthData: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace, city: birthCity },
+              result: data.result,
+              rawResults: rawResults,
+              monthHighlights: [],
+            };
+            saveReading(wizardUser, hebanSave);
+            setServerReadings(prev => [hebanSave, ...prev].slice(0, 50));
             break;
           }
         } catch { continue; }
