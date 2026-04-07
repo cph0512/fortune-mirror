@@ -830,16 +830,14 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             {currentLang === 'en' ? 'Ask about your family chart' : currentLang === 'ja' ? '家族命盤について質問' : '針對家族命盤追問'}
           </div>
           {chatHistory.length > 0 && (
-            <div className="wizard-chat-history">
+            <div className="wizard-chat-messages">
               {chatHistory.map((msg, i) => (
-                <div key={i} className={`wizard-chat-msg ${msg.role}`}>
-                  <div className="wizard-chat-bubble">{msg.text}</div>
-                </div>
+                <div key={i} className={`wizard-chat-msg ${msg.role}`}>{msg.text}</div>
               ))}
-              {chatLoading && <div className="wizard-chat-msg assistant"><div className="wizard-chat-bubble wizard-loading-dots">...</div></div>}
+              {chatLoading && <div className="wizard-chat-msg assistant" style={{ opacity: 0.5 }}>...</div>}
             </div>
           )}
-          <div className="wizard-chat-input-row">
+          <div className="wizard-chat-input">
             <input className="wizard-input" value={chatInput}
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) sendFamilyChat(chatInput); }}
