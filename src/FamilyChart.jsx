@@ -54,12 +54,12 @@ function membersForSave(members) {
 }
 
 // Save family data to server — both the analysis result AND the family structure
-async function saveFamilyToServer(apiBackend, user, data) {
-  if (!user?.email) return;
+async function saveFamilyToServer(apiBackend, user, data, getVisitorId) {
+  const userId = user?.email || (typeof getVisitorId === 'function' ? getVisitorId() : 'anonymous');
   const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
   const protoBirth = data.protagonist || {};
   const payload = {
-    user: user.email,
+    user: userId,
     time: new Date().toISOString(),
     finalResult: data.result || "",
     goal: "family",
@@ -430,7 +430,7 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             // Save to server
             saveFamilyToServer(apiBackend, wizardUser, {
               result: data.result, familyName, members: membersToAnalyze, protagonist: proto,
-            });
+            }, getVisitorId);
             break;
           }
         } catch { continue; }
@@ -476,7 +476,7 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
           // Save chat to server
           saveFamilyToServer(apiBackend, wizardUser, {
             result, familyName, members, protagonist, chat: newChat,
-          });
+          }, getVisitorId);
           break;
         }
       }

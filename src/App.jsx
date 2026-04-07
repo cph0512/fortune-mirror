@@ -674,7 +674,10 @@ function MainApp({ auth, isAdmin, onLogout }) {
       time: new Date().toISOString(),
       birthData: bd,
     };
-    await fetch(`${API_BACKEND}-save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    try {
+      const res = await fetch(`${API_BACKEND}-save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res.ok) console.error("[Pro saveReading] failed:", res.status, await res.text().catch(() => ""));
+    } catch (e) { console.error("[Pro saveReading] error:", e); }
     logActivity(auth.username, "存檔", label);
   };
 

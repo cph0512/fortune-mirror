@@ -106,13 +106,14 @@ function loadSession(user) {
 
 // Save chat history to server (as part of latest reading)
 async function saveChatToServer(user, chatHistory, finalResult, goal, goalPrompt, birthData) {
-  if (!user?.email || chatHistory.length === 0) return;
+  if (chatHistory.length === 0) return;
+  const userId = user?.email || getVisitorId();
   try {
-    await fetch(API_SAVE, {
+    const res = await fetch(API_SAVE, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        user: user.email,
+        user: userId,
         time: new Date().toISOString(),
         finalResult: finalResult || "",
         goal: goal || "",
@@ -122,7 +123,8 @@ async function saveChatToServer(user, chatHistory, finalResult, goal, goalPrompt
         source: "b2c",
       }),
     });
-  } catch {}
+    if (!res.ok) console.error("[saveChatToServer] failed:", res.status);
+  } catch (e) { console.error("[saveChatToServer] error:", e); }
 }
 
 // ============================================================
@@ -162,29 +164,29 @@ async function saveReading(user, reading) {
     if (readings.length > 50) readings.length = 50;
     localStorage.setItem(readingsKey(user), JSON.stringify(readings));
   } catch {}
-  // Then save to server for logged-in users
-  if (user?.email) {
-    try {
-      await fetch(API_SAVE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: user.email,
-          time: reading.date || new Date().toISOString(),
-          finalResult: reading.result || "",
-          gender: reading.gender || "",
-          goal: reading.goal || "",
-          goalPrompt: reading.goalPrompt || "",
-          birth: reading.birth || "",
-          birthData: reading.birthData || {},
-          rawResults: reading.rawResults || [],
-          chat: [],
-          monthHighlights: reading.monthHighlights || [],
-          source: "b2c",
-        }),
-      });
-    } catch {}
-  }
+  // ALWAYS save to server — use email if logged in, visitor_id if not
+  const userId = user?.email || getVisitorId();
+  try {
+    const res = await fetch(API_SAVE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: userId,
+        time: reading.date || new Date().toISOString(),
+        finalResult: reading.result || "",
+        gender: reading.gender || "",
+        goal: reading.goal || "",
+        goalPrompt: reading.goalPrompt || "",
+        birth: reading.birth || "",
+        birthData: reading.birthData || {},
+        rawResults: reading.rawResults || [],
+        chat: [],
+        monthHighlights: reading.monthHighlights || [],
+        source: "b2c",
+      }),
+    });
+    if (!res.ok) console.error("[saveReading] failed:", res.status, await res.text().catch(() => ""));
+  } catch (e) { console.error("[saveReading] error:", e); }
 }
 
 // Parse month highlights from analysis result text
