@@ -208,6 +208,14 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
               }
               saveFamilyLocal({ familyName: latest.familyData.familyName, members: restoredMembers, result: latest.finalResult, protagonist: latest.familyData.protagonist });
             }
+            // Fallback: server has result but no members — still show the result
+            if (!local?.members?.length && !latest.familyData?.members?.length && latest.finalResult) {
+              const fname = latest.familyData?.familyName || latest.goalPrompt?.replace(/^家族命盤 — /, '').split('（')[0] || '';
+              setFamilyName(fname);
+              setResult(latest.finalResult);
+              setPhase("result");
+              saveFamilyLocal({ familyName: fname, members: [], result: latest.finalResult, protagonist: null });
+            }
             // If local has members but no result, and server has a result — restore result
             if (local?.members?.length && !local?.result) {
               const withResult = familySaves.find(s => s.finalResult);
