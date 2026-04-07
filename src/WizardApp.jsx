@@ -547,6 +547,25 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [userCredits, setUserCredits] = useState(0);
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentPlans, setPaymentPlans] = useState(null);
+  const [paymentMsg, setPaymentMsg] = useState(null); // {type: "success"|"fail"|"cancel", order}
+
+  // Handle payment callback from OEN redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get("payment");
+    const orderId = params.get("order");
+    if (paymentStatus) {
+      setPaymentMsg({ type: paymentStatus, order: orderId });
+      if (paymentStatus === "success" && wizardUser?.email) {
+        fetchUserStatus(wizardUser.email);
+      }
+      setShowAccount(true);
+      // Clean URL
+      window.history.replaceState({}, "", window.location.pathname);
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => setPaymentMsg(null), 8000);
+    }
+  }, []);
 
   // Horoscope state
   const [horoscopeData, setHoroscopeData] = useState(null);
@@ -838,7 +857,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const res = await fetch(`${API_SANDBOX}/payment/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan_id: planId, email: wizardUser.email }),
+        body: JSON.stringify({ plan_id: planId, email: wizardUser.email, name: wizardUser.name || "User" }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -1422,6 +1441,21 @@ ${hebanRelation === "relations.twin" ? `
           <button className="wizard-back" onClick={() => setShowAccount(false)}>‹</button>
           <div className="wizard-account-title">{t('account.title')}</div>
         </div>
+
+        {paymentMsg && (
+          <div style={{
+            padding: "12px 16px", borderRadius: 8, marginBottom: 16, fontSize: 14, fontWeight: 500,
+            background: paymentMsg.type === "success" ? "#e8f5e9" : paymentMsg.type === "fail" ? "#ffebee" : "#fff3e0",
+            color: paymentMsg.type === "success" ? "#2e7d32" : paymentMsg.type === "fail" ? "#c62828" : "#e65100",
+            border: `1px solid ${paymentMsg.type === "success" ? "#a5d6a7" : paymentMsg.type === "fail" ? "#ef9a9a" : "#ffcc80"}`,
+          }}>
+            {paymentMsg.type === "success"
+              ? (currentLang === 'en' ? "Payment successful! Your features have been unlocked." : currentLang === 'ja' ? "お支払い完了！機能がアンロックされました。" : "付款成功！功能已解鎖。")
+              : paymentMsg.type === "fail"
+              ? (currentLang === 'en' ? "Payment failed. Please try again." : currentLang === 'ja' ? "お支払いに失敗しました。再試行してください。" : "付款失敗，請重試。")
+              : (currentLang === 'en' ? "Payment was cancelled." : currentLang === 'ja' ? "お支払いがキャンセルされました。" : "付款已取消。")}
+          </div>
+        )}
 
         <div className="wizard-account-info">
           <div className="wizard-account-avatar">{wizardUser?.name?.[0] || "U"}</div>
