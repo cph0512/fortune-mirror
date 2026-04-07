@@ -438,13 +438,15 @@ function filterKBByGoal(kbEntries, goalKey) {
 
   const needTopics = GOAL_TOPIC_MAP[goalKey] || [];
   if (needTopics.length === 0) return kbEntries;
-  const allTopics = [...needTopics, "personality"];
 
-  return kbEntries.filter(e => {
-    const topics = e.topics || [];
-    if (topics.includes("core")) return true;
-    return allTopics.some(t => topics.includes(t));
+  const filtered = kbEntries.filter(e => {
+    const t = e.tags || e.topics || [];
+    if (t.includes("core")) return true;
+    return needTopics.some(topic => t.includes(topic));
   });
+  // Safety: if filtering removed too much, send all (quality first)
+  if (filtered.length < 20) return kbEntries;
+  return filtered;
 }
 
 function buildWizardPrompt(kbEntries, goalKey) {
