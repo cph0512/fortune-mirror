@@ -486,6 +486,15 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         body: JSON.stringify({ user: wizardUser.email, session: { _lang: lng } }),
       }).catch(() => {});
     }
+    // Re-translate horoscope if already loaded
+    if (horoscopeData?.horoscope && lng !== 'zh-TW' && horoscopeData.horoscope._lang !== lng) {
+      translateHoroscope(horoscopeData.horoscope, lng).then(translated => {
+        setHoroscopeData(prev => prev ? { ...prev, horoscope: translated } : null);
+      });
+    } else if (lng === 'zh-TW' && horoscopeData?.horoscope?._lang) {
+      // Switch back to Chinese — refetch original
+      fetchHoroscope(selectedZodiac || null);
+    }
   };
 
   const savedAuth = loadAuth();
