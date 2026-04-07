@@ -43,54 +43,65 @@ function saveFamilyHistoryEntry(entry) {
   } catch {}
 }
 
+// Strip heavy chart strings from members for server save (charts can be recalculated)
+function membersForSave(members) {
+  if (!members) return [];
+  return members.map(m => ({
+    id: m.id, role: m.role, name: m.name, gender: m.gender,
+    year: m.year, month: m.month, day: m.day, hour: m.hour, minute: m.minute,
+    place: m.place, cityData: m.cityData,
+  }));
+}
+
 // Save family data to server — both the analysis result AND the family structure
 async function saveFamilyToServer(apiBackend, user, data) {
   if (!user?.email) return;
   const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
+  const protoBirth = data.protagonist || {};
   const payload = {
     user: user.email,
     time: new Date().toISOString(),
     finalResult: data.result || "",
     goal: "family",
     goalPrompt: `家族命盤 — ${data.familyName || ""}（主角：${data.protagonist?.name || ""})`,
-    gender: data.protagonist?.gender || "",
-    birth: data.protagonist ? `${data.protagonist.year}/${data.protagonist.month}/${data.protagonist.day}` : "",
-    birthData: data.protagonist || {},
-    rawResults: data.members?.map(m => ({ system: `${getRoleLabel(m.role, 'zh-TW')}（${m.name}）`, text: `${m.charts?.ziwei || ""}\n\n${m.charts?.bazi || ""}\n\n${m.charts?.astro || ""}` })) || [],
+    gender: protoBirth.gender || "",
+    birth: protoBirth.year ? `${protoBirth.year}/${protoBirth.month}/${protoBirth.day}` : "",
+    birthData: { year: protoBirth.year, month: protoBirth.month, day: protoBirth.day, hour: protoBirth.hour, minute: protoBirth.minute, place: protoBirth.place, cityData: protoBirth.cityData },
+    rawResults: [],
     chat: data.chat || [],
     monthHighlights: [],
     source: "b2c",
-    familyData: { familyName: data.familyName, members: data.members, protagonist: data.protagonist },
+    familyData: {
+      familyName: data.familyName,
+      members: membersForSave(data.members),
+      protagonist: data.protagonist ? { id: data.protagonist.id, role: data.protagonist.role, name: data.protagonist.name, gender: data.protagonist.gender, year: data.protagonist.year, month: data.protagonist.month, day: data.protagonist.day, hour: data.protagonist.hour, minute: data.protagonist.minute, place: data.protagonist.place, cityData: data.protagonist.cityData } : null,
+    },
   };
   try {
-    await fetch(saveUrl, {
+    const res = await fetch(saveUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  } catch {}
+    if (!res.ok) console.error("[FamilyChart] save failed:", res.status, await res.text().catch(() => ""));
+  } catch (e) { console.error("[FamilyChart] save error:", e); }
 }
 
-// Load family data from server saves (find latest family-type save)
-async function loadFamilyFromServer(apiBackend, user) {
-  if (!user?.email) return null;
+// Rebuild charts for members loaded from server (server saves don't include chart strings)
+function rebuildCharts(members) {
+  return members.map(m => m.charts?.ziwei ? m : { ...m, charts: generateCharts(m) });
+}
+
+// Load family data from server saves (find ALL family saves for history)
+async function loadFamilySavesFromServer(apiBackend, user) {
+  if (!user?.email) return [];
   const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
   try {
     const res = await fetch(`${saveUrl}?user=${encodeURIComponent(user.email)}`);
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const saves = await res.json();
-    // Find the latest family save
-    const familySave = saves.find(s => s.goal === "family" && s.familyData);
-    if (familySave?.familyData) {
-      return {
-        familyName: familySave.familyData.familyName || "",
-        members: familySave.familyData.members || [],
-        protagonist: familySave.familyData.protagonist || null,
-        result: familySave.finalResult || "",
-      };
-    }
-  } catch {}
-  return null;
+    return (Array.isArray(saves) ? saves : []).filter(s => s.goal === "family" && (s.finalResult || s.familyData));
+  } catch { return []; }
 }
 
 function getRoleLabel(roleId, lang) {
@@ -167,14 +178,9 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
   // Load from server on mount (server-first)
   useEffect(() => {
     if (wizardUser?.email && !serverLoaded) {
-      const saveUrl = apiBackend.replace("/api/fortune", API_SAVE_PATH);
-      // Load all family saves from server
-      fetch(`${saveUrl}?user=${encodeURIComponent(wizardUser.email)}`)
-        .then(r => r.json())
-        .then(saves => {
+      loadFamilySavesFromServer(apiBackend, wizardUser)
+        .then(familySaves => {
           setServerLoaded(true);
-          const familySaves = (Array.isArray(saves) ? saves : []).filter(s => s.goal === "family" && (s.finalResult || s.familyData));
-          // Build server history
           if (familySaves.length > 0) {
             const serverHistory = familySaves.map(s => ({
               id: s.time,
@@ -190,8 +196,9 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
             // Restore latest if local is empty
             const latest = familySaves[0];
             if (!local?.members?.length && latest.familyData?.members?.length) {
+              const restoredMembers = rebuildCharts(latest.familyData.members);
               setFamilyName(latest.familyData.familyName || "");
-              setMembers(latest.familyData.members);
+              setMembers(restoredMembers);
               setProtagonist(latest.familyData.protagonist);
               if (latest.finalResult) {
                 setResult(latest.finalResult);
@@ -199,7 +206,7 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
               } else {
                 setPhase("list");
               }
-              saveFamilyLocal({ familyName: latest.familyData.familyName, members: latest.familyData.members, result: latest.finalResult, protagonist: latest.familyData.protagonist });
+              saveFamilyLocal({ familyName: latest.familyData.familyName, members: restoredMembers, result: latest.finalResult, protagonist: latest.familyData.protagonist });
             }
           }
         })
@@ -856,7 +863,7 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
                   <div key={h.id || i} className="wizard-dashboard-card" onClick={() => {
                     setResult(h.result);
                     if (h.protagonist) setProtagonist(h.protagonist);
-                    if (h.members) setMembers(h.members);
+                    if (h.members) setMembers(rebuildCharts(h.members));
                     setChatHistory([]);
                     setShowHistory(false);
                     window.scrollTo({ top: 0, behavior: "smooth" });
