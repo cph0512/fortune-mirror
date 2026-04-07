@@ -734,12 +734,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       if (!res.ok) throw new Error();
       const data = await res.json();
       if (data.horoscope || data.horoscopes) {
-        // Auto-translate if user language is not zh-TW
+        // Show immediately, translate in background if needed
+        setHoroscopeData(data);
         if (currentLang !== 'zh-TW' && data.horoscope) {
-          const translated = await translateHoroscope(data.horoscope, currentLang);
-          setHoroscopeData({ ...data, horoscope: translated });
-        } else {
-          setHoroscopeData(data);
+          translateHoroscope(data.horoscope, currentLang).then(translated => {
+            setHoroscopeData(prev => prev ? { ...prev, horoscope: translated } : null);
+          });
         }
       } else {
         setHoroscopeData(null);
