@@ -193,7 +193,7 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
               protagonist: s.familyData?.protagonist,
             }));
             setFamilyHistoryList(serverHistory);
-            // Restore latest if local is empty
+            // Restore from server if local is empty
             const latest = familySaves[0];
             if (!local?.members?.length && latest.familyData?.members?.length) {
               const restoredMembers = rebuildCharts(latest.familyData.members);
@@ -207,6 +207,15 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
                 setPhase("list");
               }
               saveFamilyLocal({ familyName: latest.familyData.familyName, members: restoredMembers, result: latest.finalResult, protagonist: latest.familyData.protagonist });
+            }
+            // If local has members but no result, and server has a result — restore result
+            if (local?.members?.length && !local?.result) {
+              const withResult = familySaves.find(s => s.finalResult);
+              if (withResult) {
+                setResult(withResult.finalResult);
+                setPhase("result");
+                saveFamilyLocal({ ...local, result: withResult.finalResult });
+              }
             }
           }
         })
@@ -256,6 +265,11 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
     setPhase("analyzing");
     setAnalyzing(true);
     setResult("");
+
+    // Pre-save members to server BEFORE analysis starts (prevents data loss if page crashes)
+    saveFamilyToServer(apiBackend, wizardUser, {
+      result: "", familyName, members: membersToAnalyze, protagonist: proto,
+    }, getVisitorId);
 
     const msgs = currentLang === 'en'
       ? ["Analyzing family energy field...", "Cross-referencing parent charts...", "Mapping family dynamics...", "Generating family destiny report..."]
