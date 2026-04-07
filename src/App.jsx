@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import './i18n.js';
 import './App.css';
 import { calculateChart, formatChart } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
@@ -9,12 +11,21 @@ import { calculateFinance, formatFinance } from "./finance-calc.js";
 // CONSTANTS
 // ============================================================
 
+// Categories — static data (display names use i18n when available via useCategories hook)
 const CATEGORIES = [
   { id: "bazi", name: "八字命理", desc: "四柱、十神、五行、大運、流年等知識" },
   { id: "astro", name: "西洋占星", desc: "星座、行星、宮位、相位、流運等知識" },
   { id: "ziwei", name: "紫微斗數", desc: "主星、四化、十二宮、飛星等知識" },
   { id: "general", name: "通用知識", desc: "跨系統通則、命理哲學、解讀技巧等" },
 ];
+function useCategories() {
+  const { t } = useTranslation();
+  return CATEGORIES.map(c => ({
+    ...c,
+    name: t(`pro.cat.${c.id}`),
+    desc: t(`pro.cat.${c.id}Desc`),
+  }));
+}
 
 const BASE_SYSTEM_PROMPT = `你是一位精通三大命理系統的高級命理分析師，擅長：
 1. **八字命理**（Four Pillars of Destiny）
@@ -100,16 +111,8 @@ const BASE_SYSTEM_PROMPT = `你是一位精通三大命理系統的高級命理�
 
 const TIAN_GAN_LIST = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
 
-const LOADING_MESSAGES = [
-  "正在辨識命盤類型...",
-  "提取星體位置與四柱資訊...",
-  "計算五行分布...",
-  "分析宮位配置...",
-  "交叉比對三大系統...",
-  "尋找共鳴點...",
-  "推算流年運勢...",
-  "彙整綜合分析報告...",
-];
+// LOADING_MESSAGES moved to i18n: pro.loading[]
+// Used via t('pro.loading', { returnObjects: true }) in components
 
 const STORAGE_KEY_KB = "fortune-app-kb";
 const STORAGE_KEY_API = "fortune-app-api-key";
@@ -257,8 +260,10 @@ function renderMarkdown(md) {
 // ============================================================
 
 function KnowledgeBase({ entries, setEntries }) {
+  const { t } = useTranslation();
+  const cats = useCategories();
   const [openCats, setOpenCats] = useState({});
-  const [editing, setEditing] = useState(null); // null | { mode: 'new'|'edit', category, entry? }
+  const [editing, setEditing] = useState(null);
   const [importMode, setImportMode] = useState(false);
   const fileRef = useRef(null);
 
@@ -317,7 +322,7 @@ function KnowledgeBase({ entries, setEntries }) {
           setEntries(merged);
           saveKB(merged);
         }
-      } catch { alert("檔案格式錯誤"); }
+      } catch { alert(t('pro.kb.fileError')); }
     };
     reader.readAsText(file);
     e.target.value = "";
@@ -331,27 +336,27 @@ function KnowledgeBase({ entries, setEntries }) {
       <div className="kb-stats">
         <div className="kb-stat">
           <div className="num">{entries.length}</div>
-          <div className="label">知識條目</div>
+          <div className="label">{t('pro.kb.entries')}</div>
         </div>
         <div className="kb-stat">
-          <div className="num">{CATEGORIES.filter(c => entries.some(e => e.category === c.id)).length}</div>
-          <div className="label">涵蓋系統</div>
+          <div className="num">{cats.filter(c => entries.some(e => e.category === c.id)).length}</div>
+          <div className="label">{t('pro.kb.systems')}</div>
         </div>
         <div className="kb-stat">
           <div className="num">{totalChars > 1000 ? (totalChars / 1000).toFixed(1) + "k" : totalChars}</div>
-          <div className="label">總字數</div>
+          <div className="label">{t('pro.kb.totalChars')}</div>
         </div>
       </div>
 
       {/* Toolbar */}
       <div className="kb-toolbar">
-        <button onClick={handleExport}>📤 匯出知識庫</button>
-        <button onClick={() => fileRef.current?.click()}>📥 匯入知識庫</button>
+        <button onClick={handleExport}>{t('pro.kb.export')}</button>
+        <button onClick={() => fileRef.current?.click()}>{t('pro.kb.import')}</button>
         <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
       </div>
 
       {/* Categories */}
-      {CATEGORIES.map(cat => {
+      {cats.map(cat => {
         const catEntries = entries.filter(e => e.category === cat.id);
         const isOpen = openCats[cat.id];
         return (
@@ -360,7 +365,7 @@ function KnowledgeBase({ entries, setEntries }) {
               <div className="left">
                 <span className="icon">·</span>
                 <span className="title">{cat.name}</span>
-                <span className="count">{catEntries.length} 筆</span>
+                <span className="count">{t('pro.kb.count', { count: catEntries.length })}</span>
               </div>
               <span className={`arrow ${isOpen ? "open" : ""}`}>▼</span>
             </div>
@@ -371,13 +376,13 @@ function KnowledgeBase({ entries, setEntries }) {
                     <div className="entry-title">{entry.title}</div>
                     <div className="entry-preview">{entry.content}</div>
                     <div className="entry-actions">
-                      <button onClick={() => editEntry(entry)} title="編輯">✏️</button>
-                      <button className="delete" onClick={() => deleteEntry(entry.id)} title="刪除">🗑️</button>
+                      <button onClick={() => editEntry(entry)} title={t('pro.kb.edit')}>✏️</button>
+                      <button className="delete" onClick={() => deleteEntry(entry.id)} title={t('pro.kb.delete')}>🗑️</button>
                     </div>
                   </div>
                 ))}
                 <button className="kb-add-btn" onClick={() => addEntry(cat.id)}>
-                  ＋ 新增{cat.name}知識
+                  + {t('pro.kb.addNew', { name: cat.name })}
                 </button>
               </div>
             )}
@@ -400,9 +405,11 @@ function KnowledgeBase({ entries, setEntries }) {
 }
 
 function EditorModal({ mode, category, entry, onSave, onCancel }) {
+  const { t } = useTranslation();
+  const cats = useCategories();
   const [title, setTitle] = useState(entry.title);
   const [content, setContent] = useState(entry.content);
-  const catInfo = CATEGORIES.find(c => c.id === category);
+  const catInfo = cats.find(c => c.id === category);
 
   const handleSubmit = () => {
     if (!title.trim() || !content.trim()) return;
@@ -412,27 +419,27 @@ function EditorModal({ mode, category, entry, onSave, onCancel }) {
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h3>{mode === "new" ? "新增" : "編輯"}{catInfo.name}知識</h3>
-        <label>標題</label>
+        <h3>{mode === "new" ? t('pro.editor.addTitle', { name: catInfo.name }) : t('pro.editor.editTitle', { name: catInfo.name })}</h3>
+        <label>{t('pro.editor.title')}</label>
         <input
           type="text"
           value={title}
           onChange={e => setTitle(e.target.value)}
           placeholder={`例：${category === "bazi" ? "十神解析" : category === "astro" ? "冥王星過境效應" : category === "ziwei" ? "紫微星入命宮" : "命理交叉比對技巧"}`}
         />
-        <label>知識內容</label>
+        <label>{t('pro.editor.content')}</label>
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}
           placeholder="貼上命理知識內容，可以是教學文章、口訣、解盤技巧、星體意涵等..."
         />
         <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
-          {content.length} 字
+          {t('pro.editor.chars', { count: content.length })}
         </div>
         <div className="modal-actions">
-          <button className="cancel-btn" onClick={onCancel}>取消</button>
+          <button className="cancel-btn" onClick={onCancel}>{t('pro.editor.cancel')}</button>
           <button className="save-btn" onClick={handleSubmit} disabled={!title.trim() || !content.trim()}>
-            {mode === "new" ? "新增" : "儲存"}
+            {mode === "new" ? t('pro.editor.add') : t('pro.editor.save')}
           </button>
         </div>
       </div>
@@ -441,37 +448,27 @@ function EditorModal({ mode, category, entry, onSave, onCancel }) {
 }
 
 function Settings({ apiKey, setApiKey, model, setModel }) {
+  const { t } = useTranslation();
   return (
     <div className="settings-section">
       <div className="setting-card">
-        <div className="setting-title">解盤引擎</div>
-        <div className="setting-desc">
-          由伺服器端引擎驅動，無需設定。
-        </div>
-        <div className="status ok">✓ 已連線</div>
+        <div className="setting-title">{t('pro.settings.engine')}</div>
+        <div className="setting-desc">{t('pro.settings.engineDesc')}</div>
+        <div className="status ok">✓ {t('pro.settings.connected')}</div>
       </div>
-
       <div className="setting-card">
-        <div className="setting-title">分析模型</div>
-        <div className="setting-desc">伺服器端自動選擇最佳模型進行分析。</div>
-        <select
-          value={model}
-          onChange={e => { setModel(e.target.value); saveModel(e.target.value); }}
-        >
-          <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (推薦)</option>
-          <option value="claude-opus-4-20250514">Claude Opus 4</option>
-          <option value="claude-haiku-4-20250514">Claude Haiku 4</option>
+        <div className="setting-title">{t('pro.settings.model')}</div>
+        <div className="setting-desc">{t('pro.settings.modelDesc')}</div>
+        <select value={model} onChange={e => { setModel(e.target.value); saveModel(e.target.value); }}>
+          <option value="claude-sonnet-4-20250514">{t('pro.settings.sonnet')}</option>
+          <option value="claude-opus-4-20250514">{t('pro.settings.opus')}</option>
+          <option value="claude-haiku-4-20250514">{t('pro.settings.haiku')}</option>
         </select>
       </div>
-
       <div className="setting-card">
-        <div className="setting-title">使用說明</div>
+        <div className="setting-title">{t('pro.settings.guide')}</div>
         <div className="setting-desc" style={{ lineHeight: 1.8 }}>
-          1. 在「設定」頁面填入 Anthropic API Key<br />
-          2. 在「知識庫」頁面新增命理知識（可選）<br />
-          3. 在「解盤」頁面上傳命盤截圖<br />
-          4. 系統會結合你的知識庫 + 內建知識進行分析<br />
-          5. 知識庫越豐富，分析越精準！
+          {t('pro.settings.guideContent').split('\n').map((line, i) => <span key={i}>{line}<br /></span>)}
         </div>
       </div>
     </div>
@@ -483,7 +480,8 @@ function Settings({ apiKey, setApiKey, model, setModel }) {
 // ============================================================
 
 function LoginPage({ onLogin }) {
-  const [mode, setMode] = useState("login"); // login | register
+  const { t } = useTranslation();
+  const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -500,11 +498,11 @@ function LoginPage({ onLogin }) {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) { setErr(data.error || "失敗"); return; }
+      if (!res.ok) { setErr(data.error || t('pro.login.error')); return; }
       localStorage.setItem("fortune_auth", JSON.stringify(data));
       logActivity(data.username, mode === "login" ? "登入" : "註冊", "");
       onLogin(data);
-    } catch (e) { setErr("連線失敗"); } finally { setLoading(false); }
+    } catch (e) { setErr(t('pro.login.failed')); } finally { setLoading(false); }
   };
 
   return (
@@ -512,24 +510,24 @@ function LoginPage({ onLogin }) {
       <div className="bg-pattern" />
       <div className="header">
         <div className="header-icon">✦</div>
-        <h1>命理三鏡</h1>
-        <p className="tagline">八字 · 占星 · 紫微｜交叉解盤</p>
+        <h1>{t('pro.login.title')}</h1>
+        <p className="tagline">{t('pro.login.tagline')}</p>
       </div>
       <div className="content">
         <div className="login-card">
           <div className="login-tabs">
-            <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>登入</button>
-            <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>註冊</button>
+            <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>{t('pro.login.login')}</button>
+            <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>{t('pro.login.register')}</button>
           </div>
           {mode === "register" && (
-            <input placeholder="顯示名稱" value={name} onChange={e => setName(e.target.value)} />
+            <input placeholder={t('pro.login.displayName')} value={name} onChange={e => setName(e.target.value)} />
           )}
-          <input placeholder="帳號" value={username} onChange={e => setUsername(e.target.value)} />
-          <input placeholder="密碼" type="password" value={password} onChange={e => setPassword(e.target.value)}
+          <input placeholder={t('pro.login.account')} value={username} onChange={e => setUsername(e.target.value)} />
+          <input placeholder={t('pro.login.password')} type="password" value={password} onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === "Enter" && submit()} />
           {err && <div className="login-err">{err}</div>}
           <button className="login-btn" onClick={submit} disabled={loading}>
-            {loading ? "..." : mode === "login" ? "登入" : "註冊"}
+            {loading ? "..." : mode === "login" ? t('pro.login.login') : t('pro.login.register')}
           </button>
         </div>
       </div>
@@ -549,7 +547,9 @@ export default function App() {
 }
 
 function MainApp({ auth, isAdmin, onLogout }) {
-  const ukey = (k) => `${k}_${auth.username}`; // per-user localStorage key
+  const { t } = useTranslation();
+  const cats = useCategories();
+  const ukey = (k) => `${k}_${auth.username}`;
   const [tab, setTab] = useState("analyze"); // analyze | kb | saves | settings | users
   const [images, setImages] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -892,7 +892,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
       }
       throw new Error("合盤分析逾時");
     } catch (err) {
-      setError("合盤分析錯誤：" + err.message);
+      setError(t('pro.heban.error') + err.message);
     } finally {
       setHebanLoading(false);
       setHebanModal(false);
@@ -903,7 +903,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
   // 合盤：從表單輸入第二人資料後排盤並分析
   const submitHeban = async (question) => {
     const y = parseInt(hebanData.year);
-    if (!y) { setError("請至少填寫出生年份"); return; }
+    if (!y) { setError(t('pro.heban.fillYear')); return; }
     logActivity(auth.username, "合盤分析", `精度:${hebanPrecision} 對方:${hebanData.name||hebanData.relation||"未命名"} ${y}年 問:${question||"整體"}`);
     const m = parseInt(hebanData.month), d = parseInt(hebanData.day), h = parseInt(hebanData.hour);
     const label = hebanData.name || hebanData.relation || "對方";
@@ -922,7 +922,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
       } catch (err) { setError("排盤錯誤：" + err.message); return; }
     } else {
       // 完整資料
-      if (!m || !d) { setError("請填寫完整出生年月日"); return; }
+      if (!m || !d) { setError(t('pro.heban.fillFull')); return; }
       try {
         const chart = formatChart(calculateChart(y, m, d, h, 0, hebanData.gender));
         chartText = `## 乙方（${label}）排盤資料\n- 出生：${y}年${m}月${d}日 ${h}時\n- 性別：${hebanData.gender}\n\n${chart}`;
@@ -986,11 +986,12 @@ ${question || "請分析兩人的整體緣分和互動模式"}
     setResult("");
     logActivity(auth.username, "上傳圖片解盤", `${images.length} 張`);
 
+    const loadMsgs = t('pro.loading', { returnObjects: true });
     let msgIdx = 0;
-    setLoadingMsg(LOADING_MESSAGES[0]);
+    setLoadingMsg(loadMsgs[0]);
     const interval = setInterval(() => {
-      msgIdx = (msgIdx + 1) % LOADING_MESSAGES.length;
-      setLoadingMsg(LOADING_MESSAGES[msgIdx]);
+      msgIdx = (msgIdx + 1) % loadMsgs.length;
+      setLoadingMsg(loadMsgs[msgIdx]);
     }, 3000);
 
     try {
@@ -1049,7 +1050,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
         }
       }
     } catch (err) {
-      setError("分析過程發生錯誤：" + err.message);
+      setError(t('pro.analysis.error') + err.message);
     } finally {
       clearInterval(interval);
       setAnalyzing(false);
@@ -1065,31 +1066,31 @@ ${question || "請分析兩人的整體緣分和互動模式"}
       {/* Header */}
       <div className="header">
         <div className="header-icon">✦</div>
-        <h1>命理三鏡</h1>
-        <p className="tagline">八字 · 占星 · 紫微｜交叉解盤</p>
+        <h1>{t('pro.login.title')}</h1>
+        <p className="tagline">{t('pro.login.tagline')}</p>
       </div>
 
       {/* Nav */}
       <div className="content">
         <div className="nav-tabs">
           <button className={`nav-tab ${tab === "analyze" ? "active" : ""}`} onClick={() => setTab("analyze")}>
-            <span className="tab-icon">⟐</span> 解盤
+            <span className="tab-icon">⟐</span> {t('pro.nav.analyze')}
           </button>
           <button className={`nav-tab ${tab === "saves" ? "active" : ""}`} onClick={() => { setTab("saves"); loadSaves(); }}>
-            <span className="tab-icon">⟐</span> 存檔
+            <span className="tab-icon">⟐</span> {t('pro.nav.saves')}
           </button>
           {isAdmin && (
             <button className={`nav-tab ${tab === "kb" ? "active" : ""}`} onClick={() => setTab("kb")}>
-              <span className="tab-icon">⟐</span> 知識庫
+              <span className="tab-icon">⟐</span> {t('pro.nav.kb')}
               {kbEntries.length > 0 && <span className="badge">{kbEntries.length}</span>}
             </button>
           )}
           {isAdmin && (
             <button className={`nav-tab ${tab === "admin" ? "active" : ""}`} onClick={() => { setTab("admin"); loadUsersList(); loadActivity(); fetch(`${API_BACKEND}-feedback`).then(r => r.json()).then(d => setFeedbackList(d)).catch(() => {}); }}>
-              <span className="tab-icon">⟐</span> 管理
+              <span className="tab-icon">⟐</span> {t('pro.nav.admin')}
             </button>
           )}
-          <button className="nav-tab logout-tab" onClick={() => { if (confirm("確定登出？")) onLogout(); }}>
+          <button className="nav-tab logout-tab" onClick={() => { if (confirm(t('pro.nav.confirmLogout'))) onLogout(); }}>
             {auth.name || auth.username} ✕
           </button>
         </div>
@@ -1102,53 +1103,53 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                 {/* Mode toggle */}
                 <div className="mode-toggle">
                   <button className={`mode-btn ${inputMode === "auto" ? "active" : ""}`} onClick={() => setInputMode("auto")}>
-                    自動排盤
+                    {t('pro.analysis.autoCalc')}
                   </button>
                   <button className={`mode-btn ${inputMode === "upload" ? "active" : ""}`} onClick={() => setInputMode("upload")}>
-                    上傳命盤圖
+                    {t('pro.analysis.uploadChart')}
                   </button>
                 </div>
 
                 {/* Auto calc mode */}
                 {inputMode === "auto" && (
                   <div className="auto-calc-section">
-                    <p className="instruction">輸入出生資料，自動排盤</p>
+                    <p className="instruction">{t('pro.analysis.enterBirth')}</p>
                     <div className="birth-form">
                       <div className="birth-row">
-                        <label>年</label>
+                        <label>{t('pro.analysis.year')}</label>
                         <input type="number" placeholder="1990" value={birthData.year}
                           onChange={e => setBirthData(p => ({...p, year: e.target.value}))} />
                       </div>
                       <div className="birth-row">
-                        <label>月</label>
+                        <label>{t('pro.analysis.month')}</label>
                         <input type="number" placeholder="1" min="1" max="12" value={birthData.month}
                           onChange={e => setBirthData(p => ({...p, month: e.target.value}))} />
                       </div>
                       <div className="birth-row">
-                        <label>日</label>
+                        <label>{t('pro.analysis.day')}</label>
                         <input type="number" placeholder="15" min="1" max="31" value={birthData.day}
                           onChange={e => setBirthData(p => ({...p, day: e.target.value}))} />
                       </div>
                       <div className="birth-row">
-                        <label>時</label>
+                        <label>{t('pro.analysis.hour')}</label>
                         <input type="number" placeholder="15" min="0" max="23" value={birthData.hour}
                           onChange={e => setBirthData(p => ({...p, hour: e.target.value}))} />
                       </div>
                       <div className="birth-row">
-                        <label>分</label>
+                        <label>{t('pro.analysis.minute')}</label>
                         <input type="number" placeholder="00" min="0" max="59" value={birthData.minute}
                           onChange={e => setBirthData(p => ({...p, minute: e.target.value}))} />
                       </div>
                       <div className="birth-row">
-                        <label>性別</label>
+                        <label>{t('pro.analysis.gender')}</label>
                         <select value={birthData.gender} onChange={e => setBirthData(p => ({...p, gender: e.target.value}))}>
-                          <option value="男">男</option>
-                          <option value="女">女</option>
+                          <option value="男">{t('pro.analysis.male')}</option>
+                          <option value="女">{t('pro.analysis.female')}</option>
                         </select>
                       </div>
                       {autoSystems.includes("astro") && (
                         <div className="birth-row birth-full-row">
-                          <label>出生地</label>
+                          <label>{t('pro.analysis.birthPlace')}</label>
                           <select value={birthData.birthPlace} onChange={e => {
                             const places = {
                               "桃園": [24.9936, 121.3130], "台北": [25.0330, 121.5654], "新北": [25.0169, 121.4628],
@@ -1177,10 +1178,10 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                     </div>
                     <div className="auto-system-selector">
                       {[
-                        { id: "ziwei", label: "紫微斗數" },
-                        { id: "bazi", label: "八字" },
-                        { id: "astro", label: "西洋占星" },
-                        { id: "finance", label: "財運分析" },
+                        { id: "ziwei", label: t('pro.analysis.ziwei') },
+                        { id: "bazi", label: t('pro.analysis.bazi') },
+                        { id: "astro", label: t('pro.analysis.astro') },
+                        { id: "finance", label: t('pro.analysis.finance') },
                       ].map(sys => (
                         <button key={sys.id}
                           className={`system-btn ${autoSystems.includes(sys.id) ? "active" : ""}`}
@@ -1194,7 +1195,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                       try {
                         const y = parseInt(birthData.year), m = parseInt(birthData.month), d = parseInt(birthData.day);
                         const h = parseInt(birthData.hour);
-                        if (!y || !m || !d) { setError("請填寫完整出生資料"); return; }
+                        if (!y || !m || !d) { setError(t('pro.analysis.fillBirth')); return; }
                         logActivity(auth.username, "自動排盤", `${y}/${m}/${d} ${h}時 ${birthData.gender} [${autoSystems.join("+")}]`);
 
                         const min = parseInt(birthData.minute) || 0;
@@ -1209,16 +1210,16 @@ ${question || "請分析兩人的整體緣分和互動模式"}
 
                         // Show loading animation during chart calculation
                         setAnalyzing(true);
-                        setLoadingMsg("正在排盤計算中...");
+                        setLoadingMsg(t('pro.analysis.calcing'));
                         await new Promise(r => setTimeout(r, 2000));
 
                         const charts = autoSystems.map(id => ({ system: calcMap[id].system, text: calcMap[id].calc(), engine: engineMap[calcMap[id].system] || "claude" }));
                         setAllResults(prev => [...prev, ...charts.map(c => ({ system: c.system, result: c.text }))]);
                         setResult(charts.map(c => c.text).join("\n\n---\n\n"));
                         setAddingChart(false);
-                        setLoadingMsg("排盤完成！命盤分析進行中...");
+                        setLoadingMsg(t('pro.analysis.calcDone'));
                         const sp = buildSystemPrompt(kbEntries);
-                        setLoadingMsg(`正在並行分析 ${charts.length} 盤...`);
+                        setLoadingMsg(t('pro.analysis.parallelAnalyze', { count: charts.length }));
 
                         // 並行送出所有分析
                         const analyzePromises = charts.map(c =>
@@ -1247,10 +1248,10 @@ ${question || "請分析兩人的整體緣分和互動模式"}
 
                         setAnalyzing(false); setLoadingMsg("");
                         autoSaveRef.current?.();
-                      } catch (err) { setError("排盤錯誤：" + err.message); setAnalyzing(false); }
+                      } catch (err) { setError(t('pro.analysis.calcError') + err.message); setAnalyzing(false); }
                     }}>
                       <span style={{ fontSize: 18 }}>⟐</span>
-                      {autoSystems.length > 1 ? `排盤 + 命運分析（${autoSystems.length} 盤）` : "排盤 + 命運分析"}
+                      {autoSystems.length > 1 ? t('pro.analysis.calcAndAnalyzeMulti', { count: autoSystems.length }) : t('pro.analysis.calcAndAnalyze')}
                     </button>
                   </div>
                 )}
@@ -1258,12 +1259,12 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                 {/* Upload mode */}
                 {inputMode === "upload" && (
                   <>
-                <p className="instruction">選擇命盤類型</p>
+                <p className="instruction">{t('pro.upload.selectType')}</p>
                 <div className="system-selector">
                   {[
-                    { id: "ziwei", label: "紫微斗數" },
-                    { id: "bazi", label: "八字" },
-                    { id: "astro", label: "西洋占星" },
+                    { id: "ziwei", label: t('pro.analysis.ziwei') },
+                    { id: "bazi", label: t('pro.analysis.bazi') },
+                    { id: "astro", label: t('pro.analysis.astro') },
                   ].map(sys => (
                     <button
                       key={sys.id}
@@ -1275,10 +1276,10 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   ))}
                 </div>
                 <p className="sub-instruction">
-                  {selectedSystems.length === 0 ? "未選擇＝自動辨識（較慢）" : `已選：${selectedSystems.map(s => ({bazi:"八字",astro:"占星",ziwei:"紫微"})[s]).join("＋")}｜上傳對應命盤截圖`}
+                  {selectedSystems.length === 0 ? t('pro.upload.autoDetect') : t('pro.upload.selected', { systems: selectedSystems.map(s => ({bazi:t('pro.analysis.bazi'),astro:t('pro.analysis.astro'),ziwei:t('pro.analysis.ziwei')})[s]).join("+") })}
                   {kbEntries.length > 0 && (
                     <span style={{ color: "var(--teal)" }}>
-                      {" "}· 已載入 {kbEntries.length} 筆知識
+                      {" "}· {t('pro.upload.kbLoaded', { count: kbEntries.length })}
                     </span>
                   )}
                 </p>
@@ -1294,9 +1295,9 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                 >
                   <div className="drop-icon">{images.length > 0 ? "+" : "⟐"}</div>
                   <p className="drop-text">
-                    {images.length > 0 ? "點擊或拖曳添加更多命盤" : "點擊或拖曳命盤圖片到這裡"}
+                    {images.length > 0 ? t('pro.upload.dropAdd') : t('pro.upload.dropHere')}
                   </p>
-                  <p className="drop-hint">支援 JPG、PNG</p>
+                  <p className="drop-hint">{t('pro.upload.formats')}</p>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1332,7 +1333,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                     </div>
                     <button className="analyze-btn" onClick={analyze}>
                       <span style={{ fontSize: 18 }}>⟐</span>
-                      開始解盤（{images.length} 張命盤）
+                      {t('pro.upload.startAnalyze', { count: images.length })}
                     </button>
                   </>
                 )}
@@ -1352,14 +1353,14 @@ ${question || "請分析兩人的整體緣分和互動模式"}
             {error && (
               <div className="error-card">
                 <p>{error}</p>
-                <button className="retry-btn" onClick={() => { setError(""); setResult(""); }}>重新上傳</button>
+                <button className="retry-btn" onClick={() => { setError(""); setResult(""); }}>{t('pro.analysis.retry')}</button>
               </div>
             )}
 
             {result && (
               <div className="result-section">
                 <div style={{ textAlign: "center" }}>
-                  <span className="result-badge">{analyzing ? `分析中（${allResults.length} 項完成）` : `✓ ${allResults.length > 1 ? `已完成 ${allResults.length} 項分析` : "分析完成"}`}</span>
+                  <span className="result-badge">{analyzing ? t('pro.analysis.analyzeComplete', { count: allResults.length }) : `✓ ${allResults.length > 1 ? t('pro.analysis.doneMulti', { count: allResults.length }) : t('pro.analysis.doneOne')}`}</span>
                   {allResults.length > 1 && (
                     <span className="result-badge" style={{ marginLeft: 8, background: "rgba(76,201,176,0.12)", color: "var(--teal)" }}>
                       {allResults.map(r => r.system).join(" + ")}
@@ -1425,7 +1426,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                       }
                     } finally { setDetailLoading(false); }
                   }}>
-                    {detailLoading ? "分析中..." : "詳細分析"}
+                    {detailLoading ? t('pro.analysis.analyzing') : t('pro.analysis.detail')}
                   </button>
                   <button className="detail-btn" disabled={detailLoading || analyzing} onClick={async () => {
                     // Try birthData first, then extract from existing chart results
@@ -1447,34 +1448,34 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                       if (genderMatch) gender = genderMatch[1];
                     }
                     if (!y || !m || !d) {
-                      setError("無法從現有資料中提取出生資料，請在表單中填寫出生資料後再試");
+                      setError(t('pro.analysis.noBirthData'));
                       return;
                     }
                     setAnalyzing(true);
-                    setLoadingMsg("正在計算財運排盤...");
+                    setLoadingMsg(t('pro.analysis.financeCalcing'));
                     logActivity(auth.username, "財運分析", `${y}/${m}/${d} ${h}時 ${gender}`);
                     try {
                       const finText = formatFinance(calculateFinance(y, m, d, h, gender));
                       setAllResults(prev => [...prev, { system: "紫微財運", result: finText }]);
                       setResult(finText);
-                      setLoadingMsg("正在進行財運深度分析...");
+                      setLoadingMsg(t('pro.analysis.financeAnalyzing'));
                       const sp = buildSystemPrompt(kbEntries);
                       const r = await autoAnalyze("紫微財運", finText, sp, "claude");
                       if (r) {
                         setAllResults(prev => [...prev, { system: "紫微財運（命盤分析）", result: r }]);
                         setResult(r);
                       }
-                    } catch (err) { setError("財運分析錯誤：" + err.message); }
+                    } catch (err) { setError(t('pro.analysis.financeError') + err.message); }
                     finally { setAnalyzing(false); setLoadingMsg(""); autoSaveRef.current?.(); }
                   }}>
-                    {analyzing ? "分析中..." : "財運分析"}
+                    {analyzing ? t('pro.analysis.analyzing') : t('pro.analysis.financeBtn')}
                   </button>
                   <button className="detail-btn heban-btn" disabled={analyzing || hebanLoading} onClick={() => {
                     setHebanData({ year: "", month: "", day: "", hour: "0", minute: "0", gender: "男", name: "", relation: "" });
                     setHebanPrecision("full");
                     setHebanModal(true);
                   }}>
-                    {hebanLoading ? "合盤中..." : "合盤分析"}
+                    {hebanLoading ? t('pro.analysis.analyzing') : t('pro.analysis.hebanBtn')}
                   </button>
                 </div>
 
@@ -1483,63 +1484,63 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   <div className="modal-overlay" onClick={() => setHebanModal(false)}>
                     <div className="heban-modal" onClick={e => e.stopPropagation()}>
                       <div className="heban-modal-header">
-                        <h3>合盤分析 — 輸入對方資料</h3>
+                        <h3>{t('pro.heban.modalTitle')}</h3>
                         <button className="modal-close" onClick={() => setHebanModal(false)}>✕</button>
                       </div>
 
                       <div className="heban-precision-selector">
                         <button className={hebanPrecision === "year" ? "active" : ""} onClick={() => setHebanPrecision("year")}>
-                          只知道生年
+                          {t('pro.heban.yearOnly')}
                         </button>
                         <button className={hebanPrecision === "date" ? "active" : ""} onClick={() => setHebanPrecision("date")}>
-                          知道年月日
+                          {t('pro.heban.dateOnly')}
                         </button>
                         <button className={hebanPrecision === "full" ? "active" : ""} onClick={() => setHebanPrecision("full")}>
-                          完整資料
+                          {t('pro.heban.full')}
                         </button>
                       </div>
                       <div className="heban-precision-hint">
-                        {hebanPrecision === "year" && "⚠️ 僅能分析年干四化大方向，無法排完整命盤"}
-                        {hebanPrecision === "date" && "⚠️ 可排盤但時辰未知，命宮可能有偏差"}
-                        {hebanPrecision === "full" && "✓ 可做完整飛化合盤分析"}
+                        {hebanPrecision === "year" && t('pro.heban.yearHint')}
+                        {hebanPrecision === "date" && t('pro.heban.dateHint')}
+                        {hebanPrecision === "full" && t('pro.heban.fullHint')}
                       </div>
 
                       <div className="heban-form">
                         <div className="heban-row">
-                          <label>稱呼</label>
-                          <input type="text" placeholder="例：老王、小美" value={hebanData.name}
+                          <label>{t('pro.heban.name')}</label>
+                          <input type="text" placeholder={t('pro.heban.namePlaceholder')} value={hebanData.name}
                             onChange={e => setHebanData(p => ({...p, name: e.target.value}))} />
                         </div>
                         <div className="heban-row">
-                          <label>關係</label>
+                          <label>{t('pro.heban.relation')}</label>
                           <select value={hebanData.relation} onChange={e => setHebanData(p => ({...p, relation: e.target.value}))}>
-                            <option value="">請選擇</option>
-                            <option value="伴侶/對象">伴侶/對象</option>
-                            <option value="配偶">配偶</option>
-                            <option value="朋友">朋友</option>
-                            <option value="同事">同事</option>
-                            <option value="主管">主管</option>
-                            <option value="合夥人">合夥人</option>
-                            <option value="父母">父母</option>
-                            <option value="子女">子女</option>
-                            <option value="兄弟姐妹">兄弟姐妹</option>
-                            <option value="其他">其他</option>
+                            <option value="">{t('pro.heban.selectRelation')}</option>
+                            <option value="伴侶/對象">{t('pro.heban.partner')}</option>
+                            <option value="配偶">{t('pro.heban.spouse')}</option>
+                            <option value="朋友">{t('pro.heban.friend')}</option>
+                            <option value="同事">{t('pro.heban.colleague')}</option>
+                            <option value="主管">{t('pro.heban.boss')}</option>
+                            <option value="合夥人">{t('pro.heban.businessPartner')}</option>
+                            <option value="父母">{t('pro.heban.parents')}</option>
+                            <option value="子女">{t('pro.heban.children')}</option>
+                            <option value="兄弟姐妹">{t('pro.heban.siblings')}</option>
+                            <option value="其他">{t('pro.heban.other')}</option>
                           </select>
                         </div>
                         <div className="heban-row">
-                          <label>出生年</label>
+                          <label>{t('pro.heban.birthYear')}</label>
                           <input type="number" placeholder="1990" value={hebanData.year}
                             onChange={e => setHebanData(p => ({...p, year: e.target.value}))} />
                         </div>
                         {hebanPrecision !== "year" && (
                           <>
                             <div className="heban-row">
-                              <label>月</label>
+                              <label>{t('pro.analysis.month')}</label>
                               <input type="number" placeholder="1" min="1" max="12" value={hebanData.month}
                                 onChange={e => setHebanData(p => ({...p, month: e.target.value}))} />
                             </div>
                             <div className="heban-row">
-                              <label>日</label>
+                              <label>{t('pro.analysis.day')}</label>
                               <input type="number" placeholder="15" min="1" max="31" value={hebanData.day}
                                 onChange={e => setHebanData(p => ({...p, day: e.target.value}))} />
                             </div>
@@ -1548,36 +1549,36 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                         {hebanPrecision === "full" && (
                           <>
                             <div className="heban-row">
-                              <label>時</label>
+                              <label>{t('pro.analysis.hour')}</label>
                               <input type="number" placeholder="15" min="0" max="23" value={hebanData.hour}
                                 onChange={e => setHebanData(p => ({...p, hour: e.target.value}))} />
                             </div>
                             <div className="heban-row">
-                              <label>分</label>
+                              <label>{t('pro.analysis.minute')}</label>
                               <input type="number" placeholder="00" min="0" max="59" value={hebanData.minute}
                                 onChange={e => setHebanData(p => ({...p, minute: e.target.value}))} />
                             </div>
                           </>
                         )}
                         <div className="heban-row">
-                          <label>性別</label>
+                          <label>{t('pro.analysis.gender')}</label>
                           <select value={hebanData.gender} onChange={e => setHebanData(p => ({...p, gender: e.target.value}))}>
-                            <option value="男">男</option>
-                            <option value="女">女</option>
+                            <option value="男">{t('pro.analysis.male')}</option>
+                            <option value="女">{t('pro.analysis.female')}</option>
                           </select>
                         </div>
                       </div>
 
                       <div className="heban-question">
-                        <label>想了解什麼？（選填）</label>
-                        <input type="text" id="heban-question-input" placeholder="例：和他適合結婚嗎？他是好的合作夥伴嗎？" />
+                        <label>{t('pro.heban.question')}</label>
+                        <input type="text" id="heban-question-input" placeholder={t('pro.heban.questionPlaceholder')} />
                       </div>
 
                       <button className="analyze-btn heban-submit" disabled={hebanLoading} onClick={() => {
                         const q = document.getElementById("heban-question-input")?.value || "";
                         submitHeban(q);
                       }}>
-                        {hebanLoading ? "排盤分析中..." : "開始合盤分析"}
+                        {hebanLoading ? t('pro.heban.analyzing') : t('pro.heban.start')}
                       </button>
                     </div>
                   </div>
@@ -1585,13 +1586,13 @@ ${question || "請分析兩人的整體緣分和互動模式"}
 
                 {/* Follow-up chat */}
                 <div className="chat-section">
-                  <div className="chat-divider">追問命盤問題</div>
+                  <div className="chat-divider">{t('pro.chat.title')}</div>
                   {chatHistory.map((msg, i) => {
                     const hebanHintMatch = msg.role === "assistant" && msg.text.match(/\[HEBAN_HINT:([^\]]+)\]/);
                     const cleanText = hebanHintMatch ? msg.text.replace(/\[HEBAN_HINT:[^\]]+\]/, "").trim() : msg.text;
                     return (
                       <div key={i} className={`chat-msg ${msg.role}`}>
-                        <div className="chat-label">{msg.role === "user" ? "你" : "命理師"}</div>
+                        <div className="chat-label">{msg.role === "user" ? t('pro.chat.you') : t('pro.chat.master')}</div>
                         <div className="chat-bubble">
                           {msg.role === "assistant" ? renderMarkdown(cleanText) : cleanText}
                           {hebanHintMatch && (
@@ -1600,7 +1601,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                               setHebanPrecision("full");
                               setHebanModal(true);
                             }}>
-                              幫對方排盤，做合盤分析
+                              {t('pro.chat.hebanFromChat')}
                             </button>
                           )}
                         </div>
@@ -1609,15 +1610,15 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   })}
                   {chatLoading && (
                     <div className="chat-msg assistant">
-                      <div className="chat-label">命理師</div>
-                      <div className="chat-bubble typing">思考中...</div>
+                      <div className="chat-label">{t('pro.chat.master')}</div>
+                      <div className="chat-bubble typing">{t('pro.chat.thinking')}</div>
                     </div>
                   )}
                   <div ref={chatEndRef} />
                   <div className="chat-input-row">
                     <input
                       className="chat-input"
-                      placeholder="針對這個命盤提問，例如：今年感情運如何？"
+                      placeholder={t('pro.chat.placeholder')}
                       value={chatInput}
                       onChange={e => setChatInput(e.target.value)}
                       onCompositionStart={() => setComposing(true)}
@@ -1631,7 +1632,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   </div>
                   {/* Report issue */}
                   <button className="report-btn" onClick={() => {
-                    const issue = prompt("描述分析錯誤的地方（例如：兄弟宮應該是廉貞不是貪狼、流年計算方式錯誤等）：");
+                    const issue = prompt(t('pro.chat.reportPrompt'));
                     if (!issue) return;
                     fetch(`${API_BACKEND}-feedback`, {
                       method: "POST", headers: { "Content-Type": "application/json" },
@@ -1643,16 +1644,16 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                         chat: chatHistory.slice(-4),
                         time: new Date().toISOString(),
                       }),
-                    }).then(() => alert("已回報，感謝反饋！")).catch(() => alert("回報失敗"));
+                    }).then(() => alert(t('pro.chat.reportSuccess'))).catch(() => alert(t('pro.chat.reportFailed')));
                   }}>
-                    回報分析錯誤
+                    {t('pro.chat.reportIssue')}
                   </button>
                 </div>
 
                 {/* Add more charts / cross-analyze — always at bottom */}
                 <div className="action-row bottom-actions">
                   <button className="add-chart-btn" onClick={() => { setAddingChart(true); setImages([]); setSelectedSystems([]); setCorrection(""); }}>
-                    追加其他命盤
+                    {t('pro.actions.addChart')}
                   </button>
                   {allResults.length > 1 && (
                     <button className="cross-btn" onClick={async () => {
@@ -1685,17 +1686,17 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                         }
                       } finally { setChatLoading(false); }
                     }}>
-                      ⟐ 交叉分析
+                      ⟐ {t('pro.actions.crossAnalyze')}
                     </button>
                   )}
                 </div>
 
                 <div className="action-row">
                   <button className="save-btn" onClick={saveReading}>
-                    存檔
+                    {t('pro.actions.save')}
                   </button>
                   <button className="reset-btn" style={{ flex: 1 }} onClick={() => { setResult(""); setImages([]); setChatHistory([]); setAllResults([]); setSelectedSystems([]); setCorrection(""); sessionStorage.removeItem(ukey("fortune-results")); }}>
-                    全部重來
+                    {t('pro.actions.reset')}
                   </button>
                 </div>
               </div>
@@ -1712,26 +1713,26 @@ ${question || "請分析兩人的整體緣分和互動模式"}
         {tab === "saves" && (
           <div className="saves-section">
             <div className="setting-card">
-              <div className="setting-title">{auth.name || auth.username} 的命盤紀錄</div>
+              <div className="setting-title">{t('pro.saves.title', { name: auth.name || auth.username })}</div>
               {savedList.length >= 2 && (
                 <button className={`heban-save-toggle ${hebanSaveMode ? "active" : ""}`} onClick={() => {
                   setHebanSaveMode(!hebanSaveMode);
                   setHebanSelected([]);
                 }}>
-                  {hebanSaveMode ? "✕ 取消合盤" : "選兩人合盤"}
+                  {hebanSaveMode ? t('pro.saves.cancelHeban') : t('pro.saves.selectTwo')}
                 </button>
               )}
             </div>
             {hebanSaveMode && (
               <div className="heban-save-hint">
-                請選擇兩筆紀錄進行合盤分析（已選 {hebanSelected.length}/2）
+                {t('pro.saves.selectHint', { count: hebanSelected.length })}
                 {hebanSelected.length === 2 && (
                   <button className="heban-save-go" disabled={hebanLoading} onClick={async () => {
                     await hebanFromSaves(savedList[hebanSelected[0]], savedList[hebanSelected[1]]);
                     setHebanSaveMode(false);
                     setHebanSelected([]);
                   }}>
-                    {hebanLoading ? "分析中..." : "開始合盤"}
+                    {hebanLoading ? t('pro.analysis.analyzing') : t('pro.saves.startHeban')}
                   </button>
                 )}
               </div>
@@ -1754,14 +1755,14 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                     {hebanSaveMode && (
                       <div className="save-check">{hebanSelected.includes(i) ? "✓" : ""}</div>
                     )}
-                    <div className="save-card-title">{s.person || "未命名"}</div>
+                    <div className="save-card-title">{s.person || t('pro.saves.unnamed')}</div>
                     <div className="save-card-time">{s.systems?.filter(x => !x.includes("命盤分析")).join(" + ") || "命盤"} · {new Date(s.time).toLocaleString("zh-TW")}</div>
                     <div className="save-card-preview">{s.results?.[0]?.result?.slice(0, 80)}...</div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="save-empty">尚無存檔紀錄，解盤後按「存檔」即可保存</div>
+              <div className="save-empty">{t('pro.saves.empty')}</div>
             )}
           </div>
         )}
@@ -1771,13 +1772,13 @@ ${question || "請分析兩人的整體緣分和互動模式"}
           <div className="saves-section">
             {/* 來源篩選 + 檢視切換 */}
             <div className="admin-filter-bar" style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-              {[["all", "全部"], ["b2c", "B2C 大眾版"], ["b2b", "B2B 專業版"]].map(([val, label]) => (
+              {[["all", t('pro.admin.all')], ["b2c", t('pro.admin.b2c')], ["b2b", t('pro.admin.b2b')]].map(([val, label]) => (
                 <button key={val}
                   style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid var(--border)", background: adminSourceFilter === val ? "var(--gold)" : "transparent", color: adminSourceFilter === val ? "#111" : "var(--text)", cursor: "pointer", fontSize: 13 }}
                   onClick={() => setAdminSourceFilter(val)}>{label}</button>
               ))}
               <span style={{ flex: 1 }} />
-              {[["users", "註冊用戶"], ["visitors", "訪客軌跡"]].map(([val, label]) => (
+              {[["users", t('pro.admin.users')], ["visitors", t('pro.admin.visitors')]].map(([val, label]) => (
                 <button key={val}
                   style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid var(--border)", background: adminView === val ? "var(--teal)" : "transparent", color: adminView === val ? "#111" : "var(--text)", cursor: "pointer", fontSize: 13 }}
                   onClick={() => { setAdminView(val); if (val === "visitors" && visitorList.length === 0) loadVisitorList(); }}>{label}</button>
@@ -1786,14 +1787,14 @@ ${question || "請分析兩人的整體緣分和互動模式"}
 
             {/* 搜尋列 */}
             <div className="admin-search-bar">
-              <input type="text" placeholder="搜尋用戶、活動、聊天內容..." value={adminSearch}
+              <input type="text" placeholder={t('pro.admin.search')} value={adminSearch}
                 onChange={e => setAdminSearch(e.target.value)} />
             </div>
 
             {/* 反饋提示 */}
             {feedbackList.length > 0 && !adminSelectedUser && (
               <div className="admin-feedback-banner" onClick={() => setAdminSearch("__feedback__")}>
-                {feedbackList.length} 筆用戶反饋待處理
+                {t('pro.admin.feedbackCount', { count: feedbackList.length })}
               </div>
             )}
 
@@ -1801,18 +1802,18 @@ ${question || "請分析兩人的整體緣分和互動模式"}
             {adminSearch === "__feedback__" && (
               <>
                 <div className="admin-section-title">
-                  用戶反饋
-                  <button className="admin-back" onClick={() => setAdminSearch("")}>返回</button>
+                  {t('pro.admin.feedback')}
+                  <button className="admin-back" onClick={() => setAdminSearch("")}>{t('pro.admin.back')}</button>
                 </div>
                 <div className="save-list">
                   {feedbackList.map((f, i) => (
                     <div key={i} className="save-card feedback-card">
-                      <div className="save-card-title">{f.user || "匿名"} — {f.context || ""}</div>
+                      <div className="save-card-title">{f.user || t('pro.admin.anonymous')} — {f.context || ""}</div>
                       <div className="save-card-time">{f.time ? new Date(f.time).toLocaleString("zh-TW") : ""}</div>
                       <div className="feedback-issue">{f.issue}</div>
                       {f.result_preview && (
                         <details>
-                          <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>查看分析摘要</summary>
+                          <summary style={{ fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>{t('pro.saves.viewSummary')}</summary>
                           <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{f.result_preview}</div>
                         </details>
                       )}
@@ -1826,14 +1827,14 @@ ${question || "請分析兩人的整體緣分和互動模式"}
             {adminSelectedUser && adminSearch !== "__feedback__" && (
               <>
                 <div className="admin-section-title">
-                  {adminSelectedUser} 的記錄
-                  <button className="admin-back" onClick={() => { setAdminSelectedUser(null); setActivityList([]); setAdminUserSaves([]); }}>返回用戶列表</button>
+                  {t('pro.admin.recordTitle', { name: adminSelectedUser })}
+                  <button className="admin-back" onClick={() => { setAdminSelectedUser(null); setActivityList([]); setAdminUserSaves([]); }}>{t('pro.admin.backToList')}</button>
                 </div>
 
                 {/* 存檔 */}
                 {adminUserSaves.length > 0 && (
                   <>
-                    <div className="admin-sub-title">命盤存檔（{adminUserSaves.length} 筆）</div>
+                    <div className="admin-sub-title">{t('pro.admin.saves', { count: adminUserSaves.length })}</div>
                     <div className="save-list">
                       {adminUserSaves.filter(s => {
                         if (!adminSearch) return true;
@@ -1842,7 +1843,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                       }).map((s, i) => (
                         <details key={i} className="save-card">
                           <summary>
-                            <span className="save-card-title">{s.person || "未命名"}</span>
+                            <span className="save-card-title">{s.person || t('pro.saves.unnamed')}</span>
                             <span className="save-card-time" style={{ marginLeft: 8 }}>
                               {s.systems?.filter(x => !x.includes("命盤分析")).join(" + ") || "命盤"} · {new Date(s.time).toLocaleString("zh-TW")}
                             </span>
@@ -1855,13 +1856,13 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                             )}
                             {s.chat && s.chat.length > 0 && (
                               <div className="admin-chat-log">
-                                <div className="admin-sub-title">對話記錄（{s.chat.length} 則）</div>
+                                <div className="admin-sub-title">{t('pro.admin.chatLog', { count: s.chat.length })}</div>
                                 {s.chat.filter(m => {
                                   if (!adminSearch) return true;
                                   return m.text?.toLowerCase().includes(adminSearch.toLowerCase());
                                 }).map((m, j) => (
                                   <div key={j} className={`admin-chat-msg ${m.role}`}>
-                                    <span className="admin-chat-role">{m.role === "user" ? "用戶" : "AI"}</span>
+                                    <span className="admin-chat-role">{m.role === "user" ? t('pro.admin.user') : "AI"}</span>
                                     <span className="admin-chat-text">{m.text?.slice(0, 300)}{m.text?.length > 300 ? "..." : ""}</span>
                                   </div>
                                 ))}
@@ -1877,7 +1878,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                 {/* API 分析記錄 */}
                 {adminUserHistory.length > 0 && (
                   <>
-                    <div className="admin-sub-title" style={{ marginTop: 16 }}>API 分析記錄（{adminUserHistory.length} 筆）</div>
+                    <div className="admin-sub-title" style={{ marginTop: 16 }}>{t('pro.admin.apiRecords', { count: adminUserHistory.length })}</div>
                     <div className="save-list">
                       {adminUserHistory.filter(h => {
                         if (!adminSearch) return true;
@@ -1887,7 +1888,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                           <summary>
                             <span className="activity-time">{new Date(h.time).toLocaleString("zh-TW")}</span>
                             <span className="activity-action" style={{ marginLeft: 8 }}>{h.systems?.join("+") || "auto"}</span>
-                            <span style={{ fontSize: 11, color: "var(--text-faint)", marginLeft: 8 }}>{h.images > 0 ? `${h.images} 張圖` : "文字"} · {h.result_length} 字</span>
+                            <span style={{ fontSize: 11, color: "var(--text-faint)", marginLeft: 8 }}>{h.images > 0 ? t('pro.admin.images', { count: h.images }) : t('pro.admin.text')} · {h.result_length}</span>
                           </summary>
                           <div className="admin-save-detail">
                             <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>Prompt: {h.prompt}</div>
@@ -1902,7 +1903,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                 {/* 活動 */}
                 {activityList.length > 0 && (
                   <>
-                    <div className="admin-sub-title" style={{ marginTop: 16 }}>活動記錄（{activityList.length} 筆）</div>
+                    <div className="admin-sub-title" style={{ marginTop: 16 }}>{t('pro.admin.activity', { count: activityList.length })}</div>
                     <div className="activity-list">
                       {activityList.filter(a => {
                         if (!adminSearch) return true;
@@ -1933,7 +1934,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   <div key={uname} className="save-card user-card" onClick={() => loadAdminUserDetail(uname)} style={{ cursor: "pointer" }}>
                     <div className="save-card-title">
                       {u.name || uname}
-                      <span className={`role-badge ${u.role}`}>{u.role === "admin" ? "管理員" : "用戶"}</span>
+                      <span className={`role-badge ${u.role}`}>{u.role === "admin" ? t('pro.admin.adminRole') : t('pro.admin.userRole')}</span>
                       <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, marginLeft: 6, background: (u.source || "b2b") === "b2c" ? "#7a9e8e33" : "#8e7eaa33", color: (u.source || "b2b") === "b2c" ? "var(--teal)" : "var(--purple)" }}>
                         {(u.source || "b2b").toUpperCase()}
                       </span>
@@ -1947,22 +1948,22 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                             body: JSON.stringify({ action: "set_role", username: uname, role: u.role === "admin" ? "user" : "admin" }),
                           });
                           loadUsersList();
-                        }}>{u.role === "admin" ? "降為用戶" : "升為管理員"}</button>
+                        }}>{u.role === "admin" ? t('pro.admin.demote') : t('pro.admin.promote')}</button>
                         <button onClick={async () => {
                           await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
                             method: "POST", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ action: "reset_password", username: uname, password: "123456" }),
                           });
-                          alert(`已重設 ${uname} 密碼為 123456`);
-                        }}>重設密碼</button>
+                          alert(t('pro.admin.resetConfirm', { name: uname }));
+                        }}>{t('pro.admin.resetPassword')}</button>
                         <button className="danger" onClick={async () => {
-                          if (!confirm(`確定刪除 ${uname}？`)) return;
+                          if (!confirm(t('pro.admin.deleteConfirm', { name: uname }))) return;
                           await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-users")}`, {
                             method: "POST", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ action: "delete", username: uname }),
                           });
                           loadUsersList();
-                        }}>刪除</button>
+                        }}>{t('pro.admin.deleteUser')}</button>
                       </div>
                     )}
                   </div>
@@ -2033,7 +2034,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
       </div>
 
       <div className="footer">
-        <p>僅供參考，不構成人生重大決策依據</p>
+        <p>{t('pro.footer')}</p>
       </div>
     </div>
   );

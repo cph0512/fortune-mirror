@@ -180,6 +180,23 @@
     "pastReadings": "歷史紀錄 ({{count}})",
     "analysis": "分析"
   },
+  "horoscope": {
+    "title": "今日運勢",
+    "selectZodiac": "選擇你的星座",
+    "overall": "綜合運勢",
+    "love": "愛情",
+    "career": "事業",
+    "wealth": "財運",
+    "health": "健康",
+    "luckyColor": "幸運色",
+    "luckyNumber": "幸運數字",
+    "luckyItem": "幸運物",
+    "advice": "今日建議",
+    "notReady": "今日運勢正在生成中，請稍後再試",
+    "loginForPersonal": "登入查看個人化運勢",
+    "poweredBy": "三系統交叉分析",
+    "zodiacNames": ["牡羊座", "金牛座", "雙子座", "巨蟹座", "獅子座", "處女座", "天秤座", "天蠍座", "射手座", "摩羯座", "水瓶座", "雙魚座"]
+  },
   "quickQuestions": {
     "deepTitle": "深度分析",
     "deepQ1": "幫我分析目前的 10 年大運走向，現在處於什麼階段？",
@@ -193,5 +210,157 @@
     "hebanQ1": "和主管/同事的相處，誰是你的貴人？",
     "hebanQ2": "和家人之間的隱形牽絆，如何化解？",
     "hebanQ3": "和曖昧對象的緣分，現在該前進嗎？"
+  },
+  "pro": {
+    "cat": {
+      "bazi": "八字命理", "baziDesc": "四柱、十神、五行、大運、流年等知識",
+      "astro": "西洋占星", "astroDesc": "星座、行星、宮位、相位、流運等知識",
+      "ziwei": "紫微斗數", "ziweiDesc": "主星、四化、十二宮、飛星等知識",
+      "general": "通用知識", "generalDesc": "跨系統通則、命理哲學、解讀技巧等"
+    },
+    "loading": [
+      "正在辨識命盤類型...", "提取星體位置與四柱資訊...", "計算五行分布...",
+      "分析宮位配置...", "交叉比對三大系統...", "尋找共鳴點...",
+      "推算流年運勢...", "彙整綜合分析報告..."
+    ],
+    "login": {
+      "title": "命理三鏡",
+      "tagline": "八字 · 占星 · 紫微｜交叉解盤",
+      "login": "登入", "register": "註冊", "displayName": "顯示名稱",
+      "account": "帳號", "password": "密碼", "failed": "連線失敗", "error": "失敗"
+    },
+    "nav": {
+      "analyze": "解盤", "saves": "存檔", "kb": "知識庫", "admin": "管理",
+      "confirmLogout": "確定登出？"
+    },
+    "kb": {
+      "entries": "知識條目", "systems": "涵蓋系統", "totalChars": "總字數",
+      "export": "匯出知識庫", "import": "匯入知識庫",
+      "count": "{{count}} 筆", "edit": "編輯", "delete": "刪除",
+      "addNew": "新增{{name}}知識", "fileError": "檔案格式錯誤"
+    },
+    "editor": {
+      "addTitle": "新增{{name}}知識", "editTitle": "編輯{{name}}知識",
+      "title": "標題", "content": "知識內容",
+      "chars": "{{count}} 字", "cancel": "取消", "add": "新增", "save": "儲存"
+    },
+    "settings": {
+      "engine": "解盤引擎", "engineDesc": "由伺服器端引擎驅動，無需設定。",
+      "connected": "已連線",
+      "model": "分析模型", "modelDesc": "伺服器端自動選擇最佳模型進行分析。",
+      "sonnet": "Claude Sonnet 4 (推薦)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
+      "guide": "使用說明",
+      "guideContent": "1. 在「設定」頁面填入 Anthropic API Key\n2. 在「知識庫」頁面新增命理知識（可選）\n3. 在「解盤」頁面上傳命盤截圖\n4. 系統會結合你的知識庫 + 內建知識進行分析\n5. 知識庫越豐富，分析越精準！"
+    },
+    "analysis": {
+      "autoCalc": "自動排盤", "uploadChart": "上傳命盤圖",
+      "enterBirth": "輸入出生資料，自動排盤",
+      "year": "年", "month": "月", "day": "日", "hour": "時", "minute": "分",
+      "gender": "性別", "male": "男", "female": "女", "birthPlace": "出生地",
+      "ziwei": "紫微斗數", "bazi": "八字", "astro": "西洋占星", "finance": "財運分析",
+      "fillBirth": "請填寫完整出生資料",
+      "calcAndAnalyze": "排盤 + 命運分析",
+      "calcAndAnalyzeMulti": "排盤 + 命運分析（{{count}} 盤）",
+      "calcing": "正在排盤計算中...",
+      "calcDone": "排盤完成！命盤分析進行中...",
+      "parallelAnalyze": "正在並行分析 {{count}} 盤...",
+      "calcError": "排盤錯誤：",
+      "analyzing": "分析中...",
+      "analyzeComplete": "分析中（{{count}} 項完成）",
+      "doneMulti": "已完成 {{count}} 項分析",
+      "doneOne": "分析完成",
+      "error": "分析過程發生錯誤：",
+      "retry": "重新上傳",
+      "detail": "詳細分析",
+      "financeBtn": "財運分析",
+      "hebanBtn": "合盤分析",
+      "financeCalcing": "正在計算財運排盤...",
+      "financeAnalyzing": "正在進行財運深度分析...",
+      "financeError": "財運分析錯誤：",
+      "noBirthData": "無法從現有資料中提取出生資料，請在表單中填寫出生資料後再試",
+      "crossAnalyze": "交叉比對 {{count}} 大系統..."
+    },
+    "upload": {
+      "selectType": "選擇命盤類型",
+      "autoDetect": "未選擇＝自動辨識（較慢）",
+      "selected": "已選：{{systems}}｜上傳對應命盤截圖",
+      "kbLoaded": "已載入 {{count}} 筆知識",
+      "dropAdd": "點擊或拖曳添加更多命盤",
+      "dropHere": "點擊或拖曳命盤圖片到這裡",
+      "formats": "支援 JPG、PNG",
+      "correction": "（選填）補充或修正命盤資訊...",
+      "startAnalyze": "開始解盤（{{count}} 張命盤）"
+    },
+    "heban": {
+      "modalTitle": "合盤分析 — 輸入對方資料",
+      "yearOnly": "只知道生年", "dateOnly": "知道年月日", "full": "完整資料",
+      "yearHint": "僅能分析年干四化大方向，無法排完整命盤",
+      "dateHint": "可排盤但時辰未知，命宮可能有偏差",
+      "fullHint": "可做完整飛化合盤分析",
+      "name": "稱呼", "namePlaceholder": "例：老王、小美",
+      "relation": "關係", "selectRelation": "請選擇",
+      "partner": "伴侶/對象", "spouse": "配偶", "friend": "朋友",
+      "colleague": "同事", "boss": "主管", "businessPartner": "合夥人",
+      "parents": "父母", "children": "子女", "siblings": "兄弟姐妹", "other": "其他",
+      "birthYear": "出生年",
+      "question": "想了解什麼？（選填）",
+      "questionPlaceholder": "例：和他適合結婚嗎？他是好的合作夥伴嗎？",
+      "analyzing": "排盤分析中...", "start": "開始合盤分析",
+      "error": "合盤分析錯誤：", "fillYear": "請至少填寫出生年份",
+      "fillFull": "請填寫完整出生年月日"
+    },
+    "chat": {
+      "title": "追問命盤問題",
+      "you": "你", "master": "命理師",
+      "thinking": "思考中...",
+      "placeholder": "針對這個命盤提問，例如：今年感情運如何？",
+      "hebanFromChat": "幫對方排盤，做合盤分析",
+      "reportIssue": "回報分析錯誤",
+      "reportPrompt": "描述分析錯誤的地方...",
+      "reportSuccess": "已回報，感謝反饋！",
+      "reportFailed": "回報失敗",
+      "replyTimeout": "回覆逾時"
+    },
+    "actions": {
+      "addChart": "追加其他命盤",
+      "crossAnalyze": "交叉分析",
+      "save": "存檔",
+      "reset": "全部重來"
+    },
+    "saves": {
+      "title": "{{name}}的命盤紀錄",
+      "selectTwo": "選兩人合盤", "cancelHeban": "取消合盤",
+      "selectHint": "請選擇兩筆紀錄進行合盤分析（已選 {{count}}/2）",
+      "startHeban": "開始合盤",
+      "unnamed": "未命名",
+      "empty": "尚無存檔紀錄，解盤後按「存檔」即可保存",
+      "viewSummary": "查看分析摘要"
+    },
+    "admin": {
+      "all": "全部", "b2c": "B2C 大眾版", "b2b": "B2B 專業版",
+      "users": "註冊用戶", "visitors": "訪客軌跡",
+      "search": "搜尋用戶、活動、聯天內容...",
+      "feedbackCount": "{{count}} 筆用戶反饋待處理",
+      "feedback": "用戶反饋", "back": "返回",
+      "anonymous": "匿名", "user": "用戶",
+      "recordTitle": "{{name}} 的記錄", "backToList": "返回用戶列表",
+      "saves": "命盤存檔（{{count}} 筆）",
+      "born": "出生：",
+      "chatLog": "對話記錄（{{count}} 則）",
+      "chatLabel": "對話",
+      "apiRecords": "API 分析記錄（{{count}} 筆）",
+      "images": "{{count}} 張圖", "text": "文字",
+      "activity": "活動記錄（{{count}} 筆）",
+      "adminRole": "管理員", "userRole": "用戶",
+      "demote": "降為用戶", "promote": "升為管理員",
+      "resetPassword": "重設密碼",
+      "resetConfirm": "已重設 {{name}} 密碼為 123456",
+      "deleteUser": "刪除", "deleteConfirm": "確定刪除 {{name}}？",
+      "registered": "已註冊", "visitor": "訪客",
+      "totalVisitors": "共 {{count}} 個訪客",
+      "reload": "重新載入",
+      "accountLabel": "帳號：", "lastActive": "最後活動：", "times": "次"
+    },
+    "footer": "僅供參考，不構成人生重大決策依據"
   }
 }

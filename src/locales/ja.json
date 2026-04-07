@@ -179,6 +179,23 @@
     "pastReadings": "過去の鑑定 ({{count}})",
     "analysis": "鑑定"
   },
+  "horoscope": {
+    "title": "今日の運勢",
+    "selectZodiac": "星座を選んでください",
+    "overall": "総合運",
+    "love": "恋愛運",
+    "career": "仕事運",
+    "wealth": "金運",
+    "health": "健康運",
+    "luckyColor": "ラッキーカラー",
+    "luckyNumber": "ラッキーナンバー",
+    "luckyItem": "ラッキーアイテム",
+    "advice": "今日のアドバイス",
+    "notReady": "今日の運勢を生成中です。しばらくしてからお試しください",
+    "loginForPersonal": "ログインしてパーソナル運勢を見る",
+    "poweredBy": "三大システムのクロス分析",
+    "zodiacNames": ["牡羊座", "牡牛座", "双子座", "蟹座", "獅子座", "乙女座", "天秤座", "蠍座", "射手座", "山羊座", "水瓶座", "魚座"]
+  },
   "quickQuestions": {
     "deepTitle": "深掘り分析",
     "deepQ1": "現在の10年大運を分析して、今どの段階にいますか？",
@@ -192,5 +209,157 @@
     "hebanQ1": "上司・同僚との相性、誰が貴人？",
     "hebanQ2": "家族との見えない絆、どう解消する？",
     "hebanQ3": "気になる人との縁、今進むべき？"
+  },
+  "pro": {
+    "cat": {
+      "bazi": "四柱推命", "baziDesc": "四柱、十神、五行、大運、流年",
+      "astro": "西洋占星術", "astroDesc": "星座、惑星、ハウス、アスペクト、トランジット",
+      "ziwei": "紫微斗数", "ziweiDesc": "主星、四化、十二宮、飛星",
+      "general": "総合知識", "generalDesc": "システム横断の法則、哲学、技法"
+    },
+    "loading": [
+      "命盤タイプを識別中...", "星体位置を抽出中...", "五行分布を計算中...",
+      "宮位配置を分析中...", "三大システムを照合中...", "共鳴点を探索中...",
+      "流年運勢を推算中...", "総合分析レポートを作成中..."
+    ],
+    "login": {
+      "title": "命理三鏡",
+      "tagline": "四柱 · 占星 · 紫微｜クロス鑑定",
+      "login": "ログイン", "register": "新規登録", "displayName": "表示名",
+      "account": "アカウント", "password": "パスワード", "failed": "接続失敗", "error": "失敗"
+    },
+    "nav": {
+      "analyze": "鑑定", "saves": "保存", "kb": "知識庫", "admin": "管理",
+      "confirmLogout": "ログアウトしますか？"
+    },
+    "kb": {
+      "entries": "知識項目", "systems": "対象システム", "totalChars": "総文字数",
+      "export": "知識庫エクスポート", "import": "知識庫インポート",
+      "count": "{{count}} 件", "edit": "編集", "delete": "削除",
+      "addNew": "{{name}}知識を追加", "fileError": "ファイル形式エラー"
+    },
+    "editor": {
+      "addTitle": "{{name}}知識を追加", "editTitle": "{{name}}知識を編集",
+      "title": "タイトル", "content": "内容",
+      "chars": "{{count}} 文字", "cancel": "キャンセル", "add": "追加", "save": "保存"
+    },
+    "settings": {
+      "engine": "鑑定エンジン", "engineDesc": "サーバー側エンジン、設定不要。",
+      "connected": "接続済み",
+      "model": "分析モデル", "modelDesc": "サーバーが最適なモデルを自動選択。",
+      "sonnet": "Claude Sonnet 4 (推奨)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
+      "guide": "使い方",
+      "guideContent": "1. 設定でAPI Keyを入力\n2. 知識庫に知識を追加（任意）\n3. 命盤画像をアップロード\n4. 知識庫+内蔵知識で分析\n5. 知識庫が豊富なほど精度UP！"
+    },
+    "analysis": {
+      "autoCalc": "自動排盤", "uploadChart": "命盤アップロード",
+      "enterBirth": "生年月日を入力して自動排盤",
+      "year": "年", "month": "月", "day": "日", "hour": "時", "minute": "分",
+      "gender": "性別", "male": "男", "female": "女", "birthPlace": "出生地",
+      "ziwei": "紫微斗数", "bazi": "四柱推命", "astro": "西洋占星術", "finance": "財運分析",
+      "fillBirth": "生年月日を入力してください",
+      "calcAndAnalyze": "排盤 + 運命分析",
+      "calcAndAnalyzeMulti": "排盤 + 運命分析（{{count}} 盤）",
+      "calcing": "排盤計算中...",
+      "calcDone": "排盤完了！分析中...",
+      "parallelAnalyze": "{{count}} 盤を並行分析中...",
+      "calcError": "排盤エラー：",
+      "analyzing": "分析中...",
+      "analyzeComplete": "分析中（{{count}} 項完了）",
+      "doneMulti": "{{count}} 項の分析完了",
+      "doneOne": "分析完了",
+      "error": "分析エラー：",
+      "retry": "再試行",
+      "detail": "詳細分析",
+      "financeBtn": "財運分析",
+      "hebanBtn": "相性分析",
+      "financeCalcing": "財運排盤を計算中...",
+      "financeAnalyzing": "財運深層分析中...",
+      "financeError": "財運分析エラー：",
+      "noBirthData": "生年月日を取得できません。フォームに入力してください",
+      "crossAnalyze": "{{count}} システムをクロス分析中..."
+    },
+    "upload": {
+      "selectType": "命盤タイプを選択",
+      "autoDetect": "未選択＝自動識別（遅い）",
+      "selected": "選択：{{systems}}｜対応する命盤をアップロード",
+      "kbLoaded": "{{count}} 件の知識を読込済",
+      "dropAdd": "クリックまたはドラッグで追加",
+      "dropHere": "クリックまたはドラッグで命盤画像をここに",
+      "formats": "JPG、PNG対応",
+      "correction": "（任意）命盤情報の補足・修正...",
+      "startAnalyze": "鑑定開始（{{count}} 枚）"
+    },
+    "heban": {
+      "modalTitle": "相性分析 — 相手の情報を入力",
+      "yearOnly": "生年のみ", "dateOnly": "年月日", "full": "完全情報",
+      "yearHint": "年干四化の大方向のみ分析可能",
+      "dateHint": "排盤可能だが時辰不明、命宮にずれの可能性",
+      "fullHint": "完全な飛化相性分析が可能",
+      "name": "呼び名", "namePlaceholder": "例：太郎、花子",
+      "relation": "関係", "selectRelation": "選択",
+      "partner": "恋人", "spouse": "配偶者", "friend": "友人",
+      "colleague": "同僚", "boss": "上司", "businessPartner": "ビジネスパートナー",
+      "parents": "両親", "children": "子供", "siblings": "兄弟姉妹", "other": "その他",
+      "birthYear": "生年",
+      "question": "知りたいことは？（任意）",
+      "questionPlaceholder": "例：結婚に適していますか？",
+      "analyzing": "分析中...", "start": "相性分析を開始",
+      "error": "相性分析エラー：", "fillYear": "少なくとも生年を入力してください",
+      "fillFull": "完全な生年月日を入力してください"
+    },
+    "chat": {
+      "title": "追加質問",
+      "you": "あなた", "master": "鑑定師",
+      "thinking": "考え中...",
+      "placeholder": "命盤について質問、例：今年の恋愛運は？",
+      "hebanFromChat": "相手の排盤と相性分析",
+      "reportIssue": "分析エラーを報告",
+      "reportPrompt": "分析の誤りを記述...",
+      "reportSuccess": "報告済み、ありがとうございます！",
+      "reportFailed": "報告失敗",
+      "replyTimeout": "返信タイムアウト"
+    },
+    "actions": {
+      "addChart": "命盤を追加",
+      "crossAnalyze": "クロス分析",
+      "save": "保存",
+      "reset": "最初から"
+    },
+    "saves": {
+      "title": "{{name}}の鑑定記録",
+      "selectTwo": "2人を選んで相性", "cancelHeban": "キャンセル",
+      "selectHint": "相性分析する2件を選択（{{count}}/2 選択済）",
+      "startHeban": "相性分析開始",
+      "unnamed": "名前なし",
+      "empty": "保存記録なし。鑑定後「保存」で保存できます。",
+      "viewSummary": "要約を見る"
+    },
+    "admin": {
+      "all": "全て", "b2c": "B2C 一般版", "b2b": "B2B プロ版",
+      "users": "登録ユーザー", "visitors": "訪問者追跡",
+      "search": "ユーザー、活動、チャットを検索...",
+      "feedbackCount": "{{count}} 件のフィードバック",
+      "feedback": "ユーザーフィードバック", "back": "戻る",
+      "anonymous": "匿名", "user": "ユーザー",
+      "recordTitle": "{{name}} の記録", "backToList": "一覧に戻る",
+      "saves": "命盤保存（{{count}} 件）",
+      "born": "生年月日：",
+      "chatLog": "チャット記録（{{count}} 件）",
+      "chatLabel": "チャット",
+      "apiRecords": "API分析記録（{{count}} 件）",
+      "images": "{{count}} 枚", "text": "テキスト",
+      "activity": "活動記録（{{count}} 件）",
+      "adminRole": "管理者", "userRole": "ユーザー",
+      "demote": "ユーザーに降格", "promote": "管理者に昇格",
+      "resetPassword": "パスワードリセット",
+      "resetConfirm": "{{name}} のパスワードを123456にリセット",
+      "deleteUser": "削除", "deleteConfirm": "{{name}} を削除しますか？",
+      "registered": "登録済", "visitor": "訪問者",
+      "totalVisitors": "訪問者 {{count}} 人",
+      "reload": "再読込",
+      "accountLabel": "アカウント：", "lastActive": "最終活動：", "times": " 回"
+    },
+    "footer": "参考情報のみ、人生の重大な決定の根拠とはなりません"
   }
 }

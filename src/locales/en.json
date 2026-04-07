@@ -179,6 +179,23 @@
     "pastReadings": "Past Readings ({{count}})",
     "analysis": "Analysis"
   },
+  "horoscope": {
+    "title": "Today's Horoscope",
+    "selectZodiac": "Select your zodiac sign",
+    "overall": "Overall",
+    "love": "Love",
+    "career": "Career",
+    "wealth": "Wealth",
+    "health": "Health",
+    "luckyColor": "Lucky Color",
+    "luckyNumber": "Lucky Number",
+    "luckyItem": "Lucky Item",
+    "advice": "Today's Advice",
+    "notReady": "Today's horoscope is being generated, please try again later",
+    "loginForPersonal": "Login for personalized horoscope",
+    "poweredBy": "Three-system cross analysis",
+    "zodiacNames": ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+  },
   "quickQuestions": {
     "deepTitle": "Deep Dive",
     "deepQ1": "Analyze my current 10-year life phase — where am I now?",
@@ -192,5 +209,157 @@
     "hebanQ1": "Who's my mentor among colleagues/boss?",
     "hebanQ2": "Hidden ties with family — how to resolve?",
     "hebanQ3": "The one I'm interested in — should I go for it?"
+  },
+  "pro": {
+    "cat": {
+      "bazi": "Four Pillars (BaZi)", "baziDesc": "Pillars, Ten Gods, Five Elements, Luck Phases",
+      "astro": "Western Astrology", "astroDesc": "Signs, Planets, Houses, Aspects, Transits",
+      "ziwei": "Zi Wei Dou Shu", "ziweiDesc": "Stars, Four Transformations, Twelve Palaces, Flying Stars",
+      "general": "General", "generalDesc": "Cross-system principles, philosophy, techniques"
+    },
+    "loading": [
+      "Identifying chart type...", "Extracting positions...", "Calculating element distribution...",
+      "Analyzing palace layout...", "Cross-referencing systems...", "Finding resonance...",
+      "Projecting yearly fortune...", "Compiling analysis report..."
+    ],
+    "login": {
+      "title": "Fortune Mirror",
+      "tagline": "BaZi · Astro · ZiWei | Cross Analysis",
+      "login": "Login", "register": "Sign Up", "displayName": "Display Name",
+      "account": "Account", "password": "Password", "failed": "Connection failed", "error": "Failed"
+    },
+    "nav": {
+      "analyze": "Analyze", "saves": "Saves", "kb": "Knowledge Base", "admin": "Admin",
+      "confirmLogout": "Confirm logout?"
+    },
+    "kb": {
+      "entries": "Entries", "systems": "Systems", "totalChars": "Total Chars",
+      "export": "Export KB", "import": "Import KB",
+      "count": "{{count}} entries", "edit": "Edit", "delete": "Delete",
+      "addNew": "Add {{name}} knowledge", "fileError": "Invalid file format"
+    },
+    "editor": {
+      "addTitle": "Add {{name}} knowledge", "editTitle": "Edit {{name}} knowledge",
+      "title": "Title", "content": "Content",
+      "chars": "{{count}} chars", "cancel": "Cancel", "add": "Add", "save": "Save"
+    },
+    "settings": {
+      "engine": "Analysis Engine", "engineDesc": "Server-side engine, no setup needed.",
+      "connected": "Connected",
+      "model": "Model", "modelDesc": "Server auto-selects the best model.",
+      "sonnet": "Claude Sonnet 4 (Recommended)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
+      "guide": "Guide",
+      "guideContent": "1. Enter your Anthropic API Key in Settings\n2. Add knowledge entries (optional)\n3. Upload chart images\n4. The system combines your KB + built-in knowledge\n5. Richer KB = more accurate analysis!"
+    },
+    "analysis": {
+      "autoCalc": "Auto Calculate", "uploadChart": "Upload Chart",
+      "enterBirth": "Enter birth data for auto calculation",
+      "year": "Year", "month": "Month", "day": "Day", "hour": "Hour", "minute": "Min",
+      "gender": "Gender", "male": "Male", "female": "Female", "birthPlace": "Birthplace",
+      "ziwei": "Zi Wei Dou Shu", "bazi": "Four Pillars", "astro": "Western Astrology", "finance": "Finance Analysis",
+      "fillBirth": "Please fill in complete birth data",
+      "calcAndAnalyze": "Calculate + Analyze",
+      "calcAndAnalyzeMulti": "Calculate + Analyze ({{count}} charts)",
+      "calcing": "Calculating charts...",
+      "calcDone": "Charts ready! Analysis in progress...",
+      "parallelAnalyze": "Analyzing {{count}} charts in parallel...",
+      "calcError": "Calculation error: ",
+      "analyzing": "Analyzing...",
+      "analyzeComplete": "Analyzing ({{count}} done)",
+      "doneMulti": "Completed {{count}} analyses",
+      "doneOne": "Analysis complete",
+      "error": "Analysis error: ",
+      "retry": "Try again",
+      "detail": "Detailed Analysis",
+      "financeBtn": "Finance Analysis",
+      "hebanBtn": "Compatibility",
+      "financeCalcing": "Calculating finance chart...",
+      "financeAnalyzing": "Running deep finance analysis...",
+      "financeError": "Finance analysis error: ",
+      "noBirthData": "Cannot extract birth data, please fill in the form",
+      "crossAnalyze": "Cross-referencing {{count}} systems..."
+    },
+    "upload": {
+      "selectType": "Select chart type",
+      "autoDetect": "None selected = auto-detect (slower)",
+      "selected": "Selected: {{systems}} | Upload matching charts",
+      "kbLoaded": "{{count}} knowledge entries loaded",
+      "dropAdd": "Click or drag to add more charts",
+      "dropHere": "Click or drag chart images here",
+      "formats": "Supports JPG, PNG",
+      "correction": "(Optional) Supplement or correct chart info...",
+      "startAnalyze": "Start analysis ({{count}} charts)"
+    },
+    "heban": {
+      "modalTitle": "Compatibility Analysis — Enter Partner's Data",
+      "yearOnly": "Year only", "dateOnly": "Year/Month/Day", "full": "Full details",
+      "yearHint": "Can only analyze year stem, no full chart",
+      "dateHint": "Can chart but birth hour unknown, palace may be inaccurate",
+      "fullHint": "Full flying star compatibility analysis",
+      "name": "Name", "namePlaceholder": "e.g. Alex, Sarah",
+      "relation": "Relationship", "selectRelation": "Select",
+      "partner": "Partner/Dating", "spouse": "Spouse", "friend": "Friend",
+      "colleague": "Colleague", "boss": "Boss", "businessPartner": "Business Partner",
+      "parents": "Parents", "children": "Children", "siblings": "Siblings", "other": "Other",
+      "birthYear": "Birth Year",
+      "question": "What would you like to know? (optional)",
+      "questionPlaceholder": "e.g. Are we compatible for marriage?",
+      "analyzing": "Analyzing...", "start": "Start Compatibility Analysis",
+      "error": "Compatibility error: ", "fillYear": "Please enter at least the birth year",
+      "fillFull": "Please fill in complete birth date"
+    },
+    "chat": {
+      "title": "Follow-up Questions",
+      "you": "You", "master": "Analyst",
+      "thinking": "Thinking...",
+      "placeholder": "Ask about your chart, e.g. How's my love life this year?",
+      "hebanFromChat": "Analyze compatibility with this person",
+      "reportIssue": "Report Error",
+      "reportPrompt": "Describe the analysis error...",
+      "reportSuccess": "Reported, thank you!",
+      "reportFailed": "Report failed",
+      "replyTimeout": "Reply timed out"
+    },
+    "actions": {
+      "addChart": "Add More Charts",
+      "crossAnalyze": "Cross Analysis",
+      "save": "Save",
+      "reset": "Start Over"
+    },
+    "saves": {
+      "title": "{{name}}'s Reading History",
+      "selectTwo": "Compare Two", "cancelHeban": "Cancel",
+      "selectHint": "Select two readings for compatibility ({{count}}/2 selected)",
+      "startHeban": "Start Compatibility",
+      "unnamed": "Unnamed",
+      "empty": "No saved readings yet. Analyze a chart and click \"Save\" to keep it.",
+      "viewSummary": "View summary"
+    },
+    "admin": {
+      "all": "All", "b2c": "B2C Public", "b2b": "B2B Pro",
+      "users": "Registered Users", "visitors": "Visitor Tracks",
+      "search": "Search users, activity, chat...",
+      "feedbackCount": "{{count}} user feedbacks pending",
+      "feedback": "User Feedback", "back": "Back",
+      "anonymous": "Anonymous", "user": "User",
+      "recordTitle": "{{name}}'s Records", "backToList": "Back to list",
+      "saves": "Chart Saves ({{count}})",
+      "born": "Born: ",
+      "chatLog": "Chat Log ({{count}})",
+      "chatLabel": "Chat",
+      "apiRecords": "API Records ({{count}})",
+      "images": "{{count}} images", "text": "Text",
+      "activity": "Activity Log ({{count}})",
+      "adminRole": "Admin", "userRole": "User",
+      "demote": "Demote to User", "promote": "Promote to Admin",
+      "resetPassword": "Reset Password",
+      "resetConfirm": "Reset {{name}}'s password to 123456",
+      "deleteUser": "Delete", "deleteConfirm": "Delete {{name}}?",
+      "registered": "Registered", "visitor": "Visitor",
+      "totalVisitors": "{{count}} visitors total",
+      "reload": "Reload",
+      "accountLabel": "Account: ", "lastActive": "Last active: ", "times": " times"
+    },
+    "footer": "For reference only, not a basis for major life decisions"
   }
 }

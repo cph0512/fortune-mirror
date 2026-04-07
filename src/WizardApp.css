@@ -1963,3 +1963,84 @@
 }
 .wizard-account-plan-btn:hover { opacity: 0.85; }
 .wizard-account-plan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== Daily Horoscope ===== */
+.wizard-horoscope-section {
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  padding: 20px;
+}
+.wizard-horoscope-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.wizard-horoscope-icon {
+  font-size: 24px; color: rgba(255,200,100,0.9);
+}
+.wizard-horoscope-title {
+  font-size: 17px; font-weight: 700; color: #fff;
+}
+.wizard-horoscope-zodiac-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px;
+}
+.wizard-horoscope-zodiac-btn {
+  background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 10px 4px; color: #fff; font-size: 13px;
+  cursor: pointer; transition: all 0.2s;
+}
+.wizard-horoscope-zodiac-btn:hover {
+  background: rgba(120,100,220,0.15); border-color: rgba(160,140,255,0.5);
+}
+.wizard-horoscope-loading {
+  text-align: center; color: rgba(255,255,255,0.5); padding: 20px;
+}
+.wizard-horoscope-card {
+  cursor: pointer; transition: background 0.2s;
+  padding: 4px 0;
+}
+.wizard-horoscope-card:hover { background: rgba(255,255,255,0.02); border-radius: 12px; }
+.wizard-horoscope-zodiac-label {
+  font-size: 13px; color: rgba(160,140,255,0.8); font-weight: 600; margin-bottom: 6px;
+}
+.wizard-horoscope-stars {
+  font-size: 20px; color: rgba(255,200,100,0.9); letter-spacing: 2px; margin-bottom: 8px;
+}
+.wizard-horoscope-summary {
+  font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6;
+}
+.wizard-horoscope-details {
+  margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.wizard-horoscope-detail-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+}
+.wizard-horoscope-detail-label {
+  font-size: 13px; font-weight: 600; color: rgba(160,140,255,0.8); min-width: 48px;
+}
+.wizard-horoscope-detail-stars {
+  font-size: 14px; color: rgba(255,200,100,0.8);
+}
+.wizard-horoscope-detail-text {
+  font-size: 13px; color: rgba(255,255,255,0.7); flex: 1; min-width: 200px;
+}
+.wizard-horoscope-lucky {
+  font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 4px;
+}
+.wizard-horoscope-lucky b { color: rgba(255,200,100,0.7); }
+.wizard-horoscope-advice {
+  font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 8px;
+  padding: 10px; background: rgba(120,100,220,0.08); border-radius: 10px;
+}
+.wizard-horoscope-advice b { color: rgba(160,140,255,0.8); }
+.wizard-horoscope-powered {
+  font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 12px; text-align: right;
+}
+.wizard-horoscope-empty {
+  font-size: 13px; color: rgba(255,255,255,0.4); padding: 16px; text-align: center;
+}
+.wizard-horoscope-zodiac-back {
+  background: none; border: none; color: rgba(160,140,255,0.7); font-size: 13px;
+  cursor: pointer; margin-top: 8px; padding: 4px 0;
+}
+.wizard-horoscope-zodiac-back:hover { color: rgba(160,140,255,1); }

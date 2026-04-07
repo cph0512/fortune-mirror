@@ -25,6 +25,12 @@ const API_SANDBOX = "https://fortune-sandbox-352618635098.asia-east1.run.app/api
 const API_TRACK = IS_TEST
   ? "https://fortune-sandbox-352618635098.asia-east1.run.app/api/fortune-track"
   : "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune-track";
+const API_BASE = IS_TEST
+  ? "https://fortune-sandbox-352618635098.asia-east1.run.app"
+  : "https://fortune-api-64kdjyxhpq-de.a.run.app";
+const API_HOROSCOPE = "https://api.destinytelling.life:3083/api/horoscope";
+const ZODIAC_KEYS = ["aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"];
+const ZODIAC_ZH = ["牡羊座","金牛座","雙子座","巨蟹座","獅子座","處女座","天秤座","天蠍座","射手座","摩羯座","水瓶座","雙魚座"];
 const STORAGE_KEY_KB = "fortune-app-kb";
 const KB_VERSION = "20260402d";
 const SESSION_KEY_PREFIX = "wizard-session-";
@@ -62,11 +68,40 @@ function trackEvent(action, detail = {}) {
 function sessionKey(user) {
   return user?.email ? `${SESSION_KEY_PREFIX}${user.email}` : SESSION_KEY_GUEST;
 }
-function saveSession(data, user) {
-  try { localStorage.setItem(sessionKey(user), JSON.stringify(data)); } catch {}
+function saveSessionLocal(data, user) {
+  try { localStorage.setItem(sessionKey(user), JSON.stringify({ ...data, _ts: new Date().toISOString() })); } catch {}
 }
-function loadSession(user) {
+function loadSessionLocal(user) {
   try { const d = localStorage.getItem(sessionKey(user)); return d ? JSON.parse(d) : null; } catch { return null; }
+}
+
+// Debounced server sync for session
+let _sessionSyncTimer = null;
+function saveSession(data, user) {
+  saveSessionLocal(data, user);
+  if (!user?.email) return;
+  clearTimeout(_sessionSyncTimer);
+  _sessionSyncTimer = setTimeout(() => {
+    fetch(`${API_BASE}/api/fortune-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: user.email, session: data }),
+    }).catch(() => {});
+  }, 5000);
+}
+
+async function loadSessionFromServer(user) {
+  if (!user?.email) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/fortune-session?user=${encodeURIComponent(user.email)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && Object.keys(data).length > 1 ? data : null;
+  } catch { return null; }
+}
+
+function loadSession(user) {
+  return loadSessionLocal(user);
 }
 
 // Save chat history to server (as part of latest reading)
@@ -511,6 +546,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentPlans, setPaymentPlans] = useState(null);
 
+  // Horoscope state
+  const [horoscopeData, setHoroscopeData] = useState(null);
+  const [horoscopeLoading, setHoroscopeLoading] = useState(false);
+  const [selectedZodiac, setSelectedZodiac] = useState("");
+  const [showHoroscopeDetail, setShowHoroscopeDetail] = useState(false);
+
   // Restore a past reading into current state (for dashboard)
   const restoreReading = (reading) => {
     // Server saves use "finalResult", local saves use "result"
@@ -562,6 +603,16 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   useEffect(() => {
     if (wizardUser?.email) {
       loadReadings(wizardUser).then(readings => setServerReadings(readings));
+      // Sync session from server if local is empty or stale
+      loadSessionFromServer(wizardUser).then(serverSess => {
+        if (!serverSess) return;
+        const localSess = loadSessionLocal(wizardUser);
+        const serverTs = serverSess._ts ? new Date(serverSess._ts).getTime() : 0;
+        const localTs = localSess?._ts ? new Date(localSess._ts).getTime() : 0;
+        if (serverTs > localTs) {
+          saveSessionLocal(serverSess, wizardUser);
+        }
+      }).catch(() => {});
     } else {
       setServerReadings(loadReadingsLocal(wizardUser));
     }
@@ -590,6 +641,31 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       setStep(TOTAL_STEPS + 1);
     }
   }, []);
+
+  // Fetch daily horoscope on mount or when user/zodiac changes
+  const fetchHoroscope = async (zodiac) => {
+    setHoroscopeLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (wizardUser?.email) params.set("user", wizardUser.email);
+      if (zodiac) params.set("zodiac", zodiac);
+      const res = await fetch(`${API_HOROSCOPE}/today?${params}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data.horoscope || data.horoscopes) {
+        setHoroscopeData(data);
+      } else {
+        setHoroscopeData(null);
+      }
+    } catch {
+      setHoroscopeData(null);
+    }
+    setHoroscopeLoading(false);
+  };
+
+  useEffect(() => {
+    if (step === 0) fetchHoroscope(selectedZodiac || null);
+  }, [step, wizardUser]);
 
   const requireAuth = (callback) => {
     if (wizardUser) {
@@ -708,7 +784,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         if (stored.passwordHash !== btoa(authPassword)) { setAuthError(t('auth.wrongPassword')); return; }
         user = { name: stored.name, email: authEmail.trim() };
       }
-      const existingSession = loadSession(user);
+      // Try server session first, fallback to localStorage
+      let existingSession = null;
+      try {
+        existingSession = await loadSessionFromServer(user);
+      } catch {}
+      if (!existingSession) existingSession = loadSession(user);
       if (existingSession?.finalResult) {
         restoreFromSession(existingSession);
       }
@@ -1426,6 +1507,9 @@ ${hebanRelation === "relations.twin" ? `
             {t('welcome.greeting', { name: wizardUser.name })}
             <button className="wizard-account-link" onClick={() => setShowAccount(true)}>{t('welcome.myAccount')}</button>
             <button className="wizard-logout-link" onClick={() => {
+              if (wizardUser?.email) {
+                fetch(`${API_BASE}/api/fortune-session?user=${encodeURIComponent(wizardUser.email)}`, { method: "DELETE" }).catch(() => {});
+              }
               setWizardUser(null);
               localStorage.removeItem(AUTH_KEY);
               setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
@@ -1474,6 +1558,60 @@ ${hebanRelation === "relations.twin" ? `
               </div>
             );
           })()}
+
+          {/* Daily Horoscope */}
+          <div className="wizard-horoscope-section" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
+            <div className="wizard-horoscope-header">
+              <span className="wizard-horoscope-icon">&#9788;</span>
+              <div className="wizard-horoscope-title">{t('horoscope.title')}</div>
+            </div>
+            {!wizardUser && !selectedZodiac && (
+              <div className="wizard-horoscope-zodiac-grid">
+                {ZODIAC_ZH.map((z, i) => (
+                  <button key={z} className="wizard-horoscope-zodiac-btn"
+                    onClick={() => { setSelectedZodiac(z); fetchHoroscope(z); }}>
+                    {t(`horoscope.zodiacNames.${i}`)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {horoscopeLoading && <div className="wizard-horoscope-loading">...</div>}
+            {!horoscopeLoading && horoscopeData?.horoscope && (() => {
+              const h = horoscopeData.horoscope;
+              return (
+                <div className="wizard-horoscope-card" onClick={() => setShowHoroscopeDetail(!showHoroscopeDetail)}>
+                  {horoscopeData.zodiac && <div className="wizard-horoscope-zodiac-label">{horoscopeData.zodiac}</div>}
+                  <div className="wizard-horoscope-stars">
+                    {'★'.repeat(h.overall_stars || 0)}{'☆'.repeat(5 - (h.overall_stars || 0))}
+                  </div>
+                  <div className="wizard-horoscope-summary">{h.summary}</div>
+                  {showHoroscopeDetail && (
+                    <div className="wizard-horoscope-details">
+                      {[['love', h.love], ['career', h.career], ['wealth', h.wealth], ['health', h.health]].map(([key, val]) => val && (
+                        <div key={key} className="wizard-horoscope-detail-row">
+                          <span className="wizard-horoscope-detail-label">{t(`horoscope.${key}`)}</span>
+                          <span className="wizard-horoscope-detail-stars">{'★'.repeat(val.stars || 0)}{'☆'.repeat(5 - (val.stars || 0))}</span>
+                          <span className="wizard-horoscope-detail-text">{val.text}</span>
+                        </div>
+                      ))}
+                      {h.lucky_color && <div className="wizard-horoscope-lucky"><b>{t('horoscope.luckyColor')}:</b> {h.lucky_color}</div>}
+                      {h.lucky_number && <div className="wizard-horoscope-lucky"><b>{t('horoscope.luckyNumber')}:</b> {h.lucky_number}</div>}
+                      {h.advice && <div className="wizard-horoscope-advice"><b>{t('horoscope.advice')}:</b> {h.advice}</div>}
+                    </div>
+                  )}
+                  <div className="wizard-horoscope-powered">{t('horoscope.poweredBy')}</div>
+                </div>
+              );
+            })()}
+            {!horoscopeLoading && !horoscopeData?.horoscope && selectedZodiac && (
+              <div className="wizard-horoscope-empty">{t('horoscope.notReady')}</div>
+            )}
+            {!wizardUser && selectedZodiac && (
+              <button className="wizard-horoscope-zodiac-back" onClick={() => { setSelectedZodiac(""); setHoroscopeData(null); }}>
+                {t('goal.back')}
+              </button>
+            )}
+          </div>
 
           {/* Family Chart entry on welcome page */}
           <div className="wizard-heban-promo" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
