@@ -1658,19 +1658,73 @@ ${hebanRelation === "relations.twin" ? `
             )}
           </div>
 
-          {/* Family Chart entry on welcome page */}
-          <div className="wizard-heban-promo" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
-            <div className="wizard-heban-promo-header">
-              <span className="wizard-heban-promo-icon wizard-diamond"></span>
-              <div>
-                <div className="wizard-heban-promo-title">{t('family.chartTitle')}</div>
-                <div className="wizard-heban-promo-desc">{t('family.chartDesc')}</div>
+          {/* Family Chart — show existing family or create new */}
+          {(() => {
+            const familySaves = serverReadings.filter(r => r.goal === "family" && r.familyData?.members?.length > 0);
+            const localFamily = (() => { try { const d = localStorage.getItem("fortune-family-data"); return d ? JSON.parse(d) : null; } catch { return null; } })();
+            const hasFamilyData = familySaves.length > 0 || localFamily?.members?.length > 0;
+
+            if (hasFamilyData) {
+              // Group by familyName
+              const families = {};
+              for (const s of familySaves) {
+                const name = s.familyData?.familyName || s.goalPrompt?.replace(/^家族命盤 — /, '') || t('family.chartTitle');
+                if (!families[name]) families[name] = [];
+                families[name].push(s);
+              }
+              // Also add local if not in server
+              if (localFamily?.familyName && !families[localFamily.familyName]) {
+                families[localFamily.familyName] = [{ familyData: localFamily, finalResult: localFamily.result, time: new Date().toISOString() }];
+              }
+
+              return (
+                <div className="wizard-family-section" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
+                  <div className="wizard-heban-promo-header" style={{ marginBottom: 12 }}>
+                    <span className="wizard-heban-promo-icon wizard-diamond"></span>
+                    <div className="wizard-heban-promo-title">{t('family.chartTitle')}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {Object.entries(families).map(([fname, saves]) => {
+                      const latest = saves[0];
+                      const memberCount = latest.familyData?.members?.length || 0;
+                      const protoName = latest.familyData?.protagonist?.name || '';
+                      return (
+                        <div key={fname} className="wizard-dashboard-card" onClick={() => setShowFamily(true)} style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{fname}</div>
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+                            {memberCount > 0 ? `${memberCount} ${t('family.members', { defaultValue: '位成員' })}` : ''}
+                            {protoName ? ` · ${t('family.protagonist', { defaultValue: '主角' })}：${protoName}` : ''}
+                          </div>
+                          {saves.length > 1 && (
+                            <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{saves.length} {t('family.analyses', { defaultValue: '次分析' })}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button className="wizard-cta-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => setShowFamily(true)}>
+                    + {t('family.buildChart')}
+                  </button>
+                </div>
+              );
+            }
+
+            // No family data — show promo
+            return (
+              <div className="wizard-heban-promo" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
+                <div className="wizard-heban-promo-header">
+                  <span className="wizard-heban-promo-icon wizard-diamond"></span>
+                  <div>
+                    <div className="wizard-heban-promo-title">{t('family.chartTitle')}</div>
+                    <div className="wizard-heban-promo-desc">{t('family.chartDesc')}</div>
+                  </div>
+                </div>
+                <button className="wizard-cta" style={{ marginTop: 16 }} onClick={() => setShowFamily(true)}>
+                  {t('family.buildChart')}
+                </button>
               </div>
-            </div>
-            <button className="wizard-cta" style={{ marginTop: 16 }} onClick={() => setShowFamily(true)}>
-              {t('family.buildChart')}
-            </button>
-          </div>
+            );
+          })()}
         </>
       ) : (
         <div className="wizard-welcome-auth">
