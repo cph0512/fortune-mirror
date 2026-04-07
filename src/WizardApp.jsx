@@ -1665,7 +1665,7 @@ ${hebanRelation === "relations.twin" ? `
         </>
       ) : (
         <div className="wizard-welcome-auth">
-          <div className="wizard-question" style={{ fontSize: 20, marginBottom: 16 }}>{t('welcome.tryFirst')}</div>
+          <div className="wizard-question">{t('welcome.iAm')}</div>
           <div className="wizard-gender-cards">
             <div className={`wizard-gender-card ${gender === "男" ? "selected" : ""}`} onClick={() => { setGender("男"); trackEvent("select_gender", { gender: "男" }); setTimeout(() => setStep(1), 300); }}>
               <div className="wizard-gender-icon">M</div>
@@ -1676,7 +1676,6 @@ ${hebanRelation === "relations.twin" ? `
               <div className="wizard-gender-label"><span>{t('welcome.female')}</span><span>›</span></div>
             </div>
           </div>
-          <div className="wizard-guest-note">{t('welcome.guestNote')}</div>
 
           <div className="wizard-welcome-divider">
             <span>{t('welcome.hasAccount')}</span>
@@ -1705,6 +1704,7 @@ ${hebanRelation === "relations.twin" ? `
             <button className="wizard-cta" onClick={handleAuthSubmit}>
               {authMode === "login" ? t('auth.login') : t('auth.freeRegister')}
             </button>
+            <div className="wizard-guest-note" style={{ marginTop: 8 }}>{t('welcome.guestNote')}</div>
           </div>
         </div>
       )}
