@@ -1623,40 +1623,6 @@ ${hebanRelation === "relations.twin" ? `
             )}
           </div>
 
-          {/* Dashboard — past readings */}
-          {(() => {
-            const readings = serverReadings;
-            if (readings.length === 0) return null;
-            return (
-              <div className="wizard-dashboard">
-                <div className="wizard-dashboard-title">{t('history.pastReadings', { count: readings.length })}</div>
-                <div className="wizard-dashboard-list">
-                  {readings.map((r, i) => (
-                    <div key={r.id || r.time || i} className="wizard-dashboard-card" onClick={() => restoreReading(r)}>
-                      <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
-                      <div className="wizard-dashboard-card-title">{(() => {
-                        const raw = r.goalPrompt || r.goal || '';
-                        if (!raw) return t('history.analysis');
-                        if (raw.startsWith('goal.')) return t(raw);
-                        if (raw === 'family') return t('family.chartTitle');
-                        return raw;
-                      })()}</div>
-                      <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
-                      {r.monthHighlights?.length > 0 && (
-                        <div className="wizard-history-months">
-                          {Array.from({ length: 12 }, (_, mi) => {
-                            const found = r.monthHighlights.find(h => h.month === mi + 1);
-                            return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
           {/* Family Chart — show existing family or create new */}
           {(() => {
             const familySaves = serverReadings.filter(r => r.goal === "family" && r.familyData?.members?.length > 0);
@@ -1721,6 +1687,40 @@ ${hebanRelation === "relations.twin" ? `
                 <button className="wizard-cta" style={{ marginTop: 16 }} onClick={() => setShowFamily(true)}>
                   {t('family.buildChart')}
                 </button>
+              </div>
+            );
+          })()}
+
+          {/* Dashboard — past readings */}
+          {(() => {
+            const readings = serverReadings;
+            if (readings.length === 0) return null;
+            return (
+              <div className="wizard-dashboard">
+                <div className="wizard-dashboard-title">{t('history.pastReadings', { count: readings.length })}</div>
+                <div className="wizard-dashboard-list">
+                  {readings.map((r, i) => (
+                    <div key={r.id || r.time || i} className="wizard-dashboard-card" onClick={() => restoreReading(r)}>
+                      <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
+                      <div className="wizard-dashboard-card-title">{(() => {
+                        const raw = r.goalPrompt || r.goal || '';
+                        if (!raw) return t('history.analysis');
+                        if (raw.startsWith('goal.')) return t(raw);
+                        if (raw === 'family') return t('family.chartTitle');
+                        return raw;
+                      })()}</div>
+                      <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
+                      {r.monthHighlights?.length > 0 && (
+                        <div className="wizard-history-months">
+                          {Array.from({ length: 12 }, (_, mi) => {
+                            const found = r.monthHighlights.find(h => h.month === mi + 1);
+                            return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })()}
