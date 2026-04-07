@@ -852,12 +852,12 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             </div>
           )}
           <div className="wizard-chat-input">
-            <input className="wizard-input" value={chatInput}
+            <input value={chatInput}
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) sendFamilyChat(chatInput); }}
               placeholder={currentLang === 'en' ? 'Ask a follow-up question...' : currentLang === 'ja' ? '追加質問...' : '輸入你的問題...'}
               disabled={chatLoading} />
-            <button onClick={() => sendFamilyChat(chatInput)} disabled={chatLoading || !chatInput.trim()} className="wizard-cta" style={{ padding: '12px 20px' }}>
+            <button onClick={() => sendFamilyChat(chatInput)} disabled={chatLoading || !chatInput.trim()}>
               {currentLang === 'en' ? 'Send' : currentLang === 'ja' ? '送信' : '送出'}
             </button>
           </div>
