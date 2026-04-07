@@ -175,56 +175,71 @@ export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onCl
     }
   }, [familyName, members, result, protagonist]);
 
-  // Load from server on mount (server-first)
+  // Load from server on mount — NEVER overwrite local members with empty server data
   useEffect(() => {
     if (wizardUser?.email && !serverLoaded) {
       loadFamilySavesFromServer(apiBackend, wizardUser)
         .then(familySaves => {
           setServerLoaded(true);
-          if (familySaves.length > 0) {
-            const serverHistory = familySaves.map(s => ({
-              id: s.time,
-              time: s.time,
-              familyName: s.familyData?.familyName || s.goalPrompt || "",
-              protagonistName: s.familyData?.protagonist?.name || "",
-              protagonistRole: s.familyData?.protagonist?.role || "",
-              result: s.finalResult || "",
-              members: s.familyData?.members,
-              protagonist: s.familyData?.protagonist,
-            }));
-            setFamilyHistoryList(serverHistory);
-            // Restore from server if local is empty
-            const latest = familySaves[0];
-            if (!local?.members?.length && latest.familyData?.members?.length) {
-              const restoredMembers = rebuildCharts(latest.familyData.members);
-              setFamilyName(latest.familyData.familyName || "");
-              setMembers(restoredMembers);
-              setProtagonist(latest.familyData.protagonist);
-              if (latest.finalResult) {
-                setResult(latest.finalResult);
-                setPhase("result");
-              } else {
-                setPhase("list");
-              }
-              saveFamilyLocal({ familyName: latest.familyData.familyName, members: restoredMembers, result: latest.finalResult, protagonist: latest.familyData.protagonist });
-            }
-            // Fallback: server has result but no members — still show the result
-            if (!local?.members?.length && !latest.familyData?.members?.length && latest.finalResult) {
-              const fname = latest.familyData?.familyName || latest.goalPrompt?.replace(/^家族命盤 — /, '').split('（')[0] || '';
-              setFamilyName(fname);
-              setResult(latest.finalResult);
-              setPhase("result");
-              saveFamilyLocal({ familyName: fname, members: [], result: latest.finalResult, protagonist: null });
-            }
-            // If local has members but no result, and server has a result — restore result
-            if (local?.members?.length && !local?.result) {
+          if (familySaves.length === 0) return;
+
+          // Build history list for display
+          const serverHistory = familySaves.map(s => ({
+            id: s.time, time: s.time,
+            familyName: s.familyData?.familyName || s.goalPrompt || "",
+            protagonistName: s.familyData?.protagonist?.name || "",
+            protagonistRole: s.familyData?.protagonist?.role || "",
+            result: s.finalResult || "",
+            members: s.familyData?.members,
+            protagonist: s.familyData?.protagonist,
+          }));
+          setFamilyHistoryList(serverHistory);
+
+          // Re-read local NOW (in case it changed since init)
+          const currentLocal = loadFamilyLocal();
+
+          // Case 1: Local has members → keep local, only supplement result if missing
+          if (currentLocal?.members?.length > 0) {
+            if (!currentLocal.result) {
               const withResult = familySaves.find(s => s.finalResult);
               if (withResult) {
                 setResult(withResult.finalResult);
                 setPhase("result");
-                saveFamilyLocal({ ...local, result: withResult.finalResult });
+                saveFamilyLocal({ ...currentLocal, result: withResult.finalResult });
               }
             }
+            // Upload local members to server if server is empty (backfill)
+            const serverHasMembers = familySaves.some(s => s.familyData?.members?.length > 0);
+            if (!serverHasMembers) {
+              saveFamilyToServer(apiBackend, wizardUser, {
+                result: currentLocal.result || "", familyName: currentLocal.familyName,
+                members: currentLocal.members, protagonist: currentLocal.protagonist,
+              }, getVisitorId);
+            }
+            return;
+          }
+
+          // Case 2: Local is empty, server has members → restore from server
+          const withMembers = familySaves.find(s => s.familyData?.members?.length > 0);
+          if (withMembers) {
+            const restoredMembers = rebuildCharts(withMembers.familyData.members);
+            setFamilyName(withMembers.familyData.familyName || "");
+            setMembers(restoredMembers);
+            setProtagonist(withMembers.familyData.protagonist);
+            if (withMembers.finalResult) { setResult(withMembers.finalResult); setPhase("result"); }
+            else { setPhase("list"); }
+            saveFamilyLocal({ familyName: withMembers.familyData.familyName, members: restoredMembers, result: withMembers.finalResult, protagonist: withMembers.familyData.protagonist });
+            return;
+          }
+
+          // Case 3: Both empty but server has a result → show result only (no member overwrite)
+          const withResult = familySaves.find(s => s.finalResult);
+          if (withResult) {
+            const fname = withResult.familyData?.familyName || withResult.goalPrompt?.replace(/^家族命盤 — /, '').split('（')[0] || '';
+            if (!currentLocal?.familyName) setFamilyName(fname);
+            setResult(withResult.finalResult);
+            setPhase("result");
+            // Do NOT saveFamilyLocal with empty members — preserve whatever local has
           }
         })
         .catch(() => setServerLoaded(true));
