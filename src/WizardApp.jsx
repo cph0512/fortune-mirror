@@ -28,7 +28,7 @@ const API_TRACK = IS_TEST
 const API_BASE = IS_TEST
   ? "https://fortune-sandbox-352618635098.asia-east1.run.app"
   : "https://fortune-api-64kdjyxhpq-de.a.run.app";
-const API_HOROSCOPE = "https://api.destinytelling.life:3083/api/horoscope";
+const API_HOROSCOPE = "https://api.destinytelling.life/api/horoscope";
 const ZODIAC_KEYS = ["aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"];
 const ZODIAC_ZH = ["牡羊座","金牛座","雙子座","巨蟹座","獅子座","處女座","天秤座","天蠍座","射手座","摩羯座","水瓶座","雙魚座"];
 const STORAGE_KEY_KB = "fortune-app-kb";
@@ -1580,7 +1580,14 @@ ${hebanRelation === "relations.twin" ? `
                   {readings.map((r, i) => (
                     <div key={r.id || r.time || i} className="wizard-dashboard-card" onClick={() => restoreReading(r)}>
                       <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
-                      <div className="wizard-dashboard-card-title">{r.goalPrompt || r.goal || t('history.analysis')}</div>
+                      <div className="wizard-dashboard-card-title">{(() => {
+                        const raw = r.goalPrompt || r.goal || '';
+                        if (!raw) return t('history.analysis');
+                        // If it's an i18n key (e.g. "goal.generalPrompt"), translate it
+                        if (raw.startsWith('goal.')) return t(raw);
+                        if (raw === 'family') return t('family.chartTitle');
+                        return raw;
+                      })()}</div>
                       <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
                       {r.monthHighlights?.length > 0 && (
                         <div className="wizard-history-months">
