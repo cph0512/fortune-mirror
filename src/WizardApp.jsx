@@ -477,7 +477,16 @@ const TOTAL_STEPS = 5;
 export default function WizardApp({ auth, onBack, onLogout }) {
   const { t, i18n } = useTranslation();
   const currentLang = i18n.language || 'zh-TW';
-  const changeLang = (lng) => i18n.changeLanguage(lng);
+  const changeLang = (lng) => {
+    i18n.changeLanguage(lng);
+    // Save language preference to server for future sessions
+    if (wizardUser?.email) {
+      fetch(`${API_BASE}/api/fortune-session`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: wizardUser.email, session: { _lang: lng } }),
+      }).catch(() => {});
+    }
+  };
 
   const savedAuth = loadAuth();
   const saved = loadSession(savedAuth);
@@ -665,6 +674,44 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   }, []);
 
+  // Translate horoscope text fields to target language
+  const translateHoroscope = async (horoscope, targetLang) => {
+    if (!horoscope || targetLang === 'zh-TW') return horoscope;
+    const langName = LANG_AI[targetLang] || targetLang;
+    const textToTranslate = JSON.stringify({
+      summary: horoscope.summary,
+      love: horoscope.love?.text,
+      career: horoscope.career?.text,
+      wealth: horoscope.wealth?.text,
+      health: horoscope.health?.text,
+      advice: horoscope.advice,
+      lucky_color: horoscope.lucky_color,
+      lucky_item: horoscope.lucky_item,
+    });
+    try {
+      const res = await fetch(API_BACKEND, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: [], system: `Translate the following JSON values to ${langName}. Keep JSON keys unchanged. Only output JSON.`, prompt: textToTranslate, user: wizardUser?.email || "guest" }),
+      });
+      if (!res.ok) return horoscope;
+      const { job_id } = await res.json();
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const poll = await fetch(`${API_BACKEND}/${job_id}`);
+        if (!poll.ok) continue;
+        const pd = await poll.json();
+        if (pd.status === "done") {
+          const match = pd.result.match(/\{[\s\S]*\}/);
+          if (match) {
+            const tr = JSON.parse(match[0]);
+            return { ...horoscope, summary: tr.summary || horoscope.summary, love: { ...horoscope.love, text: tr.love || horoscope.love?.text }, career: { ...horoscope.career, text: tr.career || horoscope.career?.text }, wealth: { ...horoscope.wealth, text: tr.wealth || horoscope.wealth?.text }, health: { ...horoscope.health, text: tr.health || horoscope.health?.text }, advice: tr.advice || horoscope.advice, lucky_color: tr.lucky_color || horoscope.lucky_color, lucky_item: tr.lucky_item || horoscope.lucky_item, _lang: targetLang };
+          }
+        }
+      }
+    } catch {}
+    return horoscope;
+  };
+
   // Fetch daily horoscope on mount or when user/zodiac changes
   const fetchHoroscope = async (zodiac) => {
     setHoroscopeLoading(true);
@@ -676,7 +723,13 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       if (!res.ok) throw new Error();
       const data = await res.json();
       if (data.horoscope || data.horoscopes) {
-        setHoroscopeData(data);
+        // Auto-translate if user language is not zh-TW
+        if (currentLang !== 'zh-TW' && data.horoscope) {
+          const translated = await translateHoroscope(data.horoscope, currentLang);
+          setHoroscopeData({ ...data, horoscope: translated });
+        } else {
+          setHoroscopeData(data);
+        }
       } else {
         setHoroscopeData(null);
       }
