@@ -685,39 +685,19 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   }, []);
 
-  // Translate horoscope text fields to target language
+  // Translate horoscope text fields to target language via horoscope server
   const translateHoroscope = async (horoscope, targetLang) => {
     if (!horoscope || targetLang === 'zh-TW') return horoscope;
     const langName = LANG_AI[targetLang] || targetLang;
-    const textToTranslate = JSON.stringify({
-      summary: horoscope.summary,
-      love: horoscope.love?.text,
-      career: horoscope.career?.text,
-      wealth: horoscope.wealth?.text,
-      health: horoscope.health?.text,
-      advice: horoscope.advice,
-      lucky_color: horoscope.lucky_color,
-      lucky_item: horoscope.lucky_item,
-    });
     try {
-      const res = await fetch(API_BACKEND, {
+      const res = await fetch(`${API_HOROSCOPE}/translate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: `Translate the following JSON values to ${langName}. Keep JSON keys unchanged. Only output JSON.`, prompt: textToTranslate, user: wizardUser?.email || "guest" }),
+        body: JSON.stringify({ horoscope, lang: langName }),
       });
       if (!res.ok) return horoscope;
-      const { job_id } = await res.json();
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 2000));
-        const poll = await fetch(`${API_BACKEND}/${job_id}`);
-        if (!poll.ok) continue;
-        const pd = await poll.json();
-        if (pd.status === "done") {
-          const match = pd.result.match(/\{[\s\S]*\}/);
-          if (match) {
-            const tr = JSON.parse(match[0]);
-            return { ...horoscope, summary: tr.summary || horoscope.summary, love: { ...horoscope.love, text: tr.love || horoscope.love?.text }, career: { ...horoscope.career, text: tr.career || horoscope.career?.text }, wealth: { ...horoscope.wealth, text: tr.wealth || horoscope.wealth?.text }, health: { ...horoscope.health, text: tr.health || horoscope.health?.text }, advice: tr.advice || horoscope.advice, lucky_color: tr.lucky_color || horoscope.lucky_color, lucky_item: tr.lucky_item || horoscope.lucky_item, _lang: targetLang };
-          }
-        }
+      const data = await res.json();
+      if (data.ok && data.horoscope) {
+        return { ...data.horoscope, _lang: targetLang };
       }
     } catch {}
     return horoscope;
