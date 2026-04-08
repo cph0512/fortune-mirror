@@ -1655,6 +1655,7 @@ ${hebanRelation === "relations.twin" ? `
               const h = horoscopeData.horoscope;
               return (
                 <div className="wizard-horoscope-card" onClick={() => setShowHoroscopeDetail(!showHoroscopeDetail)}>
+                  {horoscopeData.date && <div className="wizard-horoscope-date">{horoscopeData.date}</div>}
                   {horoscopeData.zodiac && <div className="wizard-horoscope-zodiac-label">{horoscopeData.zodiac}</div>}
                   <div className="wizard-horoscope-stars">
                     {'★'.repeat(h.overall_stars || 0)}{'☆'.repeat(5 - (h.overall_stars || 0))}
