@@ -685,21 +685,22 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   }, []);
 
-  // Translate horoscope text fields to target language via horoscope server
   const translateHoroscope = async (horoscope, targetLang) => {
     if (!horoscope || targetLang === 'zh-TW') return horoscope;
     const langName = LANG_AI[targetLang] || targetLang;
+    console.log('[Horoscope] translating to', langName);
     try {
       const res = await fetch(`${API_HOROSCOPE}/translate`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ horoscope, lang: langName }),
       });
-      if (!res.ok) return horoscope;
+      if (!res.ok) { console.warn('[Horoscope] translate failed', res.status); return horoscope; }
       const data = await res.json();
       if (data.ok && data.horoscope) {
+        console.log('[Horoscope] translated ok');
         return { ...data.horoscope, _lang: targetLang };
       }
-    } catch {}
+    } catch (e) { console.error('[Horoscope] translate error', e); }
     return horoscope;
   };
 
