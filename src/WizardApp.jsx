@@ -1892,9 +1892,9 @@ ${hebanRelation === "relations.twin" ? `
             );
           })()}
 
-          {/* Dashboard — past readings */}
+          {/* Dashboard — past readings (filter out chat-only entries) */}
           {(() => {
-            const readings = serverReadings;
+            const readings = serverReadings.filter(r => r.finalResult || r.result);
             if (readings.length === 0) return null;
             return (
               <div className="wizard-dashboard">
@@ -1906,10 +1906,13 @@ ${hebanRelation === "relations.twin" ? `
                         <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => restoreReading(r)}>
                           <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                           <div className="wizard-dashboard-card-title">{(() => {
-                            const raw = r.goalPrompt || r.goal || '';
+                            let raw = r.goalPrompt || r.goal || '';
                             if (!raw) return t('history.analysis');
-                            if (raw.startsWith('goal.')) return t(raw);
-                            if (raw === 'family') return t('family.chartTitle');
+                            // Strip (chat) suffix and translate the base key
+                            const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
+                            if (baseKey.startsWith('goal.')) return t(baseKey);
+                            if (baseKey === 'family') return t('family.chartTitle');
+                            if (raw.startsWith('合盤')) return raw;
                             return raw;
                           })()}</div>
                           <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
