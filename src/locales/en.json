@@ -175,6 +175,17 @@
     "good": "Good",
     "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
   },
+  "charts": {
+    "title": "My Charts",
+    "systems": "systems",
+    "delete": "Delete",
+    "noChartData": "No chart data yet. Please complete a full analysis first.",
+    "confirmDelete": "Delete chart for \"{{name}}\"?",
+    "confirmDeleteReading": "Delete this reading?",
+    "confirmDeleteFamily": "Delete family chart \"{{name}}\"? All related analyses will also be deleted.",
+    "chartOf": "'s Chart",
+    "askAboutChart": "Ask questions directly — answers will be based on real chart data"
+  },
   "history": {
     "pastReadings": "Past Readings ({{count}})",
     "analysis": "Analysis"

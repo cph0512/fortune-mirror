@@ -133,6 +133,7 @@ async function saveChatToServer(user, chatHistory, finalResult, goal, goalPrompt
 // READING HISTORY (server-first, localStorage fallback)
 // ============================================================
 const API_SAVE = API_BACKEND.replace("/api/fortune", "/api/fortune-save");
+const API_CHARTS = API_BACKEND.replace("/api/fortune", "/api/fortune-charts");
 const READINGS_KEY_PREFIX = "wizard-readings-";
 function readingsKey(user) {
   return user?.email ? `${READINGS_KEY_PREFIX}${user.email}` : `${READINGS_KEY_PREFIX}guest`;
@@ -189,6 +190,49 @@ async function saveReading(user, reading) {
     });
     if (!res.ok) console.error("[saveReading] failed:", res.status, await res.text().catch(() => ""));
   } catch (e) { console.error("[saveReading] error:", e); }
+}
+
+// ============================================================
+// CHARTS (命盤庫)
+// ============================================================
+async function loadCharts(user) {
+  if (!user?.email) return [];
+  try {
+    const res = await fetch(`${API_CHARTS}?user=${encodeURIComponent(user.email)}`);
+    if (res.ok) return await res.json();
+  } catch {}
+  return [];
+}
+async function saveChart(user, chart) {
+  if (!user?.email) return null;
+  try {
+    const res = await fetch(API_CHARTS, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: user.email, chart }),
+    });
+    if (res.ok) { const d = await res.json(); return d.chart; }
+  } catch {}
+  return null;
+}
+async function deleteChart(user, chartId) {
+  if (!user?.email) return false;
+  try {
+    const res = await fetch(API_CHARTS, {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: user.email, id: chartId }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+async function deleteReading(user, readingTime) {
+  if (!user?.email) return false;
+  try {
+    const res = await fetch(`${API_SAVE}/delete`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: user.email, time: readingTime }),
+    });
+    return res.ok;
+  } catch { return false; }
 }
 
 // Parse month highlights from analysis result text
@@ -589,6 +633,11 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     }
   }, []);
 
+  // Charts (命盤庫) state
+  const [userCharts, setUserCharts] = useState([]);
+  const [showChartLibrary, setShowChartLibrary] = useState(false);
+  const [selectedChart, setSelectedChart] = useState(null);
+
   // Horoscope state
   const [horoscopeData, setHoroscopeData] = useState(null);
   const [horoscopeLoading, setHoroscopeLoading] = useState(false);
@@ -646,6 +695,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   useEffect(() => {
     if (wizardUser?.email) {
       loadReadings(wizardUser).then(readings => setServerReadings(readings));
+      loadCharts(wizardUser).then(charts => setUserCharts(charts));
       // Sync session from server if local is empty or stale
       loadSessionFromServer(wizardUser).then(serverSess => {
         if (!serverSess) return;
@@ -1180,6 +1230,20 @@ ${astroChart}${twinChartBlock}
             };
             saveReading(wizardUser, newReading);
             setServerReadings(prev => [newReading, ...prev].slice(0, 50));
+            // Auto-save chart to chart library
+            if (wizardUser?.email && rawResults.length > 0) {
+              const chartName = wizardUser.name || wizardUser.email.split("@")[0];
+              const chartData = {
+                name: chartName,
+                is_primary: true,
+                birthData: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace, city: birthCity },
+                gender: gender,
+                charts: Object.fromEntries(rawResults.filter(r => r.text).map(r => [r.system, r.text])),
+              };
+              saveChart(wizardUser, chartData).then(saved => {
+                if (saved) loadCharts(wizardUser).then(c => setUserCharts(c));
+              });
+            }
             break;
           }
         } catch { continue; }
@@ -1212,7 +1276,7 @@ ${astroChart}${twinChartBlock}
       // Build raw chart data block for accurate follow-up
       const chartBlock = rawResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
       const hebanBlock = hebanResult ? `\n\n===== 合盤分析報告（${hebanName || '對方'}，${t(hebanRelation) || ''}）=====\n${hebanResult}` : "";
-      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n===== 分析報告 =====\n` : ""}之前的完整分析報告：\n${finalResult}${hebanBlock}\n\n${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先根據原始排盤資料中的宮位、飛化、星曜組合、四柱十神、行星相位進行深度推論，給出具體而非籠統的回答\n3. 排盤資料是精確計算的結果，必須以此為依據，不可編造或猜測命盤中不存在的星曜、宮位、相位\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 如果問題涉及兩人關係，必須參考合盤分析報告的內容\n6. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
+      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 分析報告 =====\n之前的完整分析報告：\n${finalResult}\n\n` : ""}${hebanBlock}${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先根據原始排盤資料中的宮位、飛化、星曜組合、四柱十神、行星相位進行深度推論，給出具體而非籠統的回答\n3. 排盤資料是精確計算的結果，必須以此為依據，不可編造或猜測命盤中不存在的星曜、宮位、相位\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 如果問題涉及兩人關係，必須參考合盤分析報告的內容\n6. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
       const isDeep = /大運|流年|逐月|十年|運勢走向|life phase|month.by.month/i.test(question);
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
@@ -1670,6 +1734,69 @@ ${hebanRelation === "relations.twin" ? `
             )}
           </div>
 
+          {/* Charts Library (命盤庫) */}
+          {wizardUser && userCharts.length > 0 && (
+            <div className="wizard-charts-section" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
+              <div className="wizard-heban-promo-header" style={{ marginBottom: 12 }}>
+                <span className="wizard-heban-promo-icon">📚</span>
+                <div className="wizard-heban-promo-title">{t('charts.title')}</div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {userCharts.map(chart => (
+                  <div key={chart.id} className="wizard-dashboard-card" style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => {
+                        // Load this chart into state and go to follow-up
+                        if (!chart.charts || Object.keys(chart.charts).length === 0) {
+                          alert(t('charts.noChartData'));
+                          return;
+                        }
+                        const results = Object.entries(chart.charts).map(([sys, text]) => ({ system: sys, text, result: "" }));
+                        setRawResults(results);
+                        if (chart.birthData) {
+                          setBirthYear(chart.birthData.year || "");
+                          setBirthMonth(chart.birthData.month || "");
+                          setBirthDay(chart.birthData.day || "");
+                          setBirthHour(chart.birthData.hour || "");
+                          setBirthMinute(chart.birthData.minute || "0");
+                          if (chart.birthData.place) setBirthPlace(chart.birthData.place);
+                          if (chart.birthData.city) setBirthCity(chart.birthData.city);
+                        }
+                        if (chart.gender) setGender(chart.gender);
+                        setFinalResult("");
+                        setChatHistory([]);
+                        setGoal("goal.general");
+                        setGoalPrompt("goal.generalPrompt");
+                        setSelectedChart(chart);
+                        setShowQuickQ(true);
+                        setStep(TOTAL_STEPS + 1);
+                      }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+                          {chart.name} {chart.is_primary && '⭐'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                          {chart.birthData ? `${chart.birthData.year}/${chart.birthData.month}/${chart.birthData.day}` : ''}
+                          {chart.gender ? ` · ${chart.gender === '男' ? t('welcome.male') : t('welcome.female')}` : ''}
+                          {chart.charts ? ` · ${Object.keys(chart.charts).length} ${t('charts.systems')}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.6)', fontSize: 16, cursor: 'pointer', padding: '4px 8px' }}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
+                          const ok = await deleteChart(wizardUser, chart.id);
+                          if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
+                        }}
+                        title={t('charts.delete')}
+                      >✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Family Chart — show existing family or create new */}
           {(() => {
             const familySaves = serverReadings.filter(r => r.goal === "family" && r.familyData?.members?.length > 0);
@@ -1701,15 +1828,42 @@ ${hebanRelation === "relations.twin" ? `
                       const memberCount = latest.familyData?.members?.length || 0;
                       const protoName = latest.familyData?.protagonist?.name || '';
                       return (
-                        <div key={fname} className="wizard-dashboard-card" onClick={() => setShowFamily(true)} style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{fname}</div>
-                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-                            {memberCount > 0 ? `${memberCount} ${t('family.members', { defaultValue: '位成員' })}` : ''}
-                            {protoName ? ` · ${t('family.protagonist', { defaultValue: '主角' })}：${protoName}` : ''}
+                        <div key={fname} className="wizard-dashboard-card" style={{ position: 'relative' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ flex: 1, cursor: 'pointer', textAlign: 'center' }} onClick={() => setShowFamily(true)}>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{fname}</div>
+                              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+                                {memberCount > 0 ? `${memberCount} ${t('family.members', { defaultValue: '位成員' })}` : ''}
+                                {protoName ? ` · ${t('family.protagonist', { defaultValue: '主角' })}：${protoName}` : ''}
+                              </div>
+                              {saves.length > 1 && (
+                                <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{saves.length} {t('family.analyses', { defaultValue: '次分析' })}</div>
+                              )}
+                            </div>
+                            {wizardUser && (
+                              <button
+                                style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.6)', fontSize: 16, cursor: 'pointer', padding: '4px 8px' }}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm(t('charts.confirmDeleteFamily', { name: fname }))) return;
+                                  // Delete all saves for this family
+                                  for (const s of saves) {
+                                    if (s.time) await deleteReading(wizardUser, s.time);
+                                  }
+                                  setServerReadings(prev => prev.filter(s => {
+                                    const n = s.familyData?.familyName || s.goalPrompt?.replace(/^家族命盤 — /, '');
+                                    return n !== fname;
+                                  }));
+                                  // Also clear localStorage family data if matching
+                                  try {
+                                    const local = JSON.parse(localStorage.getItem("fortune-family-data") || "{}");
+                                    if (local.familyName === fname) localStorage.removeItem("fortune-family-data");
+                                  } catch {}
+                                }}
+                                title={t('charts.delete')}
+                              >✕</button>
+                            )}
                           </div>
-                          {saves.length > 1 && (
-                            <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{saves.length} {t('family.analyses', { defaultValue: '次分析' })}</div>
-                          )}
                         </div>
                       );
                     })}
@@ -1747,24 +1901,40 @@ ${hebanRelation === "relations.twin" ? `
                 <div className="wizard-dashboard-title">{t('history.pastReadings', { count: readings.length })}</div>
                 <div className="wizard-dashboard-list">
                   {readings.map((r, i) => (
-                    <div key={r.id || r.time || i} className="wizard-dashboard-card" onClick={() => restoreReading(r)}>
-                      <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
-                      <div className="wizard-dashboard-card-title">{(() => {
-                        const raw = r.goalPrompt || r.goal || '';
-                        if (!raw) return t('history.analysis');
-                        if (raw.startsWith('goal.')) return t(raw);
-                        if (raw === 'family') return t('family.chartTitle');
-                        return raw;
-                      })()}</div>
-                      <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
-                      {r.monthHighlights?.length > 0 && (
-                        <div className="wizard-history-months">
-                          {Array.from({ length: 12 }, (_, mi) => {
-                            const found = r.monthHighlights.find(h => h.month === mi + 1);
-                            return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
-                          })}
+                    <div key={r.id || r.time || i} className="wizard-dashboard-card" style={{ position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => restoreReading(r)}>
+                          <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
+                          <div className="wizard-dashboard-card-title">{(() => {
+                            const raw = r.goalPrompt || r.goal || '';
+                            if (!raw) return t('history.analysis');
+                            if (raw.startsWith('goal.')) return t(raw);
+                            if (raw === 'family') return t('family.chartTitle');
+                            return raw;
+                          })()}</div>
+                          <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
+                          {r.monthHighlights?.length > 0 && (
+                            <div className="wizard-history-months">
+                              {Array.from({ length: 12 }, (_, mi) => {
+                                const found = r.monthHighlights.find(h => h.month === mi + 1);
+                                return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
+                        {wizardUser && (
+                          <button
+                            style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.6)', fontSize: 16, cursor: 'pointer', padding: '4px 8px', flexShrink: 0 }}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm(t('charts.confirmDeleteReading'))) return;
+                              const ok = await deleteReading(wizardUser, r.time || r.date);
+                              if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
+                            }}
+                            title={t('charts.delete')}
+                          >✕</button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2120,6 +2290,21 @@ ${hebanRelation === "relations.twin" ? `
     return (
       <div className="wizard-content">
         <div className="wizard-result">
+          {/* Chart info banner when entering from chart library */}
+          {selectedChart && !finalResult && (
+            <div style={{ background: 'rgba(160,140,255,0.1)', border: '1px solid rgba(160,140,255,0.3)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(160,140,255,0.9)' }}>
+                {selectedChart.name} {t('charts.chartOf')}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                {selectedChart.birthData ? `${selectedChart.birthData.year}/${selectedChart.birthData.month}/${selectedChart.birthData.day}` : ''}
+                {selectedChart.gender ? ` · ${selectedChart.gender === '男' ? t('welcome.male') : t('welcome.female')}` : ''}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                {t('charts.askAboutChart')}
+              </div>
+            </div>
+          )}
           <div className="wizard-question" style={{ marginBottom: 12 }}>{t('result.title')}</div>
 
           <div className="wizard-translate-bar">

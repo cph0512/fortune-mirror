@@ -468,6 +468,24 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             saveFamilyToServer(apiBackend, wizardUser, {
               result: data.result, familyName, members: membersToAnalyze, protagonist: proto,
             }, getVisitorId);
+            // Save each member's chart to chart library
+            if (wizardUser?.email) {
+              const chartsUrl = apiBackend.replace("/api/fortune", "/api/fortune-charts");
+              for (const m of membersToAnalyze) {
+                if (m.charts && Object.keys(m.charts).length > 0) {
+                  const chartData = {
+                    name: m.name,
+                    is_primary: m.role === "self",
+                    birthData: { year: m.year, month: m.month, day: m.day, hour: m.hour, minute: m.minute, place: m.place, city: m.cityData },
+                    gender: m.gender,
+                    charts: { ...(m.charts.ziwei ? { '紫微斗數': m.charts.ziwei } : {}), ...(m.charts.bazi ? { '八字': m.charts.bazi } : {}), ...(m.charts.astro ? { '西洋占星': m.charts.astro } : {}) },
+                    source: "family",
+                    familyName: familyName,
+                  };
+                  fetch(chartsUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: wizardUser.email, chart: chartData }) }).catch(() => {});
+                }
+              }
+            }
             break;
           }
         } catch { continue; }
