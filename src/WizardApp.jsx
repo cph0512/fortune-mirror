@@ -635,8 +635,17 @@ export default function WizardApp({ auth, onBack, onLogout }) {
 
   // Charts (命盤庫) state
   const [userCharts, setUserCharts] = useState([]);
-  const [showChartLibrary, setShowChartLibrary] = useState(false);
+  const [showAddChart, setShowAddChart] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
+  const [newChartName, setNewChartName] = useState("");
+  const [newChartGender, setNewChartGender] = useState("");
+  const [newChartYear, setNewChartYear] = useState("");
+  const [newChartMonth, setNewChartMonth] = useState("");
+  const [newChartDay, setNewChartDay] = useState("");
+  const [newChartHour, setNewChartHour] = useState("");
+  const [newChartMinute, setNewChartMinute] = useState("0");
+  const [newChartPlace, setNewChartPlace] = useState("");
+  const [newChartSaving, setNewChartSaving] = useState(false);
 
   // Horoscope state
   const [horoscopeData, setHoroscopeData] = useState(null);
@@ -1735,65 +1744,108 @@ ${hebanRelation === "relations.twin" ? `
           </div>
 
           {/* Charts Library (命盤庫) */}
-          {wizardUser && userCharts.length > 0 && (
+          {wizardUser && (
             <div className="wizard-charts-section" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
               <div className="wizard-heban-promo-header" style={{ marginBottom: 12 }}>
-                <span className="wizard-heban-promo-icon">📚</span>
+                <span className="wizard-heban-promo-icon wizard-diamond"></span>
                 <div className="wizard-heban-promo-title">{t('charts.title')}</div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {userCharts.map(chart => (
-                  <div key={chart.id} className="wizard-dashboard-card" style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => {
-                        // Load this chart into state and go to follow-up
-                        if (!chart.charts || Object.keys(chart.charts).length === 0) {
-                          alert(t('charts.noChartData'));
-                          return;
-                        }
-                        const results = Object.entries(chart.charts).map(([sys, text]) => ({ system: sys, text, result: "" }));
-                        setRawResults(results);
-                        if (chart.birthData) {
-                          setBirthYear(chart.birthData.year || "");
-                          setBirthMonth(chart.birthData.month || "");
-                          setBirthDay(chart.birthData.day || "");
-                          setBirthHour(chart.birthData.hour || "");
-                          setBirthMinute(chart.birthData.minute || "0");
-                          if (chart.birthData.place) setBirthPlace(chart.birthData.place);
-                          if (chart.birthData.city) setBirthCity(chart.birthData.city);
-                        }
-                        if (chart.gender) setGender(chart.gender);
-                        setFinalResult("");
-                        setChatHistory([]);
-                        setGoal("goal.general");
-                        setGoalPrompt("goal.generalPrompt");
-                        setSelectedChart(chart);
-                        setShowQuickQ(true);
-                        setStep(TOTAL_STEPS + 1);
-                      }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
-                          {chart.name} {chart.is_primary && '⭐'}
+
+              {/* Existing charts */}
+              {userCharts.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {userCharts.map(chart => {
+                    const hasChartData = chart.charts && Object.keys(chart.charts).length > 0;
+                    return (
+                      <div key={chart.id} className="wizard-dashboard-card" style={{ position: 'relative' }}>
+                        {/* Main clickable area */}
+                        <div style={{ cursor: 'pointer' }} onClick={() => {
+                          if (!hasChartData) {
+                            // No chart data — go to analysis flow with this person's birth data pre-filled
+                            if (chart.birthData) {
+                              setBirthYear(chart.birthData.year || "");
+                              setBirthMonth(chart.birthData.month || "");
+                              setBirthDay(chart.birthData.day || "");
+                              setBirthHour(chart.birthData.hour || "");
+                              setBirthMinute(chart.birthData.minute || "0");
+                              if (chart.birthData.place) setBirthPlace(chart.birthData.place);
+                              if (chart.birthData.city) setBirthCity(chart.birthData.city);
+                            }
+                            if (chart.gender) setGender(chart.gender);
+                            setStep(1); // Go to goal selection
+                            return;
+                          }
+                          // Has chart data — load and go to follow-up
+                          const results = Object.entries(chart.charts).map(([sys, text]) => ({ system: sys, text, result: "" }));
+                          setRawResults(results);
+                          if (chart.birthData) {
+                            setBirthYear(chart.birthData.year || "");
+                            setBirthMonth(chart.birthData.month || "");
+                            setBirthDay(chart.birthData.day || "");
+                            setBirthHour(chart.birthData.hour || "");
+                            setBirthMinute(chart.birthData.minute || "0");
+                            if (chart.birthData.place) setBirthPlace(chart.birthData.place);
+                            if (chart.birthData.city) setBirthCity(chart.birthData.city);
+                          }
+                          if (chart.gender) setGender(chart.gender);
+                          setFinalResult("");
+                          setChatHistory([]);
+                          setGoal("goal.general");
+                          setGoalPrompt("goal.generalPrompt");
+                          setSelectedChart(chart);
+                          setShowQuickQ(true);
+                          setStep(TOTAL_STEPS + 1);
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
+                              {chart.name} {chart.is_primary ? '⭐' : ''}
+                            </div>
+                            <div style={{ fontSize: 12, color: hasChartData ? 'rgba(120,200,160,0.8)' : 'rgba(255,180,100,0.7)' }}>
+                              {hasChartData ? t('charts.ready') : t('charts.notCalculated')}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                            {chart.birthData ? `${chart.birthData.year}/${chart.birthData.month}/${chart.birthData.day} ${chart.birthData.hour || '?'}:${chart.birthData.minute || '00'}` : ''}
+                            {chart.gender ? ` · ${chart.gender === '男' ? t('welcome.male') : t('welcome.female')}` : ''}
+                            {chart.birthData?.place ? ` · ${chart.birthData.place}` : ''}
+                          </div>
                         </div>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                          {chart.birthData ? `${chart.birthData.year}/${chart.birthData.month}/${chart.birthData.day}` : ''}
-                          {chart.gender ? ` · ${chart.gender === '男' ? t('welcome.male') : t('welcome.female')}` : ''}
-                          {chart.charts ? ` · ${Object.keys(chart.charts).length} ${t('charts.systems')}` : ''}
+                        {/* Action buttons */}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                          {!chart.is_primary && (
+                            <button
+                              style={{ background: 'none', border: '1px solid rgba(160,140,255,0.3)', color: 'rgba(160,140,255,0.8)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                // Unset all others, set this as primary
+                                for (const c of userCharts) {
+                                  if (c.is_primary) await saveChart(wizardUser, { ...c, is_primary: false });
+                                }
+                                await saveChart(wizardUser, { ...chart, is_primary: true });
+                                loadCharts(wizardUser).then(c => setUserCharts(c));
+                              }}
+                            >{t('charts.setAsPrimary')}</button>
+                          )}
+                          <button
+                            style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', color: 'rgba(255,100,100,0.6)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
+                              const ok = await deleteChart(wizardUser, chart.id);
+                              if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
+                            }}
+                          >{t('charts.delete')}</button>
                         </div>
                       </div>
-                      <button
-                        style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.6)', fontSize: 16, cursor: 'pointer', padding: '4px 8px' }}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
-                          const ok = await deleteChart(wizardUser, chart.id);
-                          if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
-                        }}
-                        title={t('charts.delete')}
-                      >✕</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add new chart button */}
+              <button className="wizard-cta-secondary" style={{ width: '100%' }} onClick={() => setShowAddChart(true)}>
+                + {t('charts.addNew')}
+              </button>
             </div>
           )}
 
@@ -2682,6 +2734,89 @@ ${hebanRelation === "relations.twin" ? `
         : renderLoading()}
 
       <div className="wizard-footer">{t('app.footer')}</div>
+
+      {/* Add Chart Modal */}
+      {showAddChart && (
+        <div className="wizard-auth-overlay" onClick={() => setShowAddChart(false)}>
+          <div className="wizard-auth-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <h3 style={{ margin: '0 0 16px', color: '#fff' }}>{t('charts.addNew')}</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input className="wizard-input" placeholder={t('charts.nameLabel')} value={newChartName} onChange={e => setNewChartName(e.target.value)} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className={`wizard-gender-card ${newChartGender === '男' ? 'selected' : ''}`} style={{ flex: 1, padding: 8 }} onClick={() => setNewChartGender('男')}>
+                  {t('welcome.male')}
+                </button>
+                <button className={`wizard-gender-card ${newChartGender === '女' ? 'selected' : ''}`} style={{ flex: 1, padding: 8 }} onClick={() => setNewChartGender('女')}>
+                  {t('welcome.female')}
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select className="wizard-select" value={newChartYear} onChange={e => setNewChartYear(e.target.value)} style={{ flex: 2 }}>
+                  <option value="">{t('birthday.year')}</option>
+                  {Array.from({ length: 87 }, (_, i) => new Date().getFullYear() + 1 - i).map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <select className="wizard-select" value={newChartMonth} onChange={e => setNewChartMonth(e.target.value)} style={{ flex: 1 }}>
+                  <option value="">{t('birthday.month')}</option>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+                <select className="wizard-select" value={newChartDay} onChange={e => setNewChartDay(e.target.value)} style={{ flex: 1 }}>
+                  <option value="">{t('birthday.day')}</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select className="wizard-select" value={newChartHour} onChange={e => setNewChartHour(e.target.value)} style={{ flex: 1 }}>
+                  <option value="">{t('birthday.hour')}</option>
+                  {Array.from({ length: 24 }, (_, i) => i).map(h => <option key={h} value={h}>{h}{t('birthday.hourSuffix')}</option>)}
+                </select>
+                <select className="wizard-select" value={newChartMinute} onChange={e => setNewChartMinute(e.target.value)} style={{ flex: 1 }}>
+                  <option value="0">{t('birthday.minute')}</option>
+                  {[0,5,10,15,20,25,30,35,40,45,50,55].map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <input className="wizard-input" placeholder={t('charts.placeLabel')} value={newChartPlace} onChange={e => setNewChartPlace(e.target.value)} />
+              <button
+                className="wizard-cta"
+                disabled={!newChartName || !newChartGender || !newChartYear || !newChartMonth || !newChartDay || newChartSaving}
+                onClick={async () => {
+                  setNewChartSaving(true);
+                  try {
+                    const y = parseInt(newChartYear), m = parseInt(newChartMonth), d = parseInt(newChartDay);
+                    const h = newChartHour ? parseInt(newChartHour) : 12;
+                    const min = parseInt(newChartMinute) || 0;
+                    const g = newChartGender === '男' ? 1 : 0;
+                    // Calculate all 3 charts
+                    const ziweiChart = formatChart(calculateChart(y, m, d, h, min, g));
+                    const baziChart = formatBazi(calculateBazi(y, m, d, h, g, min));
+                    let astroChart = "";
+                    try { astroChart = formatAstro(calculateAstro(y, m, d, h, min)); } catch {}
+                    const chartData = {
+                      name: newChartName,
+                      is_primary: userCharts.length === 0,
+                      birthData: { year: String(y), month: String(m), day: String(d), hour: String(h), minute: String(min), place: newChartPlace },
+                      gender: newChartGender,
+                      charts: {
+                        '紫微斗數': ziweiChart,
+                        '八字': baziChart,
+                        ...(astroChart ? { '西洋占星': astroChart } : {}),
+                      },
+                    };
+                    const saved = await saveChart(wizardUser, chartData);
+                    if (saved) {
+                      loadCharts(wizardUser).then(c => setUserCharts(c));
+                      setShowAddChart(false);
+                      setNewChartName(""); setNewChartGender(""); setNewChartYear(""); setNewChartMonth(""); setNewChartDay(""); setNewChartHour(""); setNewChartMinute("0"); setNewChartPlace("");
+                    }
+                  } catch (err) { alert(t('charts.calcError') + ': ' + err.message); }
+                  finally { setNewChartSaving(false); }
+                }}
+              >
+                {newChartSaving ? '...' : t('charts.calcAndSave')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAuthModal && (
         <div className="wizard-auth-overlay" onClick={() => setShowAuthModal(false)}>

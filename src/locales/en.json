@@ -179,12 +179,20 @@
     "title": "My Charts",
     "systems": "systems",
     "delete": "Delete",
+    "ready": "Ready",
+    "notCalculated": "Not yet calculated",
     "noChartData": "No chart data yet. Please complete a full analysis first.",
     "confirmDelete": "Delete chart for \"{{name}}\"?",
     "confirmDeleteReading": "Delete this reading?",
     "confirmDeleteFamily": "Delete family chart \"{{name}}\"? All related analyses will also be deleted.",
     "chartOf": "'s Chart",
-    "askAboutChart": "Ask questions directly — answers will be based on real chart data"
+    "askAboutChart": "Ask questions directly — answers will be based on real chart data",
+    "setAsPrimary": "Set as primary",
+    "addNew": "Add Chart",
+    "nameLabel": "Name",
+    "placeLabel": "Birthplace (optional)",
+    "calcAndSave": "Calculate & Save",
+    "calcError": "Calculation failed"
   },
   "history": {
     "pastReadings": "Past Readings ({{count}})",

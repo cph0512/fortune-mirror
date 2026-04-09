@@ -179,12 +179,20 @@
     "title": "マイ命盤",
     "systems": "システム",
     "delete": "削除",
+    "ready": "質問可能",
+    "notCalculated": "未計算",
     "noChartData": "命盤データがありません。まず完全な鑑定を行ってください。",
     "confirmDelete": "「{{name}}」の命盤を削除しますか？",
     "confirmDeleteReading": "この鑑定記録を削除しますか？",
     "confirmDeleteFamily": "「{{name}}」の家族命盤を削除しますか？関連する鑑定も全て削除されます。",
     "chartOf": "の命盤",
-    "askAboutChart": "質問を入力してください。実際の命盤データに基づいて回答します"
+    "askAboutChart": "質問を入力してください。実際の命盤データに基づいて回答します",
+    "setAsPrimary": "メイン命盤に設定",
+    "addNew": "命盤を追加",
+    "nameLabel": "名前",
+    "placeLabel": "出生地（任意）",
+    "calcAndSave": "計算して保存",
+    "calcError": "計算に失敗しました"
   },
   "history": {
     "pastReadings": "過去の鑑定 ({{count}})",

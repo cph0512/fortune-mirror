@@ -180,12 +180,20 @@
     "title": "我的命盤庫",
     "systems": "系統",
     "delete": "刪除",
+    "ready": "可提問",
+    "notCalculated": "尚未排盤",
     "noChartData": "此命盤尚無排盤資料，請先進行一次完整分析",
     "confirmDelete": "確定要刪除「{{name}}」的命盤嗎？",
     "confirmDeleteReading": "確定要刪除此筆歷史紀錄嗎？",
     "confirmDeleteFamily": "確定要刪除「{{name}}」的家族命盤嗎？所有相關分析也會一起刪除。",
     "chartOf": "的命盤",
-    "askAboutChart": "你可以直接提問，系統會根據此命盤的真實排盤資料回答"
+    "askAboutChart": "你可以直接提問，系統會根據此命盤的真實排盤資料回答",
+    "setAsPrimary": "設為本命盤",
+    "addNew": "新增命盤",
+    "nameLabel": "姓名",
+    "placeLabel": "出生地（選填）",
+    "calcAndSave": "排盤並儲存",
+    "calcError": "排盤失敗"
   },
   "history": {
     "pastReadings": "歷史紀錄 ({{count}})",
