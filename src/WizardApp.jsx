@@ -663,7 +663,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     } else {
       setFinalResult(resultText);
     }
-    if (reading.rawResults) setRawResults(reading.rawResults);
+    let restoredResults = reading.rawResults || [];
     if (reading.goal) setGoal(reading.goal);
     if (reading.goalPrompt) setGoalPrompt(reading.goalPrompt);
     if (reading.gender) setGender(reading.gender);
@@ -675,7 +675,26 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       setBirthMinute(reading.birthData.minute || "0");
       if (reading.birthData.place) setBirthPlace(reading.birthData.place);
       if (reading.birthData.city) setBirthCity(reading.birthData.city);
+
+      // 自動補算/更新疊宮分析（確保是當前年份）
+      try {
+        const bd = reading.birthData;
+        const g = reading.gender || "男";
+        const cityObj = bd.city || findCity(bd.place);
+        const tst = calculateTrueSolarTime(
+          parseInt(bd.year), parseInt(bd.month), parseInt(bd.day),
+          parseInt(bd.hour), parseInt(bd.minute || 0),
+          cityObj?.lng || 121.3130, cityObj?.timezone || "Asia/Taipei"
+        );
+        const ziweiRaw = calculateChart(tst.adjustedYear, tst.adjustedMonth, tst.adjustedDay, tst.trueSolarHour, tst.trueSolarMinute, g);
+        const overlay = calculateTransitOverlay(ziweiRaw);
+        if (overlay?.summary) {
+          restoredResults = restoredResults.filter(r => r.system !== "疊宮分析");
+          restoredResults.push({ system: "疊宮分析", text: overlay.summary, result: "" });
+        }
+      } catch (e) { console.warn("[restoreReading] overlay calc failed:", e); }
     }
+    setRawResults(restoredResults);
     setChatHistory(Array.isArray(reading.chat) && reading.chat.length > 0 ? reading.chat : []);
     setHebanResult("");
     setShowHeban(false);
@@ -1290,8 +1309,38 @@ ${transitOverlay?.summary || ''}
       const kbEntries = loadKB();
       const wizardSP = buildWizardPrompt(kbEntries, goal);
       const recentChat = chatHistory.slice(-10).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
+
+      // 確保疊宮分析是最新的（檢查年份，需要時重算）
+      let currentResults = [...rawResults];
+      const existingOverlay = currentResults.find(r => r.system === "疊宮分析");
+      const currentYear = new Date().getFullYear();
+      const overlayYear = existingOverlay?.text?.match(/【(\d{4})年流年】/)?.[1];
+      // 追問涉及特定年份？
+      const mentionedYear = question.match(/(20\d{2})\s*年/)?.[1];
+      const targetYear = mentionedYear ? parseInt(mentionedYear) : currentYear;
+
+      if (!existingOverlay || (overlayYear && parseInt(overlayYear) !== targetYear)) {
+        // 重新計算疊宮（用存的 birthData 重排紫微盤）
+        if (birthYear && birthMonth && birthDay && birthHour !== undefined) {
+          try {
+            const tst = calculateTrueSolarTime(
+              parseInt(birthYear), parseInt(birthMonth), parseInt(birthDay),
+              parseInt(birthHour), parseInt(birthMinute || 0),
+              birthCity?.lng || 121.3130, birthCity?.timezone || "Asia/Taipei"
+            );
+            const ziweiRaw = calculateChart(tst.adjustedYear, tst.adjustedMonth, tst.adjustedDay, tst.trueSolarHour, tst.trueSolarMinute, gender);
+            const overlay = calculateTransitOverlay(ziweiRaw, targetYear);
+            if (overlay?.summary) {
+              currentResults = currentResults.filter(r => r.system !== "疊宮分析");
+              currentResults.push({ system: "疊宮分析", text: overlay.summary, result: "" });
+              setRawResults(currentResults);
+            }
+          } catch (e) { console.warn("[TransitOverlay] recalc failed:", e); }
+        }
+      }
+
       // Build raw chart data block for accurate follow-up
-      const chartBlock = rawResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
+      const chartBlock = currentResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
       const hebanBlock = hebanResult ? `\n\n===== 合盤分析報告（${hebanName || '對方'}，${t(hebanRelation) || ''}）=====\n${hebanResult}` : "";
       const hasTimeQ = /月|年|季|時|何時|when|最近|今年|明年|上半|下半|幾月|什麼時候|進財|財運|感情運|健康運|事業運|運勢/i.test(question);
       const transitBlock = hasTimeQ ? `\n\n⚠️ 時間相關問題 — 排盤資料中有「疊宮分析結果」區塊，裡面有程式精確計算好的大限/流年/流月四化和疊宮效果。你必須直接根據這些已計算好的結果回答，不可忽略。每個時間判斷都要對應到具體的四化和宮位。如果疊宮結果中找不到依據，就明確說「排盤中沒有明確的跡象」。` : "";
