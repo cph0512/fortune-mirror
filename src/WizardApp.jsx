@@ -133,7 +133,8 @@ async function saveChatToServer(user, chatHistory, finalResult, goal, goalPrompt
 // READING HISTORY (server-first, localStorage fallback)
 // ============================================================
 const API_SAVE = API_BACKEND.replace("/api/fortune", "/api/fortune-save");
-const API_CHARTS = API_BACKEND.replace("/api/fortune", "/api/fortune-charts");
+// Charts API always goes to m4pro scheduler (persistent storage, not Cloud Run stateless)
+const API_CHARTS = "https://bot.velopulse.io/api/fortune-charts";
 const READINGS_KEY_PREFIX = "wizard-readings-";
 function readingsKey(user) {
   return user?.email ? `${READINGS_KEY_PREFIX}${user.email}` : `${READINGS_KEY_PREFIX}guest`;

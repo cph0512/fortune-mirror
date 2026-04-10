@@ -470,7 +470,7 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             }, getVisitorId);
             // Save each member's chart to chart library
             if (wizardUser?.email) {
-              const chartsUrl = apiBackend.replace("/api/fortune", "/api/fortune-charts");
+              const chartsUrl = "https://bot.velopulse.io/api/fortune-charts";
               for (const m of membersToAnalyze) {
                 if (m.charts && Object.keys(m.charts).length > 0) {
                   const chartData = {
