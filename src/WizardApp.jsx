@@ -1806,9 +1806,9 @@ ${hebanRelation === "relations.twin" ? `
                             </div>
                           </div>
                           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                            {chart.birthData ? `${chart.birthData.year}/${chart.birthData.month}/${chart.birthData.day} ${chart.birthData.hour || '?'}:${chart.birthData.minute || '00'}` : ''}
+                            {chart.birthData ? `${chart.birthData.year}/${chart.birthData.month}/${chart.birthData.day} ${String(chart.birthData.hour || 0).padStart(2,'0')}:${String(chart.birthData.minute || 0).padStart(2,'0')}` : ''}
                             {chart.gender ? ` · ${chart.gender === '男' ? t('welcome.male') : t('welcome.female')}` : ''}
-                            {chart.birthData?.place ? ` · ${chart.birthData.place}` : ''}
+                            {chart.birthData?.city?.nameZh ? ` · ${chart.birthData.city.nameZh}` : chart.birthData?.place ? ` · ${chart.birthData.place}` : ''}
                           </div>
                         </div>
                         {/* Action buttons */}
@@ -2353,8 +2353,9 @@ ${hebanRelation === "relations.twin" ? `
                 {selectedChart.name} {t('charts.chartOf')}
               </div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                {selectedChart.birthData ? `${selectedChart.birthData.year}/${selectedChart.birthData.month}/${selectedChart.birthData.day}` : ''}
+                {selectedChart.birthData ? `${selectedChart.birthData.year}/${selectedChart.birthData.month}/${selectedChart.birthData.day} ${String(selectedChart.birthData.hour || 0).padStart(2,'0')}:${String(selectedChart.birthData.minute || 0).padStart(2,'0')}` : ''}
                 {selectedChart.gender ? ` · ${selectedChart.gender === '男' ? t('welcome.male') : t('welcome.female')}` : ''}
+                {selectedChart.birthData?.city?.nameZh ? ` · ${selectedChart.birthData.city.nameZh}` : selectedChart.birthData?.place ? ` · ${selectedChart.birthData.place}` : ''}
               </div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
                 {t('charts.askAboutChart')}
