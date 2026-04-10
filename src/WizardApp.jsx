@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import './i18n.js';
 import './WizardApp.css';
-import { calculateChart, formatChart, formatChartByTianGan } from "./ziwei-calc.js";
+import { calculateChart, formatChart, formatChartByTianGan, calculateTransitOverlay } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
@@ -1095,7 +1095,9 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const tstY = tst.adjustedYear, tstM = tst.adjustedMonth, tstD = tst.adjustedDay;
       const tstH = tst.trueSolarHour, tstMin = tst.trueSolarMinute;
 
-      const ziweiChart = formatChart(calculateChart(tstY, tstM, tstD, tstH, tstMin, gender));
+      const ziweiRaw = calculateChart(tstY, tstM, tstD, tstH, tstMin, gender);
+      const ziweiChart = formatChart(ziweiRaw);
+      const transitOverlay = calculateTransitOverlay(ziweiRaw);
       const baziChart = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, gender, tstMin));
       const astroChart = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
 
@@ -1114,6 +1116,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         { system: "紫微斗數", text: ziweiChart, result: "" },
         { system: "八字", text: baziChart, result: "" },
         { system: "西洋占星", text: astroChart, result: "" },
+        ...(transitOverlay?.summary ? [{ system: "疊宮分析", text: transitOverlay.summary, result: "" }] : []),
       ];
       if (isTwin) {
         results.push(
@@ -1184,7 +1187,7 @@ ${baziChart}
 
 【西洋占星排盤】
 ${astroChart}${twinChartBlock}
-
+${transitOverlay?.summary || ''}
 ## 用戶資料
 - 性別：${gender}
 - 出生：${birthYear}年${birthMonth}月${birthDay}日 ${h}時${min}分
@@ -1201,15 +1204,10 @@ ${astroChart}${twinChartBlock}
 具體做法：先從紫微斗數的命盤格局、四化飛化、大限流年建立核心結論，再用八字的四柱十神大運來驗證和補充紫微的判斷，最後用占星的行星相位宮位提供額外維度。
 三套排盤的結論必須交叉驗證：共鳴點重點強調，矛盾處以紫微為準、八字為輔判。這是我們的核心分析方法。
 
-## 疊宮分析（必要，不可省略）
-凡涉及流年、流月、特定時間段的分析（不限主題：財運、感情、健康、事業皆適用），必須執行以下疊宮處理：
-1. 確認用戶目前的大限宮位（根據出生年、五行局、性別推算），找出大限天干引發的大限四化
-2. 確認當年流年命宮位置（根據出生年地支與流年地支），找出流年天干引發的流年四化
-3. 執行三盤疊宮：本命盤 + 大限盤 + 流年盤疊合，觀察同宮或對宮的四化疊加效果（雙祿、雙忌等）
-4. 若用戶問特定月份，再疊入流月命宮，觀察流月四化與大限/流年四化的交互作用
-5. 分析結論必須引用具體的疊宮格局（例：「流年財帛宮疊本命官祿宮，大限化祿飛入」），但輸出時轉換為自然語言，不暴露術語
-
-不做疊宮就等於沒有看運勢，這是分析準確度的核心。禁止跳過此步驟給出空泛的「會有好運」結論。
+## 疊宮分析（已由程式預先計算完成）
+排盤資料中包含「疊宮分析結果」區塊，裡面有程式精確計算好的：大限四化飛入宮位、流年四化飛入宮位、12個月的流月四化、以及重要疊宮效果（雙祿、雙忌、祿忌沖等）。
+你的任務是：直接根據這些已計算好的疊宮結果來撰寫分析，用自然語言表達，不暴露術語。
+禁止忽略疊宮結果而給出空泛的「會有好運」結論。每個時間段的判斷都必須對應到疊宮結果中的具體四化和宮位。
 
 ⚠️ 嚴格遵守系統規則：不提任何命理系統名稱和專有術語，用自然語言表達所有洞見。
 ⚠️ 按照指定的輸出格式（天賦特質 → 主題深度解析 → 年運勢 → 建議 → 近期提醒）組織內容。
@@ -1296,17 +1294,7 @@ ${astroChart}${twinChartBlock}
       const chartBlock = rawResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
       const hebanBlock = hebanResult ? `\n\n===== 合盤分析報告（${hebanName || '對方'}，${t(hebanRelation) || ''}）=====\n${hebanResult}` : "";
       const hasTimeQ = /月|年|季|時|何時|when|最近|今年|明年|上半|下半|幾月|什麼時候|進財|財運|感情運|健康運|事業運|運勢/i.test(question);
-      const transitBlock = hasTimeQ ? `\n\n⚠️⚠️⚠️ 時間相關問題 — 必須執行疊宮分析 ⚠️⚠️⚠️
-你必須在回答前先在內部完成以下推算步驟（推算過程不輸出，只輸出最終結論）：
-
-步驟1【確認大限】根據排盤資料中的五行局和性別，確認用戶目前走哪個大限（哪個宮位），大限天干是什麼，產生哪四化，飛入哪些宮位。
-步驟2【確認流年】根據排盤資料中的流年資訊，確認今年流年命宮疊在本命哪個宮位，流年天干產生哪四化，飛入哪些宮位。
-步驟3【三盤疊宮】將本命四化 + 大限四化 + 流年四化疊合，找出同宮或對宮的四化疊加（雙祿、雙忌、祿忌沖等）。
-步驟4【流月細化】如果問題涉及特定月份，推算該月流月命宮位置和流月四化，再與大限+流年疊合。
-步驟5【八字驗證】用八字的大運、流年天干地支交叉驗證紫微的疊宮結論。
-步驟6【占星補充】用占星的行運行星過境補充時間判斷。
-
-你的結論必須能追溯到具體的宮位和四化組合。如果你無法從排盤中找到依據，就明確說「排盤中沒有明確的跡象」，而不是編造模糊的好話。` : "";
+      const transitBlock = hasTimeQ ? `\n\n⚠️ 時間相關問題 — 排盤資料中有「疊宮分析結果」區塊，裡面有程式精確計算好的大限/流年/流月四化和疊宮效果。你必須直接根據這些已計算好的結果回答，不可忽略。每個時間判斷都要對應到具體的四化和宮位。如果疊宮結果中找不到依據，就明確說「排盤中沒有明確的跡象」。` : "";
       const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 分析報告 =====\n之前的完整分析報告：\n${finalResult}\n\n` : ""}${hebanBlock}${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先根據原始排盤資料中的宮位、飛化、星曜組合、四柱十神、行星相位進行深度推論，給出具體而非籠統的回答\n3. 排盤資料是精確計算的結果，必須以此為依據，不可編造或猜測命盤中不存在的星曜、宮位、相位\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 如果問題涉及兩人關係，必須參考合盤分析報告的內容\n6. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
       const isDeep = /大運|流年|逐月|十年|運勢走向|life phase|month.by.month/i.test(question);
       const submitRes = await fetch(API_BACKEND, {

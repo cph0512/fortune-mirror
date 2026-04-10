@@ -419,4 +419,259 @@ export function formatChartByTianGan(solarYear, solarMonth, solarDay, gender) {
   return text;
 }
 
+/**
+ * 疊宮分析引擎 — 將本命+大限+流年+流月的四化疊合結果預先計算好
+ * 回傳結構化摘要，供 AI 直接讀取，不需 AI 自己推算
+ */
+export function calculateTransitOverlay(chart, targetYear = null, targetMonths = null) {
+  if (!chart || !chart.horoscope) return null;
+
+  const SI_HUA_TABLE = {
+    "甲":["廉貞","破軍","武曲","太陽"],
+    "乙":["天機","天梁","紫微","太陰"],
+    "丙":["天同","天機","文昌","廉貞"],
+    "丁":["太陰","天同","天機","巨門"],
+    "戊":["貪狼","太陰","右弼","天機"],
+    "己":["武曲","貪狼","天梁","文曲"],
+    "庚":["太陽","武曲","天同","天相"],
+    "辛":["巨門","太陽","文曲","文昌"],
+    "壬":["天梁","紫微","左輔","武曲"],
+    "癸":["破軍","巨門","太陰","貪狼"],
+  };
+  const HUA_NAMES = ["化祿","化權","化科","化忌"];
+
+  const h = chart.horoscope;
+  const year = targetYear || new Date().getFullYear();
+
+  // === 1. 建立本命宮位 → 地支對照 ===
+  const zhiToGong = {};  // 地支 → 本命宮位名
+  const gongToZhi = {};  // 本命宮位名 → 地支
+  for (const zhi of DI_ZHI) {
+    if (chart.gongs[zhi]) {
+      zhiToGong[zhi] = chart.gongs[zhi].name;
+      gongToZhi[chart.gongs[zhi].name] = zhi;
+    }
+  }
+
+  // === 2. 收集每個宮位的四化（按地支） ===
+  // 結構: palaceEffects[zhi] = { gongName, stars, natal:[], decadal:[], yearly:[], monthly:{} }
+  const palaceEffects = {};
+  for (const zhi of DI_ZHI) {
+    palaceEffects[zhi] = {
+      gongName: zhiToGong[zhi] || '',
+      stars: chart.gongs[zhi]?.stars || [],
+      natal: [],    // 本命四化
+      decadal: [],  // 大限四化
+      yearly: [],   // 流年四化
+      monthly: {},  // 各月流月四化 { 1: [], 2: [], ... }
+    };
+  }
+
+  // 輔助：找某顆星在哪個宮位(地支)
+  function findStarZhi(starName) {
+    for (const zhi of DI_ZHI) {
+      const g = chart.gongs[zhi];
+      if (!g) continue;
+      if (g.stars.includes(starName) || g.minor.includes(starName)) return zhi;
+      // 也檢查四化裡的星名
+      if (g.sihua.some(s => s.startsWith(starName))) return zhi;
+    }
+    return null;
+  }
+
+  // === 3. 本命四化 ===
+  for (const [star, hua] of Object.entries(chart.siHua)) {
+    const zhi = findStarZhi(star);
+    if (zhi) {
+      palaceEffects[zhi].natal.push({ star, hua, source: '本命' });
+    }
+  }
+
+  // === 4. 大限四化 ===
+  const dxGan = h.decadal.ganZhi?.[0];
+  if (dxGan && SI_HUA_TABLE[dxGan]) {
+    SI_HUA_TABLE[dxGan].forEach((star, i) => {
+      const zhi = findStarZhi(star);
+      if (zhi) {
+        palaceEffects[zhi].decadal.push({ star, hua: HUA_NAMES[i], source: `大限(${h.decadal.ganZhi})` });
+      }
+    });
+  }
+
+  // === 5. 流年四化 ===
+  const ynGan = h.yearly.ganZhi?.[0];
+  if (ynGan && SI_HUA_TABLE[ynGan]) {
+    SI_HUA_TABLE[ynGan].forEach((star, i) => {
+      const zhi = findStarZhi(star);
+      if (zhi) {
+        palaceEffects[zhi].yearly.push({ star, hua: HUA_NAMES[i], source: `流年(${h.yearly.ganZhi})` });
+      }
+    });
+  }
+
+  // === 6. 流月四化（1-12月）===
+  // 流月命宮推算：流年命宮地支 + 月份偏移
+  const months = targetMonths || [1,2,3,4,5,6,7,8,9,10,11,12];
+  const ynMingIdx = DI_ZHI.indexOf(h.yearly.mingGongZhi);
+
+  // 流月天干推算：年干+月份 → 月干（五虎遁）
+  const TIGER_MAP = { "甲":"丙","乙":"戊","丙":"庚","丁":"壬","戊":"甲","己":"丙","庚":"戊","辛":"庚","壬":"壬","癸":"甲" };
+  function getMonthGan(yearGan, monthNum) {
+    const startGan = TIGER_MAP[yearGan];
+    if (!startGan) return null;
+    const idx = (TIAN_GAN.indexOf(startGan) + (monthNum - 1)) % 10;
+    return TIAN_GAN[idx];
+  }
+
+  const monthlyOverlays = {};
+  for (const m of months) {
+    // 流月命宮：從流年命宮起，正月在流年命宮，二月順一位...
+    const monthMingIdx = (ynMingIdx + (m - 1)) % 12;
+    const monthMingZhi = DI_ZHI[monthMingIdx];
+    const monthGan = getMonthGan(ynGan, m);
+
+    const monthEffects = [];
+    if (monthGan && SI_HUA_TABLE[monthGan]) {
+      SI_HUA_TABLE[monthGan].forEach((star, i) => {
+        const zhi = findStarZhi(star);
+        if (zhi) {
+          const eff = { star, hua: HUA_NAMES[i], source: `流月${m}月(${monthGan})` };
+          monthEffects.push({ ...eff, zhi, gongName: zhiToGong[zhi] });
+          if (!palaceEffects[zhi].monthly[m]) palaceEffects[zhi].monthly[m] = [];
+          palaceEffects[zhi].monthly[m].push(eff);
+        }
+      });
+    }
+
+    monthlyOverlays[m] = {
+      mingGongZhi: monthMingZhi,
+      dieBenGong: zhiToGong[monthMingZhi] || '',
+      gan: monthGan,
+      effects: monthEffects,
+    };
+  }
+
+  // === 7. 找出重疊效果（雙祿、雙忌、祿忌沖等） ===
+  const highlights = [];
+  for (const zhi of DI_ZHI) {
+    const pe = palaceEffects[zhi];
+    const allEffects = [...pe.natal, ...pe.decadal, ...pe.yearly];
+
+    // 統計同宮的化祿/化忌數量
+    const luCount = allEffects.filter(e => e.hua === '化祿').length;
+    const jiCount = allEffects.filter(e => e.hua === '化忌').length;
+    const quanCount = allEffects.filter(e => e.hua === '化權').length;
+
+    if (luCount >= 2) {
+      const sources = allEffects.filter(e => e.hua === '化祿').map(e => `${e.source}${e.star}化祿`);
+      highlights.push({ type: '雙祿', zhi, gongName: pe.gongName, detail: sources.join(' + '), impact: '大吉，該領域資源豐沛' });
+    }
+    if (jiCount >= 2) {
+      const sources = allEffects.filter(e => e.hua === '化忌').map(e => `${e.source}${e.star}化忌`);
+      highlights.push({ type: '雙忌', zhi, gongName: pe.gongName, detail: sources.join(' + '), impact: '該領域壓力加倍，需特別注意' });
+    }
+    if (luCount >= 1 && jiCount >= 1) {
+      highlights.push({ type: '祿忌同宮', zhi, gongName: pe.gongName, detail: `祿忌交會於${pe.gongName}`, impact: '機會與挑戰並存' });
+    }
+    if (quanCount >= 2) {
+      highlights.push({ type: '雙權', zhi, gongName: pe.gongName, detail: '掌控力加倍', impact: '該領域主導力強' });
+    }
+
+    // 對宮沖（化忌沖對宮）
+    const oppIdx = (DI_ZHI.indexOf(zhi) + 6) % 12;
+    const oppZhi = DI_ZHI[oppIdx];
+    const oppGong = zhiToGong[oppZhi] || '';
+    if (jiCount >= 1 && oppGong) {
+      highlights.push({ type: '化忌沖', zhi, gongName: pe.gongName, targetGong: oppGong,
+        detail: `${pe.gongName}化忌沖${oppGong}`, impact: `${oppGong}受沖，該領域易有波折` });
+    }
+
+    // 流月重疊
+    for (const m of months) {
+      const me = pe.monthly[m] || [];
+      const allWithMonth = [...allEffects, ...me];
+      const mLu = allWithMonth.filter(e => e.hua === '化祿').length;
+      const mJi = allWithMonth.filter(e => e.hua === '化忌').length;
+      if (mLu >= 3) {
+        highlights.push({ type: '三祿疊', zhi, gongName: pe.gongName, month: m,
+          detail: `${m}月三祿疊於${pe.gongName}`, impact: '該月此領域極度有利' });
+      }
+      if (mJi >= 3) {
+        highlights.push({ type: '三忌疊', zhi, gongName: pe.gongName, month: m,
+          detail: `${m}月三忌疊於${pe.gongName}`, impact: '該月此領域風險極高' });
+      }
+    }
+  }
+
+  // === 8. 生成 AI 摘要文字 ===
+  let summary = `\n===== 疊宮分析結果（程式計算，非 AI 推測）=====\n\n`;
+
+  summary += `【當前大限】${h.decadal.ganZhi}，大限命宮在${h.decadal.mingGongZhi}宮（疊本命${h.decadal.dieBenGong}）\n`;
+  if (dxGan && SI_HUA_TABLE[dxGan]) {
+    summary += `大限四化：${SI_HUA_TABLE[dxGan].map((s,i) => `${s}${HUA_NAMES[i]}`).join('、')}\n`;
+    SI_HUA_TABLE[dxGan].forEach((star, i) => {
+      const zhi = findStarZhi(star);
+      if (zhi) summary += `  → ${star}${HUA_NAMES[i]} 飛入${zhiToGong[zhi]}（${zhi}宮）\n`;
+    });
+  }
+
+  summary += `\n【${year}年流年】${h.yearly.ganZhi}，流年命宮在${h.yearly.mingGongZhi}宮（疊本命${h.yearly.dieBenGong}）\n`;
+  if (ynGan && SI_HUA_TABLE[ynGan]) {
+    summary += `流年四化：${SI_HUA_TABLE[ynGan].map((s,i) => `${s}${HUA_NAMES[i]}`).join('、')}\n`;
+    SI_HUA_TABLE[ynGan].forEach((star, i) => {
+      const zhi = findStarZhi(star);
+      if (zhi) summary += `  → ${star}${HUA_NAMES[i]} 飛入${zhiToGong[zhi]}（${zhi}宮）\n`;
+    });
+  }
+
+  summary += `\n【流月概覽】\n`;
+  for (const m of months) {
+    const mo = monthlyOverlays[m];
+    summary += `${m}月：命宮在${mo.mingGongZhi}宮（疊本命${mo.dieBenGong}），天干${mo.gan}`;
+    if (mo.effects.length > 0) {
+      summary += `，四化：${mo.effects.map(e => `${e.star}${e.hua}→${e.gongName}`).join('、')}`;
+    }
+    summary += `\n`;
+  }
+
+  if (highlights.length > 0) {
+    summary += `\n【⚠️ 重要疊宮效果】\n`;
+    for (const hl of highlights) {
+      summary += `- ${hl.type}：${hl.detail}`;
+      if (hl.month) summary += `（${hl.month}月）`;
+      summary += ` → ${hl.impact}\n`;
+    }
+  }
+
+  summary += `\n【疊宮總表】\n`;
+  summary += `| 地支 | 本命宮位 | 本命四化 | 大限四化 | 流年四化 |\n`;
+  summary += `|------|----------|----------|----------|----------|\n`;
+  for (const zhi of DI_ZHI) {
+    const pe = palaceEffects[zhi];
+    const natal = pe.natal.map(e => `${e.star}${e.hua}`).join(',') || '-';
+    const decadal = pe.decadal.map(e => `${e.star}${e.hua}`).join(',') || '-';
+    const yearly = pe.yearly.map(e => `${e.star}${e.hua}`).join(',') || '-';
+    summary += `| ${zhi} | ${pe.gongName} | ${natal} | ${decadal} | ${yearly} |\n`;
+  }
+
+  return {
+    decadal: {
+      ganZhi: h.decadal.ganZhi,
+      mingGongZhi: h.decadal.mingGongZhi,
+      dieBenGong: h.decadal.dieBenGong,
+      sihua: dxGan ? SI_HUA_TABLE[dxGan].map((s,i) => ({ star: s, hua: HUA_NAMES[i], zhi: findStarZhi(s), gongName: zhiToGong[findStarZhi(s)] || '' })) : [],
+    },
+    yearly: {
+      ganZhi: h.yearly.ganZhi,
+      mingGongZhi: h.yearly.mingGongZhi,
+      dieBenGong: h.yearly.dieBenGong,
+      sihua: ynGan ? SI_HUA_TABLE[ynGan].map((s,i) => ({ star: s, hua: HUA_NAMES[i], zhi: findStarZhi(s), gongName: zhiToGong[findStarZhi(s)] || '' })) : [],
+    },
+    monthly: monthlyOverlays,
+    palaceEffects,
+    highlights,
+    summary,
+  };
+}
+
 export { SHI_CHEN_RANGE, DI_ZHI, TIAN_GAN };
