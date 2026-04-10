@@ -445,14 +445,29 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
   const h = chart.horoscope;
   const year = targetYear || new Date().getFullYear();
 
-  // === 1. 建立本命宮位 → 地支對照 ===
+  // === 1. 建立本命宮位 + 流年宮位 → 地支對照 ===
   const zhiToGong = {};  // 地支 → 本命宮位名
   const gongToZhi = {};  // 本命宮位名 → 地支
+  const zhiToYearlyGong = {};  // 地支 → 流年宮位名
+  const PALACE_ORDER = ["命宮","兄弟宮","夫妻宮","子女宮","財帛宮","疾厄宮","遷移宮","交友宮","官祿宮","田宅宮","福德宮","父母宮"];
   for (const zhi of DI_ZHI) {
     if (chart.gongs[zhi]) {
       zhiToGong[zhi] = chart.gongs[zhi].name;
       gongToZhi[chart.gongs[zhi].name] = zhi;
     }
+  }
+  // 流年宮位：從流年命宮地支開始，逆行排12宮
+  const ynMingIdx = DI_ZHI.indexOf(h.yearly.mingGongZhi);
+  for (let i = 0; i < 12; i++) {
+    const zhiIdx = (ynMingIdx - i + 12) % 12;
+    zhiToYearlyGong[DI_ZHI[zhiIdx]] = PALACE_ORDER[i];
+  }
+  // 雙宮名稱：「本命X宮/流年Y宮」
+  function dualName(zhi) {
+    const ben = zhiToGong[zhi] || '';
+    const yn = zhiToYearlyGong[zhi] || '';
+    if (ben === yn) return ben;
+    return `本命${ben}/流年${yn}`;
   }
 
   // === 2. 收集每個宮位的四化（按地支） ===
@@ -460,7 +475,7 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
   const palaceEffects = {};
   for (const zhi of DI_ZHI) {
     palaceEffects[zhi] = {
-      gongName: zhiToGong[zhi] || '',
+      gongName: dualName(zhi),
       stars: chart.gongs[zhi]?.stars || [],
       natal: [],    // 本命四化
       decadal: [],  // 大限四化
@@ -549,7 +564,7 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
         const zhi = findStarZhi(star);
         if (zhi) {
           const eff = { star, hua: HUA_NAMES[i], source: `流月${m}月(${monthGan})` };
-          monthEffects.push({ ...eff, zhi, gongName: zhiToGong[zhi] });
+          monthEffects.push({ ...eff, zhi, gongName: dualName(zhi) });
           if (!palaceEffects[zhi].monthly[m]) palaceEffects[zhi].monthly[m] = [];
           palaceEffects[zhi].monthly[m].push(eff);
         }
@@ -558,7 +573,7 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
 
     monthlyOverlays[m] = {
       mingGongZhi: monthMingZhi,
-      dieBenGong: zhiToGong[monthMingZhi] || '',
+      dieBenGong: dualName(monthMingZhi),
       gan: monthGan,
       effects: monthEffects,
     };
@@ -593,7 +608,7 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
     // 對宮沖（化忌沖對宮）
     const oppIdx = (DI_ZHI.indexOf(zhi) + 6) % 12;
     const oppZhi = DI_ZHI[oppIdx];
-    const oppGong = zhiToGong[oppZhi] || '';
+    const oppGong = dualName(oppZhi);
     if (jiCount >= 1 && oppGong) {
       highlights.push({ type: '化忌沖', zhi, gongName: pe.gongName, targetGong: oppGong,
         detail: `${pe.gongName}化忌沖${oppGong}`, impact: `${oppGong}受沖，該領域易有波折` });
@@ -624,7 +639,7 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
     summary += `大限四化：${SI_HUA_TABLE[dxGan].map((s,i) => `${s}${HUA_NAMES[i]}`).join('、')}\n`;
     SI_HUA_TABLE[dxGan].forEach((star, i) => {
       const zhi = findStarZhi(star);
-      if (zhi) summary += `  → ${star}${HUA_NAMES[i]} 飛入${zhiToGong[zhi]}（${zhi}宮）\n`;
+      if (zhi) summary += `  → ${star}${HUA_NAMES[i]} 飛入${dualName(zhi)}（${zhi}宮）\n`;
     });
   }
 
@@ -633,14 +648,14 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
     summary += `流年四化：${SI_HUA_TABLE[ynGan].map((s,i) => `${s}${HUA_NAMES[i]}`).join('、')}\n`;
     SI_HUA_TABLE[ynGan].forEach((star, i) => {
       const zhi = findStarZhi(star);
-      if (zhi) summary += `  → ${star}${HUA_NAMES[i]} 飛入${zhiToGong[zhi]}（${zhi}宮）\n`;
+      if (zhi) summary += `  → ${star}${HUA_NAMES[i]} 飛入${dualName(zhi)}（${zhi}宮）\n`;
     });
   }
 
   summary += `\n【流月概覽】\n`;
   for (const m of months) {
     const mo = monthlyOverlays[m];
-    summary += `${m}月：命宮在${mo.mingGongZhi}宮（疊本命${mo.dieBenGong}），天干${mo.gan}`;
+    summary += `${m}月：命宮在${mo.mingGongZhi}宮（疊${mo.dieBenGong}），天干${mo.gan}`;
     if (mo.effects.length > 0) {
       summary += `，四化：${mo.effects.map(e => `${e.star}${e.hua}→${e.gongName}`).join('、')}`;
     }
@@ -657,14 +672,17 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
   }
 
   summary += `\n【疊宮總表】\n`;
-  summary += `| 地支 | 本命宮位 | 本命四化 | 大限四化 | 流年四化 |\n`;
-  summary += `|------|----------|----------|----------|----------|\n`;
+  summary += `| 地支 | 本命宮位 | 流年宮位 | 主星 | 本命四化 | 大限四化 | 流年四化 |\n`;
+  summary += `|------|----------|----------|------|----------|----------|----------|\n`;
   for (const zhi of DI_ZHI) {
     const pe = palaceEffects[zhi];
+    const benGong = zhiToGong[zhi] || '';
+    const ynGong = zhiToYearlyGong[zhi] || '';
+    const stars = pe.stars.join(',') || '-';
     const natal = pe.natal.map(e => `${e.star}${e.hua}`).join(',') || '-';
     const decadal = pe.decadal.map(e => `${e.star}${e.hua}`).join(',') || '-';
     const yearly = pe.yearly.map(e => `${e.star}${e.hua}`).join(',') || '-';
-    summary += `| ${zhi} | ${pe.gongName} | ${natal} | ${decadal} | ${yearly} |\n`;
+    summary += `| ${zhi} | ${benGong} | ${ynGong} | ${stars} | ${natal} | ${decadal} | ${yearly} |\n`;
   }
 
   return {
