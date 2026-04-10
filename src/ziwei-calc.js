@@ -230,6 +230,8 @@ export function calculateChart(solarYear, solarMonth, solarDay, hour, minute, ge
       commandStar,
       bodyStar,
       wuXingJu: juName,
+      lunarMonth: result.rawDates?.lunarDate?.lunarMonth || 0,
+      shiChenIdx,
     },
     gongs,
     gongGan,
@@ -509,10 +511,21 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
     });
   }
 
-  // === 6. 流月四化（1-12月）===
-  // 流月命宮推算：流年命宮地支 + 月份偏移
+  // === 6. 流月四化（1-12月）— 使用斗君法 ===
   const months = targetMonths || [1,2,3,4,5,6,7,8,9,10,11,12];
-  const ynMingIdx = DI_ZHI.indexOf(h.yearly.mingGongZhi);
+
+  // 斗君算法：
+  // 1. 從太歲（流年地支）起正月，逆數到出生農曆月
+  // 2. 從該位置起子時，順數到出生時辰
+  // 3. 到達的宮位就是斗君（=正月），然後順行排各月
+  const taiSuiIdx = DI_ZHI.indexOf(h.yearly.mingGongZhi);  // 流年命宮地支
+  const lunarMonth = chart.basic.lunarMonth || 1;
+  const shiChenIdx = chart.basic.shiChenIdx || 0;
+
+  // Step 1: 從太歲逆行至出生月（太歲=正月，逆行=減）
+  const step1Idx = (taiSuiIdx - (lunarMonth - 1) + 12) % 12;
+  // Step 2: 從 step1 順行至出生時辰（step1=子時，順行=加）
+  const douJunIdx = (step1Idx + shiChenIdx) % 12;
 
   // 流月天干推算：年干+月份 → 月干（五虎遁）
   const TIGER_MAP = { "甲":"丙","乙":"戊","丙":"庚","丁":"壬","戊":"甲","己":"丙","庚":"戊","辛":"庚","壬":"壬","癸":"甲" };
@@ -525,8 +538,8 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
 
   const monthlyOverlays = {};
   for (const m of months) {
-    // 流月命宮：從流年命宮起，正月在流年命宮，二月順一位...
-    const monthMingIdx = (ynMingIdx + (m - 1)) % 12;
+    // 流月命宮：從斗君（正月）順行
+    const monthMingIdx = (douJunIdx + (m - 1)) % 12;
     const monthMingZhi = DI_ZHI[monthMingIdx];
     const monthGan = getMonthGan(ynGan, m);
 
