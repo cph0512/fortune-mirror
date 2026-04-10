@@ -50,6 +50,7 @@ function membersForSave(members) {
     id: m.id, role: m.role, name: m.name, gender: m.gender,
     year: m.year, month: m.month, day: m.day, hour: m.hour, minute: m.minute,
     place: m.place, cityData: m.cityData,
+    charts: m.charts || {},
   }));
 }
 
