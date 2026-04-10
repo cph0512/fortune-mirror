@@ -28,9 +28,8 @@ const API_TRACK = IS_TEST
 const API_BASE = IS_TEST
   ? "https://fortune-sandbox-352618635098.asia-east1.run.app"
   : "https://fortune-api-64kdjyxhpq-de.a.run.app";
-const API_HOROSCOPE = IS_TEST
-  ? "https://fortune-sandbox-352618635098.asia-east1.run.app/api/horoscope"
-  : "https://api.destinytelling.life/api/horoscope";
+// Horoscope always on m4pro (api.destinytelling.life → port 3083)
+const API_HOROSCOPE = "https://api.destinytelling.life/api/horoscope";
 const ZODIAC_KEYS = ["aries","taurus","gemini","cancer","leo","virgo","libra","scorpio","sagittarius","capricorn","aquarius","pisces"];
 const ZODIAC_ZH = ["牡羊座","金牛座","雙子座","巨蟹座","獅子座","處女座","天秤座","天蠍座","射手座","摩羯座","水瓶座","雙魚座"];
 const STORAGE_KEY_KB = "fortune-app-kb";
