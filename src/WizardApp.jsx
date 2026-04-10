@@ -546,7 +546,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const savedAuth = loadAuth();
   const saved = loadSession(savedAuth);
 
-  const [step, setStep] = useState(saved?.finalResult ? (saved.step ?? 0) : 0);
+  const [step, setStep] = useState(0); // Always start at Welcome page
   const [gender, setGender] = useState(saved?.gender ?? "");
   const [goal, setGoal] = useState(saved?.goal ?? "");
   const [goalPrompt, setGoalPrompt] = useState(saved?.goalPrompt ?? "");
@@ -1454,6 +1454,26 @@ ${hebanRelation === "relations.twin" ? `
   };
 
   // ---- RESULT RENDERER ----
+  const CollapsibleSection = ({ title, body, summary, defaultOpen = true }) => {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+      <div className="wizard-section">
+        {title && (
+          <div className="wizard-section-header" onClick={() => setOpen(!open)} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="wizard-section-title">{title}</span>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+          </div>
+        )}
+        {open && (
+          <>
+            {body && <div className="wizard-section-body">{body}</div>}
+            {summary && <div className="wizard-section-summary">{summary}</div>}
+          </>
+        )}
+      </div>
+    );
+  };
+
   const renderFormattedResult = (text) => {
     if (!text) return null;
 
@@ -1537,15 +1557,7 @@ ${hebanRelation === "relations.twin" ? `
         }
       }
       return (
-        <div key={i} className="wizard-section">
-          {sec.title && (
-            <div className="wizard-section-header">
-              <span className="wizard-section-title">{sec.title}</span>
-            </div>
-          )}
-          {mainBody && <div className="wizard-section-body">{mainBody}</div>}
-          {summary && <div className="wizard-section-summary">{summary}</div>}
-        </div>
+        <CollapsibleSection key={i} title={sec.title} body={mainBody} summary={summary} defaultOpen={i < 2} />
       );
     });
   };
