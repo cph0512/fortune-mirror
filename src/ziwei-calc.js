@@ -337,6 +337,77 @@ export function formatChart(chart) {
 }
 
 /**
+ * 壓縮版紫微排盤格式 — 去 markdown table，用簡寫
+ * 給 AI 一樣能讀懂，token 省 ~40%
+ */
+export function formatChartCompact(chart) {
+  const b = chart.basic;
+  let t = `[紫微] ${b.solarDate} ${b.lunarDate} ${b.yearGanZhi}年 ${b.shiChen}時 ${b.gender}(${b.yinYang}) `;
+  t += `命宮:${b.mingGong}(${b.mingGongZhi}) 身宮:${b.shenGong} 命主:${b.commandStar} 身主:${b.bodyStar} ${b.wuXingJu}\n`;
+
+  // 十二宮：一行一宮
+  t += `[宮盤]\n`;
+  for (const zhi of DI_ZHI) {
+    const g = chart.gongs[zhi];
+    if (!g) continue;
+    const stars = g.stars.join(",") || "";
+    const minor = g.minor.length ? ` +${g.minor.join(",")}` : "";
+    const sh = g.sihua.length ? ` 化:${g.sihua.join(",")}` : "";
+    const cs = g.changSheng ? ` ${g.changSheng}` : "";
+    t += `${zhi}(${chart.gongGan[zhi]})${g.name}: ${stars}${minor}${sh}${cs}\n`;
+  }
+
+  // 四化
+  t += `[四化] ${Object.entries(chart.siHua).map(([s,h]) => `${s}${h}`).join(" ")}\n`;
+
+  // 大限
+  t += `[大限] ${chart.daXian.map(d => `${d.zhi}:${d.startAge}-${d.endAge}`).join(" ")}\n`;
+
+  // 飛化表
+  if (chart.feiHua) {
+    t += `[飛化]\n`;
+    for (const zhi of DI_ZHI) {
+      const g = chart.gongs[zhi];
+      const fh = chart.feiHua[zhi];
+      if (g && fh) {
+        t += `${g.name}(${fh.gan}): 祿${fh.sihua[0]} 權${fh.sihua[1]} 科${fh.sihua[2]} 忌${fh.sihua[3]}\n`;
+      }
+    }
+  }
+
+  // 大限/流年/小限
+  if (chart.horoscope) {
+    const h = chart.horoscope;
+    t += `[大限] ${h.decadal.ganZhi} 命宮:${h.decadal.mingGongZhi}(疊${h.decadal.dieBenGong}) 四化:${h.decadal.sihua.join(",")}\n`;
+    t += `[流年] ${h.yearly.ganZhi} 命宮:${h.yearly.mingGongZhi}(疊${h.yearly.dieBenGong}) 四化:${h.yearly.sihua.join(",")}\n`;
+    if (h.age && h.age.nominalAge) {
+      t += `[小限] 虛歲${h.age.nominalAge} ${h.age.ganZhi} 疊${h.age.dieBenGong} 四化:${h.age.sihua.join(",")}\n`;
+    }
+
+    // 疊宮對照：一行搞定
+    if (h.decadal.palaceNames?.length === 12 && h.yearly.palaceNames?.length === 12) {
+      t += `[疊宮] `;
+      for (const zhi of DI_ZHI) {
+        const ben = chart.gongs[zhi]?.name || '-';
+        const zhiIdx = DI_ZHI.indexOf(zhi);
+        const dxMingIdx = DI_ZHI.indexOf(h.decadal.mingGongZhi);
+        const dxName = h.decadal.palaceNames[(zhiIdx - dxMingIdx + 12) % 12] || '-';
+        const ynMingIdx = DI_ZHI.indexOf(h.yearly.mingGongZhi);
+        const ynName = h.yearly.palaceNames[(zhiIdx - ynMingIdx + 12) % 12] || '-';
+        if (ben === dxName && ben === ynName) {
+          t += `${zhi}=${ben} `;
+        } else {
+          t += `${zhi}=${ben}/${dxName}/${ynName} `;
+        }
+      }
+      t += `\n`;
+    }
+  }
+
+  return t;
+}
+
+/**
  * 無出生時間時，用天干推算宮位影響（不依賴時辰）
  * 年干四化、生年天干飛化入十二宮 — 這些不受出生時辰影響
  */

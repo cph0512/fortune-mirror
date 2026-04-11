@@ -126,3 +126,11 @@ export function formatAstro(chart) {
 
   return text;
 }
+
+export function formatAstroCompact(chart) {
+  let t = `[占星] ${chart.solarYear}/${chart.solarMonth}/${chart.solarDay} ${chart.hour}:${String(chart.minute).padStart(2,'0')} ASC:${chart.ascendant.sign}${chart.ascendant.degree} MC:${chart.midheaven.sign}${chart.midheaven.degree}\n`;
+  t += `[行星] ${chart.planets.map(p => `${p.name}:${p.sign}${p.degree}/H${p.house}${p.retrograde ? "R" : ""}`).join(" ")}\n`;
+  t += `[宮頭] ${chart.houses.map(h => `H${h.id}:${h.sign}${h.degree}`).join(" ")}\n`;
+  t += `[相位] ${chart.aspects.map(a => `${a.planet1}${a.type}${a.planet2}(${a.orb}°)`).join(" ")}\n`;
+  return t;
+}

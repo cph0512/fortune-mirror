@@ -154,3 +154,15 @@ export function formatBazi(chart) {
 
   return text;
 }
+
+export function formatBaziCompact(chart) {
+  const p = chart.pillars;
+  let t = `[八字] ${chart.solarDate} ${chart.lunarDate} ${chart.shiChen}時 ${chart.gender} ${chart.shengXiao} 日主:${chart.dayMaster}(${chart.dayWuXing})\n`;
+  t += `[四柱] 年${p.year.ganZhi}(${p.year.shiShenGan}) 月${p.month.ganZhi}(${p.month.shiShenGan}) 日${p.day.ganZhi}(${p.day.shiShenGan}) 時${p.time.ganZhi}(${p.time.shiShenGan})\n`;
+  t += `[藏干] 年${p.year.hideGan.join("")} 月${p.month.hideGan.join("")} 日${p.day.hideGan.join("")} 時${p.time.hideGan.join("")}\n`;
+  t += `[納音] ${p.year.naYin} ${p.month.naYin} ${p.day.naYin} ${p.time.naYin}\n`;
+  const wx = chart.wuXing;
+  t += `[五行] 金${wx["金"]}木${wx["木"]}水${wx["水"]}火${wx["火"]}土${wx["土"]}\n`;
+  t += `[大運] ${chart.startAge}歲起 ${chart.daYun.map(d => `${d.ganZhi}(${d.startAge})`).join(" ")}\n`;
+  return t;
+}

@@ -2,9 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import './i18n.js';
 import './WizardApp.css';
-import { calculateChart, formatChart, formatChartByTianGan, calculateTransitOverlay } from "./ziwei-calc.js";
-import { calculateBazi, formatBazi } from "./bazi-calc.js";
-import { calculateAstro, formatAstro } from "./astro-calc.js";
+import { calculateChart, formatChart, formatChartCompact, formatChartByTianGan, calculateTransitOverlay } from "./ziwei-calc.js";
+import { calculateBazi, formatBazi, formatBaziCompact } from "./bazi-calc.js";
+import { calculateAstro, formatAstro, formatAstroCompact } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
 import { calculateTrueSolarTime, formatCorrectionDetails } from "./true-solar-time.js";
 import { searchCities } from "./city-search.js";
@@ -1114,18 +1114,19 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       const tstH = tst.trueSolarHour, tstMin = tst.trueSolarMinute;
 
       const ziweiRaw = calculateChart(tstY, tstM, tstD, tstH, tstMin, gender);
-      const ziweiChart = formatChart(ziweiRaw);
+      // [LAB] Use compact format to save tokens
+      const ziweiChart = formatChartCompact(ziweiRaw);
       const transitOverlay = calculateTransitOverlay(ziweiRaw);
-      const baziChart = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, gender, tstMin));
-      const astroChart = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
+      const baziChart = formatBaziCompact(calculateBazi(tstY, tstM, tstD, tstH, gender, tstMin));
+      const astroChart = formatAstroCompact(calculateAstro(y, m, d, h, min, cityLat, cityLng));
 
       // Twin: calculate sibling charts
       let twinZiweiChart = "", twinBaziChart = "", twinAstroChart = "";
       if (isTwin) {
         const sibGender = twinType === "mixed" ? (gender === "男" ? "女" : "男") : gender;
-        twinZiweiChart = formatChart(calculateChart(tstY, tstM, tstD, tstH, tstMin, sibGender));
-        twinBaziChart = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, sibGender, tstMin));
-        twinAstroChart = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
+        twinZiweiChart = formatChartCompact(calculateChart(tstY, tstM, tstD, tstH, tstMin, sibGender));
+        twinBaziChart = formatBaziCompact(calculateBazi(tstY, tstM, tstD, tstH, sibGender, tstMin));
+        twinAstroChart = formatAstroCompact(calculateAstro(y, m, d, h, min, cityLat, cityLng));
       }
 
       const tstInfo = formatCorrectionDetails(tst);
@@ -1403,7 +1404,7 @@ ${transitOverlay?.summary || ''}
       let partnerCharts = "";
 
       if (hasPartnerTime) {
-        const pZiwei = formatChart(calculateChart(y2, m2, d2, h2, 0, partnerGender));
+        const pZiwei = formatChartCompact(calculateChart(y2, m2, d2, h2, 0, partnerGender));
         partnerCharts = `【紫微斗數】\n${pZiwei}`;
       } else {
         const tianGanChart = formatChartByTianGan(y2, m2, d2, partnerGender);
