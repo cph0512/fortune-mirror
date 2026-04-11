@@ -903,8 +903,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
           setAuthMode("login");
           return;
         }
+        if (data.token) saveAuthToken(data.token);
       } catch { setAuthError(t('auth.emailExists')); return; }
-      if (data.token) saveAuthToken(data.token);
       user = { name: authName.trim(), email: authEmail.trim() };
       trackEvent("register", { email: authEmail.trim(), name: authName.trim() });
       migrateGuestSession(user);
