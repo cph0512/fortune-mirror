@@ -882,10 +882,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
           return;
         }
       } catch { setAuthError(t('auth.emailExists')); return; }
-      // Also save locally for offline fallback
-      const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
-      existingUsers[authEmail.trim()] = { name: authName.trim(), passwordHash: btoa(authPassword) };
-      localStorage.setItem("wizard-users", JSON.stringify(existingUsers));
       user = { name: authName.trim(), email: authEmail.trim() };
       trackEvent("register", { email: authEmail.trim(), name: authName.trim() });
       migrateGuestSession(user);
@@ -904,31 +900,14 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         if (res.ok) {
           const data = await res.json();
           user = { name: data.name || authEmail.trim(), email: authEmail.trim(), role: data.role };
-          // Cache locally
-          const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
-          existingUsers[authEmail.trim()] = { name: data.name, passwordHash: btoa(authPassword) };
-          localStorage.setItem("wizard-users", JSON.stringify(existingUsers));
         } else {
-          // Fallback to localStorage
-          const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
-          const stored = existingUsers[authEmail.trim()];
-          if (!stored) {
-            setAuthError(t('auth.notFound'));
-            return;
-          }
-          if (stored.passwordHash !== btoa(authPassword)) {
-            setAuthError(t('auth.wrongPassword'));
-            return;
-          }
-          user = { name: stored.name, email: authEmail.trim() };
+          const data = await res.json().catch(() => ({}));
+          setAuthError(data.error || t('auth.wrongPassword'));
+          return;
         }
       } catch {
-        // Offline fallback
-        const existingUsers = JSON.parse(localStorage.getItem("wizard-users") || "{}");
-        const stored = existingUsers[authEmail.trim()];
-        if (!stored) { setAuthError(t('auth.notFound')); return; }
-        if (stored.passwordHash !== btoa(authPassword)) { setAuthError(t('auth.wrongPassword')); return; }
-        user = { name: stored.name, email: authEmail.trim() };
+        setAuthError(t('auth.networkError') || '無法連線伺服器，請稍後再試');
+        return;
       }
       // Try server session first, fallback to localStorage
       let existingSession = null;
