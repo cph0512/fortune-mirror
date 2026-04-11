@@ -20,20 +20,20 @@ const LANG_AI = { 'zh-TW': '繁體中文', en: 'English', ja: '日本語' };
 const IS_TEST = typeof window !== 'undefined' && window.location.hostname === 'test.destinytelling.life';
 const IS_LAB = typeof window !== 'undefined' && window.location.hostname === 'lab.destinytelling.life';
 const API_BACKEND = IS_LAB
-  ? "https://lab.destinytelling.life/api/fortune"
+  ? "https://fortune-lab-352618635098.asia-east1.run.app/api/fortune"
   : IS_TEST
   ? "https://fortune-sandbox-352618635098.asia-east1.run.app/api/fortune"
   : "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
 const API_SANDBOX = IS_LAB
-  ? "https://lab.destinytelling.life/api"
+  ? "https://fortune-lab-352618635098.asia-east1.run.app/api"
   : "https://fortune-sandbox-352618635098.asia-east1.run.app/api";
 const API_TRACK = IS_LAB
-  ? "https://lab.destinytelling.life/api/fortune-track"
+  ? "https://fortune-lab-352618635098.asia-east1.run.app/api/fortune-track"
   : IS_TEST
   ? "https://fortune-sandbox-352618635098.asia-east1.run.app/api/fortune-track"
   : "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune-track";
 const API_BASE = IS_LAB
-  ? "https://lab.destinytelling.life"
+  ? "https://fortune-lab-352618635098.asia-east1.run.app"
   : IS_TEST
   ? "https://fortune-sandbox-352618635098.asia-east1.run.app"
   : "https://fortune-api-64kdjyxhpq-de.a.run.app";
