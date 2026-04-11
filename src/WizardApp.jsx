@@ -527,22 +527,9 @@ function filterKBByGoal(kbEntries, goalKey) {
 }
 
 function buildWizardPrompt(kbEntries, goalKey) {
-  let prompt = WIZARD_SYSTEM_PROMPT_ZH;
-  const filtered = filterKBByGoal(kbEntries, goalKey);
-
-  if (filtered.length > 0) {
-    const grouped = {};
-    filtered.forEach(e => {
-      if (!grouped[e.category]) grouped[e.category] = [];
-      grouped[e.category].push(e);
-    });
-    prompt += "\n\n## 內部知識庫（用於推理，但輸出時不可提及來源）\n";
-    for (const [cat, entries] of Object.entries(grouped)) {
-      prompt += `\n### ${cat}\n`;
-      entries.forEach(e => { prompt += `- **${e.title}**: ${e.content.slice(0, 300)}\n`; });
-    }
-  }
-  return prompt;
+  // [LAB] KB is handled server-side with goal-based filtering
+  // Only send the base system prompt, no KB entries
+  return WIZARD_SYSTEM_PROMPT_ZH;
 }
 
 // ============================================================
@@ -1249,7 +1236,7 @@ ${transitOverlay?.summary || ''}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, notify_email: wizardUser?.email || "" }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, notify_email: wizardUser?.email || "", goal }),
       });
       if (!submitRes.ok) throw new Error(t('result.analysisError'));
       const { job_id } = await submitRes.json();
@@ -1361,7 +1348,7 @@ ${transitOverlay?.summary || ''}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null, goal }),
       });
       if (!submitRes.ok) throw new Error(t('result.chatError'));
       const { job_id } = await submitRes.json();
@@ -1484,7 +1471,7 @@ ${hebanRelation === "relations.twin" ? `
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null }),
+        body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, goal: "goal.love" }),
       });
       if (!submitRes.ok) throw new Error(t('result.hebanError'));
       const { job_id } = await submitRes.json();
