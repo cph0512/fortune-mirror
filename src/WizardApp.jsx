@@ -37,6 +37,7 @@ const KB_VERSION = "20260402d";
 const SESSION_KEY_PREFIX = "wizard-session-";
 const SESSION_KEY_GUEST = "wizard-session-guest";
 const AUTH_KEY = "wizard-auth";
+const AUTH_TOKEN_KEY = "wizard-auth-token";
 const VISITOR_ID_KEY = "fortune-visitor-id";
 
 function getVisitorId() {
@@ -85,7 +86,7 @@ function saveSession(data, user) {
   _sessionSyncTimer = setTimeout(() => {
     fetch(`${API_BASE}/api/fortune-session`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ user: user.email, session: data }),
     }).catch(() => {});
   }, 5000);
@@ -94,7 +95,9 @@ function saveSession(data, user) {
 async function loadSessionFromServer(user) {
   if (!user?.email) return null;
   try {
-    const res = await fetch(`${API_BASE}/api/fortune-session?user=${encodeURIComponent(user.email)}`);
+    const res = await fetch(`${API_BASE}/api/fortune-session?user=${encodeURIComponent(user.email)}`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return data && Object.keys(data).length > 1 ? data : null;
@@ -112,7 +115,7 @@ async function saveChatToServer(user, chatHistory, finalResult, goal, goalPrompt
   try {
     const res = await fetch(API_SAVE, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({
         user: userId,
         time: new Date().toISOString(),
@@ -145,7 +148,9 @@ async function loadReadings(user) {
   // Server-first for logged-in users
   if (user?.email) {
     try {
-      const res = await fetch(`${API_SAVE}?user=${encodeURIComponent(user.email)}`);
+      const res = await fetch(`${API_SAVE}?user=${encodeURIComponent(user.email)}`, {
+        headers: authHeaders(),
+      });
       if (res.ok) {
         const saves = await res.json();
         if (Array.isArray(saves) && saves.length > 0) {
@@ -172,7 +177,7 @@ async function saveReading(user, reading) {
   try {
     const res = await fetch(API_SAVE, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({
         user: userId,
         time: reading.date || new Date().toISOString(),
@@ -198,7 +203,9 @@ async function saveReading(user, reading) {
 async function loadCharts(user) {
   if (!user?.email) return [];
   try {
-    const res = await fetch(`${API_CHARTS}?user=${encodeURIComponent(user.email)}`);
+    const res = await fetch(`${API_CHARTS}?user=${encodeURIComponent(user.email)}`, {
+      headers: authHeaders(),
+    });
     if (res.ok) return await res.json();
   } catch {}
   return [];
@@ -207,7 +214,7 @@ async function saveChart(user, chart) {
   if (!user?.email) return null;
   try {
     const res = await fetch(API_CHARTS, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: authHeaders(),
       body: JSON.stringify({ user: user.email, chart }),
     });
     if (res.ok) { const d = await res.json(); return d.chart; }
@@ -218,7 +225,7 @@ async function deleteChart(user, chartId) {
   if (!user?.email) return false;
   try {
     const res = await fetch(API_CHARTS, {
-      method: "DELETE", headers: { "Content-Type": "application/json" },
+      method: "DELETE", headers: authHeaders(),
       body: JSON.stringify({ user: user.email, id: chartId }),
     });
     return res.ok;
@@ -228,7 +235,7 @@ async function deleteReading(user, readingTime) {
   if (!user?.email) return false;
   try {
     const res = await fetch(`${API_SAVE}/delete`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: authHeaders(),
       body: JSON.stringify({ user: user.email, time: readingTime }),
     });
     return res.ok;
@@ -323,6 +330,21 @@ function saveAuth(data) {
 }
 function loadAuth() {
   try { const d = localStorage.getItem(AUTH_KEY); return d ? JSON.parse(d) : null; } catch { return null; }
+}
+function saveAuthToken(token) {
+  if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+}
+function clearAuthToken() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+function authHeaders() {
+  const token = getAuthToken();
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
 }
 
 // KB: server-first (fetch default-kb.json), localStorage as cache
@@ -882,6 +904,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
           return;
         }
       } catch { setAuthError(t('auth.emailExists')); return; }
+      if (data.token) saveAuthToken(data.token);
       user = { name: authName.trim(), email: authEmail.trim() };
       trackEvent("register", { email: authEmail.trim(), name: authName.trim() });
       migrateGuestSession(user);
@@ -899,6 +922,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         });
         if (res.ok) {
           const data = await res.json();
+          if (data.token) saveAuthToken(data.token);
           user = { name: data.name || authEmail.trim(), email: authEmail.trim(), role: data.role };
         } else {
           const data = await res.json().catch(() => ({}));
@@ -1684,6 +1708,7 @@ ${hebanRelation === "relations.twin" ? `
         <button className="wizard-cta-secondary" style={{ marginTop: 24 }} onClick={() => {
           setWizardUser(null);
           localStorage.removeItem(AUTH_KEY);
+          clearAuthToken();
           setShowAccount(false);
           setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
           setBirthYear(""); setBirthMonth(""); setBirthDay(""); setBirthHour(""); setBirthMinute("0");
@@ -1715,10 +1740,11 @@ ${hebanRelation === "relations.twin" ? `
             <button className="wizard-account-link" onClick={() => setShowAccount(true)}>{t('welcome.myAccount')}</button>
             <button className="wizard-logout-link" onClick={() => {
               if (wizardUser?.email) {
-                fetch(`${API_BASE}/api/fortune-session?user=${encodeURIComponent(wizardUser.email)}`, { method: "DELETE" }).catch(() => {});
+                fetch(`${API_BASE}/api/fortune-session?user=${encodeURIComponent(wizardUser.email)}`, { method: "DELETE", headers: authHeaders() }).catch(() => {});
               }
               setWizardUser(null);
               localStorage.removeItem(AUTH_KEY);
+              clearAuthToken();
               setStep(0); setGender(""); setGoal(""); setGoalPrompt("");
               setBirthYear(""); setBirthMonth(""); setBirthDay(""); setBirthHour(""); setBirthMinute("0");
               setBirthPlace(""); setIsTwin(false); setTwinOrder(""); setTwinType("");
