@@ -97,8 +97,12 @@ export function calculateTrueSolarTime(year, month, day, hour, minute, lng, time
     dateOffset = -1;
   }
 
-  const tstHour = Math.floor(tstMinutes / 60);
-  const tstMinute = Math.round(tstMinutes % 60);
+  let tstHour = Math.floor(tstMinutes / 60);
+  let tstMinute = Math.round(tstMinutes % 60);
+  if (tstMinute >= 60) {
+    tstMinute -= 60;
+    tstHour += 1;
+  }
 
   // Step 7: 時辰判定
   const shichen = getShichen(tstHour, tstMinute);
