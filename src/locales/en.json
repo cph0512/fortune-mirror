@@ -118,6 +118,7 @@
     "hebanPromoDesc": "Enter their birthday to reveal the bond between you",
     "startHeban": "Start Compatibility Reading",
     "hebanRelation": "Your relationship",
+    "hebanFocus": "What to focus on (optional)",
     "hebanGender": "Their gender",
     "hebanName": "Their name (optional)",
     "hebanNamePlaceholder": "e.g. Alex",
@@ -149,6 +150,13 @@
     "friend": "Friend",
     "colleague": "Colleague / Boss",
     "twin": "Twin sibling"
+  },
+  "heban": {
+    "overall": "Overall",
+    "love": "Love & Romance",
+    "career": "Career",
+    "wealth": "Finance",
+    "children": "Children"
   },
   "account": {
     "title": "My Account",

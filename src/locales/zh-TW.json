@@ -118,6 +118,7 @@
     "hebanPromoDesc": "輸入對方生日，立即揭開你們之間的緣分密碼",
     "startHeban": "開始合盤解讀",
     "hebanRelation": "你們的關係",
+    "hebanFocus": "想了解什麼（選填）",
     "hebanGender": "對方性別",
     "hebanName": "對方稱呼（選填）",
     "hebanNamePlaceholder": "例如：小美",
@@ -149,6 +150,13 @@
     "friend": "朋友",
     "colleague": "同事 / 上下屬",
     "twin": "雙胞胎手足"
+  },
+  "heban": {
+    "overall": "整體緣分",
+    "love": "感情互動",
+    "career": "事業合作",
+    "wealth": "財務相關",
+    "children": "子女教養"
   },
   "account": {
     "title": "我的帳號",

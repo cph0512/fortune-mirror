@@ -407,6 +407,41 @@ const RELATIONS = [
   { key: "relations.twin" },
 ];
 
+// 合盤聚焦選項
+const HEBAN_FOCUS_OPTIONS = [
+  { key: "heban.overall", topics: null },  // null = 用關係預設
+  { key: "heban.love", topics: ["love", "core"] },
+  { key: "heban.career", topics: ["career", "core"] },
+  { key: "heban.wealth", topics: ["wealth", "core"] },
+  { key: "heban.children", topics: ["love", "core"] },
+];
+
+// 關係類型 → 預設 KB topics（沒選聚焦時用）
+const HEBAN_DEFAULT_TOPICS = {
+  "relations.lover": ["love", "timing", "core"],
+  "relations.spouse": ["love", "wealth", "timing", "core"],
+  "relations.family": ["love", "core"],
+  "relations.friend": ["career", "core"],
+  "relations.colleague": ["career", "wealth", "core"],
+  "relations.twin": null, // 全送
+};
+
+function filterKBForHeban(kbEntries, relation, focusKey) {
+  // 有選聚焦主題 → 用聚焦的 topics
+  const focusOption = HEBAN_FOCUS_OPTIONS.find(f => f.key === focusKey);
+  const topics = focusOption?.topics || HEBAN_DEFAULT_TOPICS[relation] || null;
+
+  if (!topics) return kbEntries; // null = 全送
+
+  const filtered = kbEntries.filter(e => {
+    const t = e.tags || e.topics || [];
+    if (t.includes("core")) return true;
+    return topics.some(topic => t.includes(topic));
+  });
+  if (filtered.length < 10) return kbEntries;
+  return filtered;
+}
+
 // System prompts are always Chinese for the AI (best quality); language instruction added dynamically
 const HEBAN_SYSTEM_PROMPT_ZH = `你是「命理三鏡」的關係分析師。
 
@@ -676,6 +711,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // 合盤 state (restore from session)
   const [showHeban, setShowHeban] = useState(saved?.showHeban ?? false);
   const [hebanRelation, setHebanRelation] = useState(saved?.hebanRelation ?? "");
+  const [hebanFocus, setHebanFocus] = useState("");
   const [hebanName, setHebanName] = useState(saved?.hebanName ?? "");
   const [hebanYear, setHebanYear] = useState(saved?.hebanYear ?? "");
   const [hebanMonth, setHebanMonth] = useState(saved?.hebanMonth ?? "");
@@ -1497,7 +1533,7 @@ ${transitOverlay?.summary || ''}
       const y2 = parseInt(hebanYear), m2 = parseInt(hebanMonth), d2 = parseInt(hebanDay);
       const h2 = parseInt(hebanHour) || 12, min2 = parseInt(hebanMinute) || 0;
       const hasPartnerTime = hebanHour !== "";
-      const kbEntries = loadKB();
+      const kbEntries = filterKBForHeban(loadKB(), hebanRelation, hebanFocus);
 
       const myZiwei = rawResults.find(r => r.system === "紫微斗數");
       const myCharts = myZiwei ? `【紫微斗數】\n${myZiwei.text}` : "";
@@ -2624,6 +2660,21 @@ ${hebanRelation === "relations.twin" ? `
                       </button>
                     ))}
                   </div>
+
+                  {hebanRelation && hebanRelation !== "relations.twin" && (
+                    <>
+                      <div className="wizard-heban-label">{t('result.hebanFocus')}</div>
+                      <div className="wizard-heban-relations">
+                        {HEBAN_FOCUS_OPTIONS.map(f => (
+                          <button key={f.key}
+                            className={`wizard-heban-rel-btn ${hebanFocus === f.key ? "selected" : ""}`}
+                            onClick={() => setHebanFocus(hebanFocus === f.key ? "" : f.key)}>
+                            {t(f.key)}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
 
                   <div className="wizard-heban-label">{t('result.hebanGender')}</div>
                   <div className="wizard-heban-relations">

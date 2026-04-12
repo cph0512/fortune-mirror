@@ -118,6 +118,7 @@
     "hebanPromoDesc": "相手の生年月日を入力して、二人の縁を読み解きます",
     "startHeban": "相性診断を始める",
     "hebanRelation": "二人の関係",
+    "hebanFocus": "知りたいこと（任意）",
     "hebanGender": "相手の性別",
     "hebanName": "相手の名前（任意）",
     "hebanNamePlaceholder": "例：花子",
@@ -149,6 +150,13 @@
     "friend": "友人",
     "colleague": "同僚・上司",
     "twin": "双子の兄弟姉妹"
+  },
+  "heban": {
+    "overall": "全体的な相性",
+    "love": "恋愛",
+    "career": "仕事",
+    "wealth": "金銭関係",
+    "children": "子育て"
   },
   "account": {
     "title": "マイアカウント",
