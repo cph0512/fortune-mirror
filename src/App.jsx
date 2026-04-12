@@ -646,6 +646,27 @@ function MainApp({ auth, isAdmin, onLogout }) {
 
   const [adminUserHistory, setAdminUserHistory] = useState([]); // API 分析記錄
 
+  // Token Monitor
+  const [tokenSummary, setTokenSummary] = useState(null);
+  const [tokenLogs, setTokenLogs] = useState([]);
+  const [tokenDays, setTokenDays] = useState(7);
+  const [tokenLoading, setTokenLoading] = useState(false);
+
+  const LAB_API = "https://fortune-lab-352618635098.asia-east1.run.app";
+  const loadTokenStats = async (days = tokenDays) => {
+    setTokenLoading(true);
+    try {
+      const [sumRes, logRes] = await Promise.all([
+        fetch(`${LAB_API}/api/token-stats/summary?days=${days}`),
+        fetch(`${LAB_API}/api/token-stats?days=${days}`),
+      ]);
+      setTokenSummary(await sumRes.json());
+      const logData = await logRes.json();
+      setTokenLogs(logData.logs || []);
+    } catch (e) { console.error("[TokenStats]", e); }
+    setTokenLoading(false);
+  };
+
   const loadAdminUserDetail = async (username) => {
     setAdminSelectedUser(username);
     loadActivity(username);
@@ -1091,6 +1112,11 @@ ${question || "請分析兩人的整體緣分和互動模式"}
           {isAdmin && (
             <button className={`nav-tab ${tab === "admin" ? "active" : ""}`} onClick={() => { setTab("admin"); loadUsersList(); loadActivity(); fetch(`${API_BACKEND}-feedback`).then(r => r.json()).then(d => setFeedbackList(d)).catch(() => {}); }}>
               <span className="tab-icon">⟐</span> {t('pro.nav.admin')}
+            </button>
+          )}
+          {isAdmin && (
+            <button className={`nav-tab ${tab === "tokens" ? "active" : ""}`} onClick={() => { setTab("tokens"); loadTokenStats(); }}>
+              <span className="tab-icon">⟐</span> Token Monitor
             </button>
           )}
           <button className="nav-tab logout-tab" onClick={() => { if (confirm(t('pro.nav.confirmLogout'))) onLogout(); }}>
@@ -2031,6 +2057,145 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   ))}
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {/* ===== Token Monitor Tab ===== */}
+        {tab === "tokens" && isAdmin && (
+          <div className="saves-section">
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: "var(--gold)" }}>Token / Cost Monitor</h3>
+              <span style={{ flex: 1 }} />
+              {[1, 7, 30].map(d => (
+                <button key={d}
+                  style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)", background: tokenDays === d ? "var(--gold)" : "transparent", color: tokenDays === d ? "#111" : "var(--text)", cursor: "pointer", fontSize: 13 }}
+                  onClick={() => { setTokenDays(d); loadTokenStats(d); }}>{d === 1 ? "Today" : `${d}d`}</button>
+              ))}
+              <button style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text)", cursor: "pointer", fontSize: 13 }}
+                onClick={() => loadTokenStats()}>Refresh</button>
+            </div>
+
+            {tokenLoading && <div style={{ textAlign: "center", padding: 24, color: "var(--text-dim)" }}>Loading...</div>}
+
+            {tokenSummary && !tokenLoading && (
+              <>
+                {/* Summary cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 16 }}>
+                  {[
+                    { label: "Requests", value: tokenSummary.total_requests, color: "var(--teal)" },
+                    { label: "Total Cost", value: `$${tokenSummary.total_cost_usd?.toFixed(4)}`, color: "var(--gold)" },
+                    { label: "Avg Cost", value: tokenSummary.total_requests > 0 ? `$${(tokenSummary.total_cost_usd / tokenSummary.total_requests).toFixed(4)}` : "$0", color: "var(--purple)" },
+                    { label: "Cache Hit", value: `${tokenSummary.cache_hit_rate}%`, color: tokenSummary.cache_hit_rate > 50 ? "#4caf50" : "#ff9800" },
+                    { label: "Avg Latency", value: `${tokenSummary.avg_latency_s}s`, color: "var(--text)" },
+                    { label: "Input Tokens", value: (tokenSummary.total_input_tokens / 1000).toFixed(1) + "K", color: "var(--text-dim)" },
+                    { label: "Output Tokens", value: (tokenSummary.total_output_tokens / 1000).toFixed(1) + "K", color: "var(--text-dim)" },
+                    { label: "Cache Read", value: (tokenSummary.total_cache_read / 1000).toFixed(1) + "K", color: "#4caf50" },
+                  ].map((card, i) => (
+                    <div key={i} style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "12px 14px", textAlign: "center" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 4 }}>{card.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: card.color }}>{card.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* By Type */}
+                {tokenSummary.by_type && Object.keys(tokenSummary.by_type).length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>By Request Type</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+                      {Object.entries(tokenSummary.by_type).map(([type, data]) => (
+                        <div key={type} style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--teal)" }}>{type}</span>
+                            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{data.count}x</span>
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--gold)", marginTop: 4 }}>${data.cost_usd?.toFixed(4)}</div>
+                          <div style={{ fontSize: 11, color: "var(--text-dim)" }}>in: {(data.input_tokens / 1000).toFixed(1)}K · out: {(data.output_tokens / 1000).toFixed(1)}K</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* By Date — simple bar chart */}
+                {tokenSummary.by_date && Object.keys(tokenSummary.by_date).length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Daily Cost Trend</div>
+                    <div style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: 14 }}>
+                      {(() => {
+                        const entries = Object.entries(tokenSummary.by_date);
+                        const maxCost = Math.max(...entries.map(([, d]) => d.cost_usd), 0.001);
+                        return entries.map(([date, data]) => (
+                          <div key={date} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, color: "var(--text-dim)", width: 70, flexShrink: 0 }}>{date.slice(5)}</span>
+                            <div style={{ flex: 1, height: 18, background: "var(--bg)", borderRadius: 4, overflow: "hidden" }}>
+                              <div style={{ width: `${(data.cost_usd / maxCost) * 100}%`, height: "100%", background: "var(--gold)", borderRadius: 4, minWidth: data.cost_usd > 0 ? 4 : 0 }} />
+                            </div>
+                            <span style={{ fontSize: 11, color: "var(--text-dim)", width: 60, textAlign: "right", flexShrink: 0 }}>${data.cost_usd?.toFixed(4)}</span>
+                            <span style={{ fontSize: 11, color: "var(--text-faint)", width: 30, textAlign: "right", flexShrink: 0 }}>{data.count}x</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* By Model */}
+                {tokenSummary.by_model && Object.keys(tokenSummary.by_model).length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>By Model</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {Object.entries(tokenSummary.by_model).map(([model, data]) => (
+                        <div key={model} style={{ background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 14px", fontSize: 12 }}>
+                          <span style={{ color: "var(--purple)", fontWeight: 600 }}>{model.replace("claude-", "").replace("-20250514", "")}</span>
+                          <span style={{ color: "var(--text-dim)", marginLeft: 8 }}>{data.count}x</span>
+                          <span style={{ color: "var(--gold)", marginLeft: 8 }}>${data.cost_usd?.toFixed(4)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Recent logs table */}
+            {tokenLogs.length > 0 && !tokenLoading && (
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Recent Requests ({tokenLogs.length})</div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", color: "var(--text)" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                        {["Time", "Type", "User", "Model", "In", "Out", "Cache", "Cost", "Latency"].map(h => (
+                          <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: "var(--text-dim)", fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...tokenLogs].reverse().slice(0, 100).map((log, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                          <td style={{ padding: "5px 8px", whiteSpace: "nowrap", color: "var(--text-dim)" }}>{log.ts ? new Date(log.ts).toLocaleString("zh-TW", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}</td>
+                          <td style={{ padding: "5px 8px" }}>
+                            <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 11, background: log.type === "deep" ? "#8e7eaa33" : log.type === "heban" ? "#7a9e8e33" : log.type === "followup" ? "#c9a96e33" : "#55555533", color: log.type === "deep" ? "var(--purple)" : log.type === "heban" ? "var(--teal)" : "var(--text)" }}>
+                              {log.type}
+                            </span>
+                          </td>
+                          <td style={{ padding: "5px 8px", maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{log.user}</td>
+                          <td style={{ padding: "5px 8px", fontSize: 11, color: "var(--text-dim)" }}>{(log.model || "").replace("claude-", "").replace("-20250514", "")}</td>
+                          <td style={{ padding: "5px 8px", textAlign: "right" }}>{(log.input_tokens / 1000).toFixed(1)}K</td>
+                          <td style={{ padding: "5px 8px", textAlign: "right" }}>{(log.output_tokens / 1000).toFixed(1)}K</td>
+                          <td style={{ padding: "5px 8px", textAlign: "center" }}>
+                            {log.cache_hit ? <span style={{ color: "#4caf50" }}>HIT</span> : <span style={{ color: "var(--text-faint)" }}>miss</span>}
+                          </td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", color: "var(--gold)", fontWeight: 600 }}>${log.cost_usd?.toFixed(4)}</td>
+                          <td style={{ padding: "5px 8px", textAlign: "right", color: "var(--text-dim)" }}>{log.latency_s}s</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
         )}
