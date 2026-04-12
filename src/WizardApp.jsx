@@ -537,6 +537,67 @@ function buildWizardPrompt(kbEntries, goalKey) {
 }
 
 // ============================================================
+// FOLLOW-UP: 問題路由 — 根據追問內容判斷該聚焦哪些宮位和疊宮
+// ============================================================
+
+const QUESTION_FOCUS_MAP = [
+  { pattern: /小孩|生子|女兒|兒子|子女|懷孕|baby|child|pregnan/i,
+    focus: "子女",
+    palaces: ["子女宮", "田宅宮", "命宮", "夫妻宮"],
+    guide: "判斷子女緣：看本命子女宮主星與四化（化祿=子女緣厚、化忌=延遲或壓力），大限子女宮疊本命哪宮判斷這十年的子女運，流年子女宮疊宮判斷今年時機，流月四化進入子女宮的月份=最可能的時間窗口。生男生女：陽星多偏男、陰星多偏女，結合命宮和子女宮的陰陽屬性判斷。" },
+  { pattern: /感情|婚姻|另一半|桃花|離婚|對象|戀愛|交往|復合|love|marriage|divorce/i,
+    focus: "感情",
+    palaces: ["夫妻宮", "福德宮", "命宮", "遷移宮"],
+    guide: "判斷感情：看本命夫妻宮主星與四化，大限夫妻宮疊本命哪宮=這十年感情主題，流年夫妻宮疊宮=今年感情走向，流月四化進夫妻宮=感情變化的具體月份。桃花看交友宮和遷移宮。" },
+  { pattern: /事業|工作|升遷|轉職|跳槽|老闆|同事|職場|career|job|promotion/i,
+    focus: "事業",
+    palaces: ["官祿宮", "命宮", "遷移宮", "田宅宮"],
+    guide: "判斷事業：看本命官祿宮主星與四化，大限官祿宮疊本命哪宮=這十年事業主題，流年官祿宮疊宮=今年事業走向，流月四化進官祿宮=關鍵變化月份。升遷看化權、化祿飛入官祿宮的時機。" },
+  { pattern: /財運|投資|賺錢|進財|破財|買賣|股票|理財|wealth|money|invest/i,
+    focus: "財運",
+    palaces: ["財帛宮", "福德宮", "田宅宮", "官祿宮"],
+    guide: "判斷財運：看本命財帛宮主星與四化，福德宮=財庫（能不能存住），大限財帛宮疊本命哪宮=這十年財運格局，流年財帛宮疊宮=今年財運走向，流月化祿/祿存進財帛宮=進財月份，化忌進財帛宮=破財風險月份。" },
+  { pattern: /健康|身體|開刀|手術|生病|養生|疾病|過敏|health|sick/i,
+    focus: "健康",
+    palaces: ["疾厄宮", "命宮", "父母宮", "福德宮"],
+    guide: "判斷健康：看本命疾厄宮主星判斷體質弱點，大限疾厄宮疊宮=這十年健康主題，流年疾厄宮化忌=今年需注意的健康問題，流月化忌進疾厄宮=具體風險月份。八字看五行偏枯判斷臟腑弱點。" },
+  { pattern: /搬家|買房|房產|不動產|裝潢|租房|house|property/i,
+    focus: "房產",
+    palaces: ["田宅宮", "財帛宮", "命宮", "遷移宮"],
+    guide: "判斷房產：看本命田宅宮主星與四化，大限/流年田宅宮疊宮=房產變動時機，化祿進田宅宮=有購屋機會，化忌=搬遷壓力或房屋問題。遷移宮看搬遷跡象。" },
+  { pattern: /考試|學業|留學|進修|讀書|證照|exam|study/i,
+    focus: "學業",
+    palaces: ["父母宮", "官祿宮", "命宮", "遷移宮"],
+    guide: "判斷學業：看父母宮（文書宮）主星與四化，官祿宮=學業表現，化科進父母宮或官祿宮=考運佳，留學看遷移宮。流年/流月四化進這些宮位=關鍵時間。" },
+  { pattern: /合夥|創業|開店|做生意|合作|partner|startup|business/i,
+    focus: "合夥創業",
+    palaces: ["交友宮", "官祿宮", "財帛宮", "兄弟宮"],
+    guide: "判斷合夥：看交友宮（僕役宮）主星與四化=合作對象品質，兄弟宮=平輩合夥關係，官祿宮=事業能否成功，財帛宮=合夥財運。化忌在交友宮=合夥有風險，化祿=有好的合作機會。" },
+  { pattern: /父母|爸|媽|長輩|家人|parent|family/i,
+    focus: "家庭",
+    palaces: ["父母宮", "田宅宮", "命宮", "兄弟宮"],
+    guide: "判斷家庭關係：看父母宮主星與四化=與父母的互動模式，田宅宮=家庭環境，兄弟宮=手足關係。大限/流年疊宮變化看具體時間的家庭事件。" },
+];
+
+function getFollowUpFocus(question) {
+  for (const rule of QUESTION_FOCUS_MAP) {
+    if (rule.pattern.test(question)) return rule;
+  }
+  return null;
+}
+
+const FOLLOWUP_SYSTEM_PROMPT = `你是「命理三鏡」的命運顧問。用戶已經做過完整分析，現在針對特定問題追問。
+
+回覆規則：
+1. 直接回答問題，不要重新跑完整報告，不要加 [SECTION] 標記
+2. 必須根據排盤資料中的具體宮位、四化、疊宮（本命/大限/流年/流月的交互）來推論，給出有依據的回答
+3. 不提任何命理系統名稱和專有術語（紫微、八字、宮位、四化等），用自然語言表達
+4. 涉及時間的判斷必須對應到排盤中的具體數據，不可隨意指定月份或年份
+5. 不可編造排盤中不存在的星曜、宮位、相位
+6. 回答要具體、有結論，不要空泛
+7. 篇幅適中，聚焦問題本身，不要發散到其他主題`;
+
+// ============================================================
 // WIZARD COMPONENT
 // ============================================================
 
@@ -1342,17 +1403,29 @@ ${transitOverlay?.summary || ''}
         }
       }
 
-      // Build raw chart data block for accurate follow-up
+      // Build follow-up prompt with question routing
       const chartBlock = currentResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
       const hebanBlock = hebanResult ? `\n\n===== 合盤分析報告（${hebanName || '對方'}，${t(hebanRelation) || ''}）=====\n${hebanResult}` : "";
+
+      // 問題路由：判斷該看哪些宮位
+      const focusRule = getFollowUpFocus(question);
+      const focusBlock = focusRule
+        ? `\n\n===== 分析指引 =====\n問題類型：${focusRule.focus}\n重點宮位：${focusRule.palaces.join("、")}\n分析方法：${focusRule.guide}\n\n你必須從排盤資料中找到上述宮位的本命主星、四化，然後查疊宮對照表中該宮位在大限和流年的疊宮位置，再查疊宮分析結果中對應的四化飛入情況，據此推論。如果排盤中找不到足夠依據，就明確說「排盤中沒有明確跡象」。`
+        : "";
+
       const hasTimeQ = /月|年|季|時|何時|when|最近|今年|明年|上半|下半|幾月|什麼時候|進財|財運|感情運|健康運|事業運|運勢/i.test(question);
       const transitBlock = hasTimeQ ? `\n\n⚠️ 時間相關問題 — 排盤資料中有「疊宮分析結果」區塊，裡面有程式精確計算好的大限/流年/流月四化和疊宮效果。你必須直接根據這些已計算好的結果回答，不可忽略。每個時間判斷都要對應到具體的四化和宮位。如果疊宮結果中找不到依據，就明確說「排盤中沒有明確的跡象」。` : "";
-      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 分析報告 =====\n之前的完整分析報告：\n${finalResult}\n\n` : ""}${hebanBlock}${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先根據原始排盤資料中的宮位、飛化、星曜組合、四柱十神、行星相位進行深度推論，給出具體而非籠統的回答\n3. 排盤資料是精確計算的結果，必須以此為依據，不可編造或猜測命盤中不存在的星曜、宮位、相位\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 如果問題涉及兩人關係，必須參考合盤分析報告的內容\n6. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
+
+      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 之前的分析摘要 =====\n${finalResult.slice(0, 1500)}\n\n` : ""}${hebanBlock}${focusBlock}${recentChat ? `\n對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n直接回答上述問題，聚焦問題本身，不要發散到其他主題。你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆。`;
+
+      // 追問用 FOLLOWUP_SYSTEM_PROMPT，不用主分析的 [SECTION] 格式
+      const followUpSP = FOLLOWUP_SYSTEM_PROMPT + (wizardSP.includes("知識庫") ? wizardSP.slice(wizardSP.indexOf("## 內部知識庫")) : "");
+
       const isDeep = /大運|流年|逐月|十年|運勢走向|life phase|month.by.month/i.test(question);
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
+        body: JSON.stringify({ images: [], system: followUpSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
       });
       if (!submitRes.ok) throw new Error(t('result.chatError'));
       const { job_id } = await submitRes.json();
