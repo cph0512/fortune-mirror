@@ -532,6 +532,31 @@ function buildWizardPrompt(kbEntries, goalKey) {
   return WIZARD_SYSTEM_PROMPT_ZH;
 }
 
+/**
+ * [LAB] Extract summary from report for follow-up context
+ * Takes first 2 sentences from each [SECTION], ~400-800 chars total
+ */
+function extractSummary(report) {
+  if (!report) return "";
+  const sections = report.split(/\[SECTION\]\s*/);
+  const parts = [];
+  for (const sec of sections) {
+    const trimmed = sec.trim();
+    if (!trimmed) continue;
+    // First line is the section title, rest is content
+    const lines = trimmed.split("\n");
+    const title = lines[0].trim();
+    const body = lines.slice(1).join("\n").trim();
+    // Take first 2 sentences (split by 。or .)
+    const sentences = body.split(/(?<=[。\.\!！\?？])\s*/).filter(s => s.trim());
+    const excerpt = sentences.slice(0, 2).join("");
+    if (title && excerpt) {
+      parts.push(`【${title}】${excerpt}`);
+    }
+  }
+  return parts.join("\n");
+}
+
 // ============================================================
 // WIZARD COMPONENT
 // ============================================================
@@ -583,6 +608,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [serverReadings, setServerReadings] = useState([]);
   const [finalResult, setFinalResult] = useState(saved?.finalResult ?? "");
+  const [reportSummary, setReportSummary] = useState("");
   const [rawResults, setRawResults] = useState(saved?.rawResults ?? []);
   const [error, setError] = useState("");
 
@@ -1250,6 +1276,8 @@ ${transitOverlay?.summary || ''}
           const data = await pollRes.json();
           if (data.status === "done") {
             setFinalResult(data.result);
+            // [LAB] Extract summary for cheaper follow-ups
+            setReportSummary(extractSummary(data.result));
             // Save to reading history
             const newReading = {
               id: job_id,
@@ -1308,7 +1336,8 @@ ${transitOverlay?.summary || ''}
     try {
       const kbEntries = loadKB();
       const wizardSP = buildWizardPrompt(kbEntries, goal);
-      const recentChat = chatHistory.slice(-10).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
+      // [LAB] Only last 3 turns instead of 10
+      const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
 
       // 確保疊宮分析是最新的（檢查年份，需要時重算）
       let currentResults = [...rawResults];
@@ -1339,12 +1368,22 @@ ${transitOverlay?.summary || ''}
         }
       }
 
-      // Build raw chart data block for accurate follow-up
-      const chartBlock = currentResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
-      const hebanBlock = hebanResult ? `\n\n===== 合盤分析報告（${hebanName || '對方'}，${t(hebanRelation) || ''}）=====\n${hebanResult}` : "";
+      // [LAB] Build compact follow-up prompt: compressed charts + summary + last 3 turns
+      const chartBlock = currentResults.filter(r => r.text).map(r => `【${r.system}】\n${r.text}`).join("\n\n");
+      const hebanBlock = hebanResult ? `\n【合盤】${hebanName || '對方'}(${t(hebanRelation) || ''})：${hebanResult.slice(0, 500)}` : "";
       const hasTimeQ = /月|年|季|時|何時|when|最近|今年|明年|上半|下半|幾月|什麼時候|進財|財運|感情運|健康運|事業運|運勢/i.test(question);
-      const transitBlock = hasTimeQ ? `\n\n⚠️ 時間相關問題 — 排盤資料中有「疊宮分析結果」區塊，裡面有程式精確計算好的大限/流年/流月四化和疊宮效果。你必須直接根據這些已計算好的結果回答，不可忽略。每個時間判斷都要對應到具體的四化和宮位。如果疊宮結果中找不到依據，就明確說「排盤中沒有明確的跡象」。` : "";
-      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 分析報告 =====\n之前的完整分析報告：\n${finalResult}\n\n` : ""}${hebanBlock}${recentChat ? `對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n⚠️ 回答規則：\n1. 不提任何命理系統名稱和專有術語，用自然語言回覆\n2. 追問細節時，優先根據原始排盤資料中的宮位、飛化、星曜組合、四柱十神、行星相位進行深度推論，給出具體而非籠統的回答\n3. 排盤資料是精確計算的結果，必須以此為依據，不可編造或猜測命盤中不存在的星曜、宮位、相位\n4. 如果問題涉及時間點，要具體到年份或時期\n5. 如果問題涉及兩人關係，必須參考合盤分析報告的內容\n6. 你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆`;
+      const transitNote = hasTimeQ ? "\n⚠️ 時間問題 — 必須根據排盤中的疊宮分析結果回答，每個判斷對應具體四化和宮位，找不到依據就說「排盤中沒有明確跡象」。" : "";
+      const summaryBlock = reportSummary || (finalResult ? finalResult.slice(0, 800) : "");
+      const prompt = `===== 排盤資料 =====
+${chartBlock}
+
+===== 分析摘要 =====
+${summaryBlock}
+${hebanBlock}
+${recentChat ? `\n最近對話：\n${recentChat}\n` : ""}
+用戶追問：${question}${transitNote}
+
+回答規則：不提命理術語，用自然語言。根據排盤資料推論，不可編造。時間問題具體到年月。用「${LANG_AI[currentLang] || '繁體中文'}」回覆。`;
       const isDeep = /大運|流年|逐月|十年|運勢走向|life phase|month.by.month/i.test(question);
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
