@@ -39,7 +39,7 @@
     "notFound": "找不到此帳號，請先註冊",
     "wrongPassword": "密碼不正確",
     "forgotPassword": "忘記密碼？",
-    "resetSent": "密碼已重設為 fortune2026，請用新密碼登入後修改"
+    "resetSent": "密碼已重設為 {{password}}，請用新密碼登入後修改"
   },
   "goal": {
     "question": "你想了解什麼？",

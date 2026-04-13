@@ -3083,14 +3083,15 @@ ${hebanRelation === "relations.twin" ? `
                 const email = authEmail.trim();
                 if (!email) { setAuthError(t('auth.fillEmailPw')); return; }
                 try {
+                  const tempPw = Math.random().toString(36).slice(2, 10);
                   const res = await fetch(API_BACKEND.replace("/api/fortune", "/api/fortune-users"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "reset_password", username: email, password: "fortune2026" }),
+                    body: JSON.stringify({ action: "reset_password", username: email, password: tempPw }),
                   });
                   const data = await res.json();
                   if (res.ok) {
-                    setAuthError(t('auth.resetSent'));
+                    setAuthError(t('auth.resetSent', { password: tempPw }));
                   } else {
                     setAuthError(data.error || t('auth.notFound'));
                   }

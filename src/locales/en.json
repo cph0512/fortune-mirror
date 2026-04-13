@@ -39,7 +39,7 @@
     "notFound": "Account not found, please sign up",
     "wrongPassword": "Incorrect password",
     "forgotPassword": "Forgot password?",
-    "resetSent": "Password reset to fortune2026. Please login and change it."
+    "resetSent": "Password reset to {{password}}. Please login and change it."
   },
   "goal": {
     "question": "What would you like to know?",
