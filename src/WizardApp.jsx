@@ -1456,14 +1456,16 @@ ${transitOverlay?.summary || ''}
     if (!question.trim() || chatLoading) return;
     setShowQuickQ(false);
     trackEvent("chat_question", { question: question.slice(0, 200) });
+    // Snapshot current chat BEFORE adding user message, then add
+    const chatBefore = [...chatHistory];
     setChatHistory(prev => [...prev, { role: "user", text: question }]);
     setChatInput("");
     setChatLoading(true);
     try {
       const kbEntries = loadKB();
       const wizardSP = buildWizardPrompt(kbEntries, goal);
-      // [LAB] Only last 3 turns instead of 10
-      const recentChat = chatHistory.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
+      // [LAB] Only last 3 turns — use snapshot, not stale closure
+      const recentChat = chatBefore.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
 
       // 確保疊宮分析是最新的（檢查年份，需要時重算）
       let currentResults = [...rawResults];
@@ -1526,10 +1528,10 @@ ${transitOverlay?.summary || ''}
         if (!pollRes.ok) continue;
         const data = await pollRes.json();
         if (data.status === "done") {
-          const newChat = [...chatHistory, { role: "user", text: question }, { role: "assistant", text: data.result }];
-          setChatHistory(prev => [...prev, { role: "assistant", text: data.result }]);
+          const fullChat = [...chatBefore, { role: "user", text: question }, { role: "assistant", text: data.result }];
+          setChatHistory(fullChat);
           // Save chat to the current reading (update, not create new)
-          saveChatToServer(wizardUser, newChat, activeReadingId);
+          saveChatToServer(wizardUser, fullChat, activeReadingId);
           break;
         }
       }
