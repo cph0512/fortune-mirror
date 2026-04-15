@@ -775,6 +775,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [userCharts, setUserCharts] = useState([]);
   const [showAddChart, setShowAddChart] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
+  const [expandedChartId, setExpandedChartId] = useState(null);
   const [newChartName, setNewChartName] = useState("");
   const [newChartGender, setNewChartGender] = useState("");
   const [newChartYear, setNewChartYear] = useState("");
@@ -850,6 +851,33 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const goalDisplay = (gk) => gk ? t(gk) : "";
   // Helper: get display text for relation key
   const relationDisplay = (rk) => rk ? t(rk) : "";
+
+  // Helper: match a reading's birthData to a chart's birthData (by year/month/day)
+  const birthMatch = (bd1, bd2) => {
+    if (!bd1 || !bd2) return false;
+    return String(bd1.year) === String(bd2.year) && String(bd1.month) === String(bd2.month) && String(bd1.day) === String(bd2.day);
+  };
+
+  // Group readings by chart — returns { chartId: [readings], _unmatched: [readings] }
+  const groupReadingsByChart = () => {
+    const readings = serverReadings.filter(r => (r.finalResult || r.result) && r.goal !== "family");
+    const groups = {};
+    const unmatched = [];
+    for (const r of readings) {
+      const bd = r.birthData || {};
+      let matched = false;
+      for (const chart of userCharts) {
+        if (birthMatch(bd, chart.birthData)) {
+          if (!groups[chart.id]) groups[chart.id] = [];
+          groups[chart.id].push(r);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) unmatched.push(r);
+    }
+    return { groups, unmatched };
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1954,65 +1982,50 @@ ${hebanRelation === "relations.twin" ? `
             )}
           </div>
 
-          {/* Charts Library (命盤庫) */}
-          {wizardUser && (
+          {/* Charts Library (命盤庫) — grouped with readings */}
+          {wizardUser && (() => {
+            const { groups, unmatched } = groupReadingsByChart();
+            // Deduplicate charts by birthData (keep first match, merge names)
+            const seen = new Map();
+            const dedupedCharts = [];
+            for (const chart of userCharts) {
+              const key = `${chart.birthData?.year}-${chart.birthData?.month}-${chart.birthData?.day}`;
+              if (seen.has(key)) continue;
+              seen.set(key, chart.id);
+              dedupedCharts.push(chart);
+            }
+            return (
             <div className="wizard-charts-section" style={{ marginTop: 24, maxWidth: 480, width: '100%' }}>
               <div className="wizard-heban-promo-header" style={{ marginBottom: 12 }}>
                 <span className="wizard-heban-promo-icon wizard-diamond"></span>
                 <div className="wizard-heban-promo-title">{t('charts.title')}</div>
               </div>
 
-              {/* Existing charts */}
-              {userCharts.length > 0 && (
+              {dedupedCharts.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                  {userCharts.map(chart => {
+                  {dedupedCharts.map(chart => {
+                    const isExpanded = expandedChartId === chart.id;
+                    const chartReadings = groups[chart.id] || [];
+                    // Also collect readings from duplicate charts with same birthData
+                    for (const c2 of userCharts) {
+                      if (c2.id !== chart.id && birthMatch(c2.birthData, chart.birthData) && groups[c2.id]) {
+                        chartReadings.push(...groups[c2.id]);
+                      }
+                    }
+                    // Sort by date desc
+                    chartReadings.sort((a, b) => new Date(b.time || b.date) - new Date(a.time || a.date));
                     const hasChartData = chart.charts && Object.keys(chart.charts).length > 0;
+
                     return (
                       <div key={chart.id} className="wizard-dashboard-card" style={{ position: 'relative' }}>
-                        {/* Main clickable area */}
-                        <div style={{ cursor: 'pointer' }} onClick={() => {
-                          if (!hasChartData) {
-                            // No chart data — go to analysis flow with this person's birth data pre-filled
-                            if (chart.birthData) {
-                              setBirthYear(chart.birthData.year || "");
-                              setBirthMonth(chart.birthData.month || "");
-                              setBirthDay(chart.birthData.day || "");
-                              setBirthHour(chart.birthData.hour || "");
-                              setBirthMinute(chart.birthData.minute || "0");
-                              if (chart.birthData.place) setBirthPlace(chart.birthData.place);
-                              if (chart.birthData.city) setBirthCity(chart.birthData.city);
-                            }
-                            if (chart.gender) setGender(chart.gender);
-                            setStep(1); // Go to goal selection
-                            return;
-                          }
-                          // Has chart data — load and go to follow-up
-                          const results = Object.entries(chart.charts).map(([sys, text]) => ({ system: sys, text, result: "" }));
-                          setRawResults(results);
-                          if (chart.birthData) {
-                            setBirthYear(chart.birthData.year || "");
-                            setBirthMonth(chart.birthData.month || "");
-                            setBirthDay(chart.birthData.day || "");
-                            setBirthHour(chart.birthData.hour || "");
-                            setBirthMinute(chart.birthData.minute || "0");
-                            if (chart.birthData.place) setBirthPlace(chart.birthData.place);
-                            if (chart.birthData.city) setBirthCity(chart.birthData.city);
-                          }
-                          if (chart.gender) setGender(chart.gender);
-                          setFinalResult("");
-                          setChatHistory([]);
-                          setGoal("goal.general");
-                          setGoalPrompt("goal.generalPrompt");
-                          setSelectedChart(chart);
-                          setShowQuickQ(true);
-                          setStep(TOTAL_STEPS + 1);
-                        }}>
+                        {/* Chart header — click to expand/collapse */}
+                        <div style={{ cursor: 'pointer' }} onClick={() => setExpandedChartId(isExpanded ? null : chart.id)}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
-                              {chart.name} {chart.is_primary ? '⭐' : ''}
+                              {isExpanded ? '▾' : '▸'} {chart.name} {chart.is_primary ? '⭐' : ''}
                             </div>
-                            <div style={{ fontSize: 12, color: hasChartData ? 'rgba(120,200,160,0.8)' : 'rgba(255,180,100,0.7)' }}>
-                              {hasChartData ? t('charts.ready') : t('charts.notCalculated')}
+                            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+                              {chartReadings.length > 0 ? `${chartReadings.length} ${t('charts.analyses', { defaultValue: '筆分析' })}` : ''}
                             </div>
                           </div>
                           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
@@ -2021,44 +2034,162 @@ ${hebanRelation === "relations.twin" ? `
                             {chart.birthData?.city?.nameZh ? ` · ${chart.birthData.city.nameZh}` : chart.birthData?.place ? ` · ${chart.birthData.place}` : ''}
                           </div>
                         </div>
-                        {/* Action buttons */}
-                        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
-                          {!chart.is_primary && (
+
+                        {/* Expanded: readings list + actions */}
+                        {isExpanded && (
+                          <div style={{ marginTop: 12 }}>
+                            {/* Quick action: new analysis for this person */}
                             <button
-                              style={{ background: 'none', border: '1px solid rgba(160,140,255,0.3)', color: 'rgba(160,140,255,0.8)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                // Unset all others, set this as primary
-                                for (const c of userCharts) {
-                                  if (c.is_primary) await saveChart(wizardUser, { ...c, is_primary: false });
+                              className="wizard-cta-secondary"
+                              style={{ width: '100%', fontSize: 13, padding: '8px 0', marginBottom: chartReadings.length > 0 ? 10 : 0 }}
+                              onClick={() => {
+                                if (chart.birthData) {
+                                  setBirthYear(chart.birthData.year || "");
+                                  setBirthMonth(chart.birthData.month || "");
+                                  setBirthDay(chart.birthData.day || "");
+                                  setBirthHour(chart.birthData.hour || "");
+                                  setBirthMinute(chart.birthData.minute || "0");
+                                  if (chart.birthData.place) setBirthPlace(chart.birthData.place);
+                                  if (chart.birthData.city) setBirthCity(chart.birthData.city);
                                 }
-                                await saveChart(wizardUser, { ...chart, is_primary: true });
-                                loadCharts(wizardUser).then(c => setUserCharts(c));
+                                if (chart.gender) setGender(chart.gender);
+                                setStep(1);
                               }}
-                            >{t('charts.setAsPrimary')}</button>
-                          )}
-                          <button
-                            style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', color: 'rgba(255,100,100,0.6)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
-                              const ok = await deleteChart(wizardUser, chart.id);
-                              if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
-                            }}
-                          >{t('charts.delete')}</button>
-                        </div>
+                            >
+                              + {t('charts.newAnalysis', { defaultValue: '新分析' })}
+                            </button>
+
+                            {/* Readings for this chart */}
+                            {chartReadings.map((r, i) => (
+                              <div
+                                key={r.id || r.time || i}
+                                style={{
+                                  padding: '8px 12px', marginBottom: 4, borderRadius: 8,
+                                  background: 'rgba(255,255,255,0.04)', cursor: 'pointer',
+                                  border: '1px solid rgba(255,255,255,0.06)',
+                                }}
+                                onClick={() => restoreReading(r)}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
+                                    {(() => {
+                                      let raw = r.goalPrompt || r.goal || '';
+                                      const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
+                                      if (baseKey.startsWith('goal.')) return t(baseKey);
+                                      if (raw.startsWith('合盤')) return raw;
+                                      return raw || t('history.analysis');
+                                    })()}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {r.chat?.length > 0 && (
+                                      <span style={{ fontSize: 11, color: 'rgba(160,140,255,0.7)' }}>
+                                        {r.chat.length / 2 | 0} Q&A
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                                      {new Date(r.date || r.time).toLocaleDateString()}
+                                    </span>
+                                    <button
+                                      style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.5)', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!confirm(t('charts.confirmDeleteReading'))) return;
+                                        const ok = await deleteReading(wizardUser, r.time || r.date);
+                                        if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
+                                      }}
+                                    >✕</button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Chart actions */}
+                            <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+                              {!chart.is_primary && (
+                                <button
+                                  style={{ background: 'none', border: '1px solid rgba(160,140,255,0.3)', color: 'rgba(160,140,255,0.8)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    for (const c of userCharts) {
+                                      if (c.is_primary) await saveChart(wizardUser, { ...c, is_primary: false });
+                                    }
+                                    await saveChart(wizardUser, { ...chart, is_primary: true });
+                                    loadCharts(wizardUser).then(c => setUserCharts(c));
+                                  }}
+                                >{t('charts.setAsPrimary')}</button>
+                              )}
+                              {!chart.is_primary && (
+                                <button
+                                  style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', color: 'rgba(255,100,100,0.6)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
+                                    const ok = await deleteChart(wizardUser, chart.id);
+                                    if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
+                                  }}
+                                >{t('charts.delete')}</button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               )}
 
+              {/* Unmatched readings (no chart) */}
+              {unmatched.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+                    {t('charts.unmatched', { defaultValue: '未歸類紀錄', count: unmatched.length })}
+                  </div>
+                  {unmatched.map((r, i) => (
+                    <div
+                      key={r.id || r.time || i}
+                      style={{
+                        padding: '8px 12px', marginBottom: 4, borderRadius: 8,
+                        background: 'rgba(255,255,255,0.04)', cursor: 'pointer',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => restoreReading(r)}>
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
+                            {(() => {
+                              let raw = r.goalPrompt || r.goal || '';
+                              const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
+                              if (baseKey.startsWith('goal.')) return t(baseKey);
+                              return raw || t('history.analysis');
+                            })()}
+                            {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+                            {new Date(r.date || r.time).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <button
+                          style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.5)', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!confirm(t('charts.confirmDeleteReading'))) return;
+                            const ok = await deleteReading(wizardUser, r.time || r.date);
+                            if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
+                          }}
+                        >✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Add new chart button */}
-              <button className="wizard-cta-secondary" style={{ width: '100%' }} onClick={() => setShowAddChart(true)}>
+              <button className="wizard-cta-secondary" style={{ width: '100%', marginTop: 12 }} onClick={() => setShowAddChart(true)}>
                 + {t('charts.addNew')}
               </button>
             </div>
-          )}
+            );
+          })()}
 
           {/* Family Chart — show existing family or create new */}
           {(() => {
@@ -2155,58 +2286,7 @@ ${hebanRelation === "relations.twin" ? `
             );
           })()}
 
-          {/* Dashboard — past readings (filter out chat-only entries) */}
-          {(() => {
-            const readings = serverReadings.filter(r => r.finalResult || r.result);
-            if (readings.length === 0) return null;
-            return (
-              <div className="wizard-dashboard">
-                <div className="wizard-dashboard-title">{t('history.pastReadings', { count: readings.length })}</div>
-                <div className="wizard-dashboard-list">
-                  {readings.map((r, i) => (
-                    <div key={r.id || r.time || i} className="wizard-dashboard-card" style={{ position: 'relative' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => restoreReading(r)}>
-                          <div className="wizard-dashboard-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
-                          <div className="wizard-dashboard-card-title">{(() => {
-                            let raw = r.goalPrompt || r.goal || '';
-                            if (!raw) return t('history.analysis');
-                            // Strip (chat) suffix and translate the base key
-                            const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
-                            if (baseKey.startsWith('goal.')) return t(baseKey);
-                            if (baseKey === 'family') return t('family.chartTitle');
-                            if (raw.startsWith('合盤')) return raw;
-                            return raw;
-                          })()}</div>
-                          <div className="wizard-dashboard-card-birth">{typeof r.birth === 'string' ? r.birth : (r.birthData ? `${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : '')}</div>
-                          {r.monthHighlights?.length > 0 && (
-                            <div className="wizard-history-months">
-                              {Array.from({ length: 12 }, (_, mi) => {
-                                const found = r.monthHighlights.find(h => h.month === mi + 1);
-                                return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
-                              })}
-                            </div>
-                          )}
-                        </div>
-                        {wizardUser && (
-                          <button
-                            style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.6)', fontSize: 16, cursor: 'pointer', padding: '4px 8px', flexShrink: 0 }}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (!confirm(t('charts.confirmDeleteReading'))) return;
-                              const ok = await deleteReading(wizardUser, r.time || r.date);
-                              if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
-                            }}
-                            title={t('charts.delete')}
-                          >✕</button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Dashboard removed — readings are now grouped under Charts above */}
         </>
       ) : (
         <div className="wizard-welcome-auth">
@@ -2787,33 +2867,56 @@ ${hebanRelation === "relations.twin" ? `
             </button>
           </div>
 
-          {/* Past Readings History */}
+          {/* Past Readings History — grouped by chart */}
           {(() => {
-            const readings = serverReadings;
-            if (readings.length <= 1) return null;
+            const { groups, unmatched } = groupReadingsByChart();
+            const totalReadings = Object.values(groups).reduce((sum, arr) => sum + arr.length, 0) + unmatched.length;
+            if (totalReadings <= 1) return null;
             return (
               <>
                 <button className="wizard-history-btn" onClick={() => {
                   const panel = document.getElementById("wizard-history-panel");
                   if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
                 }}>
-                  {t('history.pastReadings', { count: readings.length })}
+                  {t('history.pastReadings', { count: totalReadings })}
                 </button>
                 <div id="wizard-history-panel" className="wizard-history-panel" style={{ display: "none" }}>
-                  {readings.map((r, i) => (
-                    <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
-                      <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
-                      <div className="wizard-history-card-title">{r.goalPrompt || r.goal || t('history.analysis')} — {typeof r.birth === 'string' ? r.birth : ''}</div>
-                      {r.monthHighlights?.length > 0 && (
-                        <div className="wizard-history-months">
-                          {Array.from({ length: 12 }, (_, mi) => {
-                            const found = r.monthHighlights.find(h => h.month === mi + 1);
-                            return <div key={mi} className={`wizard-history-month-dot ${found?.tone || ""}`} />;
-                          })}
+                  {userCharts.map(chart => {
+                    const chartReadings = groups[chart.id] || [];
+                    if (chartReadings.length === 0) return null;
+                    return (
+                      <div key={chart.id} style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(160,140,255,0.8)', marginBottom: 4 }}>
+                          {chart.name}
                         </div>
-                      )}
+                        {chartReadings.map((r, i) => (
+                          <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
+                            <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
+                            <div className="wizard-history-card-title">
+                              {(() => { const k = (r.goalPrompt || r.goal || '').replace(/\s*\(chat\)\s*/g, '').trim(); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                              {r.chat?.length > 0 ? ` (${r.chat.length / 2 | 0} Q&A)` : ''}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {unmatched.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>
+                        {t('charts.unmatched', { defaultValue: '未歸類' })}
+                      </div>
+                      {unmatched.map((r, i) => (
+                        <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
+                          <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
+                          <div className="wizard-history-card-title">
+                            {(() => { const k = (r.goalPrompt || r.goal || '').replace(/\s*\(chat\)\s*/g, '').trim(); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                            {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               </>
             );
