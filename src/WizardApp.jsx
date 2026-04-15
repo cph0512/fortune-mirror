@@ -117,23 +117,18 @@ function loadSession(user) {
   return loadSessionLocal(user);
 }
 
-// Save chat history to server (as part of latest reading)
-async function saveChatToServer(user, chatHistory, finalResult, goal, goalPrompt, birthData) {
-  if (chatHistory.length === 0) return;
+// Save chat history to server — update existing reading by readingId
+async function saveChatToServer(user, chatHistory, readingId) {
+  if (chatHistory.length === 0 || !readingId) return;
   const userId = user?.email || getVisitorId();
   try {
     const res = await fetch(API_SAVE, {
-      method: "POST",
+      method: "PUT",
       headers: authHeaders(),
       body: JSON.stringify({
         user: userId,
-        time: new Date().toISOString(),
-        finalResult: finalResult || "",
-        goal: goal || "",
-        goalPrompt: goalPrompt ? `${goalPrompt} (chat)` : "chat",
-        birthData: birthData || {},
+        readingId: readingId,
         chat: chatHistory,
-        source: "b2c",
       }),
     });
     if (!res.ok) console.error("[saveChatToServer] failed:", res.status);
@@ -189,6 +184,7 @@ async function saveReading(user, reading) {
       headers: authHeaders(),
       body: JSON.stringify({
         user: userId,
+        id: reading.id || `save_${Date.now()}`,
         time: reading.date || new Date().toISOString(),
         finalResult: reading.result || "",
         gender: reading.gender || "",
@@ -727,6 +723,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [hebanAnalyzing, setHebanAnalyzing] = useState(false);
   const [hebanResult, setHebanResult] = useState(saved?.hebanResult ?? "");
 
+  const [activeReadingId, setActiveReadingId] = useState(saved?.activeReadingId ?? null);
   const [chatHistory, setChatHistory] = useState(saved?.chatHistory ?? []);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -836,6 +833,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       } catch (e) { console.warn("[restoreReading] overlay calc failed:", e); }
     }
     setRawResults(restoredResults);
+    setActiveReadingId(reading.id || reading.time);
     setChatHistory(Array.isArray(reading.chat) && reading.chat.length > 0 ? reading.chat : []);
     setHebanResult("");
     setShowHeban(false);
@@ -894,9 +892,10 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       showHeban,
       // 追問
       chatHistory,
+      activeReadingId,
     };
     saveSession(sessionData, wizardUser);
-  }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity, isTwin, twinOrder, twinType, finalResult, rawResults, hebanResult, hebanRelation, hebanName, hebanGender, hebanYear, hebanMonth, hebanDay, hebanHour, hebanMinute, showHeban, chatHistory, analyzing, hebanAnalyzing, wizardUser]);
+  }, [step, gender, goal, goalPrompt, loveSub, birthYear, birthMonth, birthDay, birthHour, birthMinute, birthPlace, birthCity, isTwin, twinOrder, twinType, finalResult, rawResults, hebanResult, hebanRelation, hebanName, hebanGender, hebanYear, hebanMonth, hebanDay, hebanHour, hebanMinute, showHeban, chatHistory, activeReadingId, analyzing, hebanAnalyzing, wizardUser]);
 
   useEffect(() => {
     if (saved?.finalResult && saved.step >= TOTAL_STEPS) {
@@ -1391,6 +1390,8 @@ ${transitOverlay?.summary || ''}
             };
             saveReading(wizardUser, newReading);
             setServerReadings(prev => [newReading, ...prev].slice(0, 50));
+            setActiveReadingId(job_id);
+            setChatHistory([]);
             // Auto-save chart to chart library
             if (wizardUser?.email && rawResults.length > 0) {
               const chartName = wizardUser.name || wizardUser.email.split("@")[0];
@@ -1499,9 +1500,8 @@ ${transitOverlay?.summary || ''}
         if (data.status === "done") {
           const newChat = [...chatHistory, { role: "user", text: question }, { role: "assistant", text: data.result }];
           setChatHistory(prev => [...prev, { role: "assistant", text: data.result }]);
-          // Save chat to server
-          saveChatToServer(wizardUser, newChat, finalResult, goal, goalPrompt,
-            { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace });
+          // Save chat to the current reading (update, not create new)
+          saveChatToServer(wizardUser, newChat, activeReadingId);
           break;
         }
       }
@@ -2776,7 +2776,7 @@ ${hebanRelation === "relations.twin" ? `
           {/* Action buttons */}
           <div className="wizard-result-actions">
             <button className="wizard-result-btn primary" onClick={() => {
-              setStep(0); setFinalResult(""); setRawResults([]); setChatHistory([]); setLoveSub("");
+              setStep(0); setFinalResult(""); setRawResults([]); setChatHistory([]); setActiveReadingId(null); setLoveSub("");
               setShowHeban(false); setHebanResult(""); setHebanRelation(""); setHebanName("");
               setHebanYear(""); setHebanMonth(""); setHebanDay(""); setHebanHour(""); setHebanGender("");
             }}>
