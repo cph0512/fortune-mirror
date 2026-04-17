@@ -2075,7 +2075,7 @@ ${hebanRelation === "relations.twin" ? `
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
                                     {(() => {
-                                      let raw = r.goalPrompt || r.goal || '';
+                                      let raw = r.goal || r.goalPrompt || '';
                                       const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
                                       if (baseKey.startsWith('goal.')) return t(baseKey);
                                       if (raw.startsWith('合盤')) return raw;
@@ -2159,7 +2159,7 @@ ${hebanRelation === "relations.twin" ? `
                         <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => restoreReading(r)}>
                           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
                             {(() => {
-                              let raw = r.goalPrompt || r.goal || '';
+                              let raw = r.goal || r.goalPrompt || '';
                               const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
                               if (baseKey.startsWith('goal.')) return t(baseKey);
                               return raw || t('history.analysis');
@@ -2895,7 +2895,7 @@ ${hebanRelation === "relations.twin" ? `
                           <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                             <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                             <div className="wizard-history-card-title">
-                              {(() => { const k = (r.goalPrompt || r.goal || '').replace(/\s*\(chat\)\s*/g, '').trim(); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                              {(() => { const k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                               {r.chat?.length > 0 ? ` (${r.chat.length / 2 | 0} Q&A)` : ''}
                             </div>
                           </div>
@@ -2912,7 +2912,7 @@ ${hebanRelation === "relations.twin" ? `
                         <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                           <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                           <div className="wizard-history-card-title">
-                            {(() => { const k = (r.goalPrompt || r.goal || '').replace(/\s*\(chat\)\s*/g, '').trim(); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                            {(() => { const k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                             {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
                           </div>
                         </div>
