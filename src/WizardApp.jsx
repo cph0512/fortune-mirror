@@ -840,6 +840,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     setShowHeban(false);
     setDisplayLang(null);
     setTranslatedResults({});
+    setReportSummary("");
     setShowQuickQ(true);
     setStep(TOTAL_STEPS + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1532,6 +1533,8 @@ ${transitOverlay?.summary || ''}
           setChatHistory(fullChat);
           // Save chat to the current reading (update, not create new)
           saveChatToServer(wizardUser, fullChat, activeReadingId);
+          // Sync chat to in-memory readings so switching readings stays isolated
+          setServerReadings(prev => prev.map(sr => (sr.id || sr.time) === activeReadingId ? { ...sr, chat: fullChat } : sr));
           break;
         }
       }
@@ -2055,6 +2058,7 @@ ${hebanRelation === "relations.twin" ? `
                                   if (chart.birthData.city) setBirthCity(chart.birthData.city);
                                 }
                                 if (chart.gender) setGender(chart.gender);
+                                setChatHistory([]); setActiveReadingId(null); setFinalResult(""); setRawResults([]); setReportSummary("");
                                 setStep(1);
                               }}
                             >
