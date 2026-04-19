@@ -2908,7 +2908,7 @@ ${hebanRelation === "relations.twin" ? `
                           <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                             <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                             <div className="wizard-history-card-title">
-                              {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                              {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('header.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                               {r.chat?.length > 0 ? ` (${r.chat.length / 2 | 0} Q&A)` : ''}
                             </div>
                           </div>
@@ -2925,7 +2925,7 @@ ${hebanRelation === "relations.twin" ? `
                         <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                           <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                           <div className="wizard-history-card-title">
-                            {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                            {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('header.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                             {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
                           </div>
                         </div>
