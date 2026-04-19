@@ -281,7 +281,7 @@
       "engine": "Analysis Engine", "engineDesc": "Server-side engine, no setup needed.",
       "connected": "Connected",
       "model": "Model", "modelDesc": "Server auto-selects the best model.",
-      "sonnet": "Claude Sonnet 4 (Recommended)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
+      "sonnet": "GPT-5 mini (Recommended)", "opus": "GPT-5", "haiku": "GPT-5 nano",
       "guide": "Guide",
       "guideContent": "1. Enter your Anthropic API Key in Settings\n2. Add knowledge entries (optional)\n3. Upload chart images\n4. The system combines your KB + built-in knowledge\n5. Richer KB = more accurate analysis!"
     },

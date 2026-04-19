@@ -281,7 +281,7 @@
       "engine": "鑑定エンジン", "engineDesc": "サーバー側エンジン、設定不要。",
       "connected": "接続済み",
       "model": "分析モデル", "modelDesc": "サーバーが最適なモデルを自動選択。",
-      "sonnet": "Claude Sonnet 4 (推奨)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
+      "sonnet": "GPT-5 mini (推奨)", "opus": "GPT-5", "haiku": "GPT-5 nano",
       "guide": "使い方",
       "guideContent": "1. 設定でAPI Keyを入力\n2. 知識庫に知識を追加（任意）\n3. 命盤画像をアップロード\n4. 知識庫+内蔵知識で分析\n5. 知識庫が豊富なほど精度UP！"
     },
