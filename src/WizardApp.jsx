@@ -1397,7 +1397,7 @@ ${transitOverlay?.summary || ''}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, notify_email: wizardUser?.email || "", goal }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", notify_email: wizardUser?.email || "", goal, job_type: "analysis", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace } }),
       });
       if (!submitRes.ok) throw new Error(t('result.analysisError'));
       const { job_id } = await submitRes.json();
@@ -1528,7 +1528,7 @@ ${transitOverlay?.summary || ''}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: followUpSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null, goal }),
+        body: JSON.stringify({ images: [], system: followUpSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", goal, job_type: "chat", chart_id: activeReadingId || "" }),
       });
       if (!submitRes.ok) throw new Error(t('result.chatError'));
       const { job_id } = await submitRes.json();
@@ -1652,7 +1652,7 @@ ${hebanRelation === "relations.twin" ? `
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, goal: "goal.love" }),
+        body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", goal: "goal.love", job_type: "heban", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hebanYear, hebanMonth, hebanDay, hebanRelation } }),
       });
       if (!submitRes.ok) throw new Error(t('result.hebanError'));
       const { job_id } = await submitRes.json();
