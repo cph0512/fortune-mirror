@@ -39,7 +39,8 @@
     "notFound": "找不到此帳號，請先註冊",
     "wrongPassword": "密碼不正確",
     "forgotPassword": "忘記密碼？",
-    "resetSent": "密碼已重設為 {{password}}，請用新密碼登入後修改"
+    "resetSent": "密碼已重設為 {{password}}，請用新密碼登入後修改",
+    "networkError": "無法連線伺服器，請稍後再試"
   },
   "goal": {
     "question": "你想了解什麼？",
@@ -174,7 +175,10 @@
     "chartTitle": "家族命盤分析",
     "chartDesc": "加入父母、手足、配偶的命盤，揭示家庭能量如何塑造你的命運",
     "buildChart": "建立家族命盤",
-    "analysisError": "分析失敗"
+    "analysisError": "分析失敗",
+    "members": "{{count}} 位成員",
+    "protagonist": "主角",
+    "analyses": "{{count}} 次分析"
   },
   "calendar": {
     "title": "{{year}} 年度月份總覽",
@@ -186,6 +190,9 @@
   },
   "charts": {
     "title": "我的命盤庫",
+    "analyses": "{{count}} 筆分析",
+    "newAnalysis": "新分析",
+    "unmatched": "未歸類紀錄",
     "systems": "系統",
     "delete": "刪除",
     "ready": "可提問",

@@ -39,7 +39,8 @@
     "notFound": "アカウントが見つかりません。新規登録してください",
     "wrongPassword": "パスワードが正しくありません",
     "forgotPassword": "パスワードをお忘れですか？",
-    "resetSent": "パスワードを {{password}} にリセットしました。ログイン後に変更してください。"
+    "resetSent": "パスワードを {{password}} にリセットしました。ログイン後に変更してください。",
+    "networkError": "サーバーに接続できません。しばらくしてから再度お試しください"
   },
   "goal": {
     "question": "何を知りたいですか？",
@@ -173,7 +174,10 @@
   "family": {
     "chartTitle": "家族命盤分析",
     "chartDesc": "家族を追加して、家庭のエネルギーが運命にどう影響するかを解き明かします",
-    "buildChart": "家族命盤を作成"
+    "buildChart": "家族命盤を作成",
+    "members": "{{count}} 名",
+    "protagonist": "主役",
+    "analyses": "{{count}} 件の鑑定"
   },
   "calendar": {
     "title": "{{year}}年 月別運勢一覧",
@@ -185,6 +189,9 @@
   },
   "charts": {
     "title": "マイ命盤",
+    "analyses": "{{count}} 件",
+    "newAnalysis": "新しい鑑定",
+    "unmatched": "未分類",
     "systems": "システム",
     "delete": "削除",
     "ready": "質問可能",

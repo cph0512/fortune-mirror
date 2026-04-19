@@ -1079,7 +1079,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
           return;
         }
       } catch {
-        setAuthError(t('auth.networkError') || '無法連線伺服器，請稍後再試');
+        setAuthError(t('auth.networkError'));
         return;
       }
       // Try server session first, fallback to localStorage
@@ -2908,7 +2908,7 @@ ${hebanRelation === "relations.twin" ? `
                           <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                             <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                             <div className="wizard-history-card-title">
-                              {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('header.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                              {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                               {r.chat?.length > 0 ? ` (${r.chat.length / 2 | 0} Q&A)` : ''}
                             </div>
                           </div>
@@ -2925,7 +2925,7 @@ ${hebanRelation === "relations.twin" ? `
                         <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                           <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                           <div className="wizard-history-card-title">
-                            {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('header.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                            {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                             {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
                           </div>
                         </div>
@@ -3097,25 +3097,25 @@ ${hebanRelation === "relations.twin" ? `
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <select className="wizard-select" value={newChartYear} onChange={e => setNewChartYear(e.target.value)} style={{ flex: 2 }}>
-                  <option value="">{t('birthday.year')}</option>
+                  <option value="">{t('birth.year')}</option>
                   {Array.from({ length: 87 }, (_, i) => new Date().getFullYear() + 1 - i).map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <select className="wizard-select" value={newChartMonth} onChange={e => setNewChartMonth(e.target.value)} style={{ flex: 1 }}>
-                  <option value="">{t('birthday.month')}</option>
+                  <option value="">{t('birth.month')}</option>
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
                 <select className="wizard-select" value={newChartDay} onChange={e => setNewChartDay(e.target.value)} style={{ flex: 1 }}>
-                  <option value="">{t('birthday.day')}</option>
+                  <option value="">{t('birth.day')}</option>
                   {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <select className="wizard-select" value={newChartHour} onChange={e => setNewChartHour(e.target.value)} style={{ flex: 1 }}>
-                  <option value="">{t('birthday.hour')}</option>
-                  {Array.from({ length: 24 }, (_, i) => i).map(h => <option key={h} value={h}>{h}{t('birthday.hourSuffix')}</option>)}
+                  <option value="">{t('birth.hour')}</option>
+                  {Array.from({ length: 24 }, (_, i) => i).map(h => <option key={h} value={h}>{h}{t('birth.hourSuffix')}</option>)}
                 </select>
                 <select className="wizard-select" value={newChartMinute} onChange={e => setNewChartMinute(e.target.value)} style={{ flex: 1 }}>
-                  <option value="0">{t('birthday.minute')}</option>
+                  <option value="0">{t('birth.minute')}</option>
                   {[0,5,10,15,20,25,30,35,40,45,50,55].map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>

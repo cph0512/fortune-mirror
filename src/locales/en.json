@@ -39,7 +39,8 @@
     "notFound": "Account not found, please sign up",
     "wrongPassword": "Incorrect password",
     "forgotPassword": "Forgot password?",
-    "resetSent": "Password reset to {{password}}. Please login and change it."
+    "resetSent": "Password reset to {{password}}. Please login and change it.",
+    "networkError": "Cannot reach server, please try again later"
   },
   "goal": {
     "question": "What would you like to know?",
@@ -173,7 +174,10 @@
   "family": {
     "chartTitle": "Family Chart Analysis",
     "chartDesc": "Add your parents, siblings, spouse — reveal how family energy shapes your destiny",
-    "buildChart": "Build Family Chart"
+    "buildChart": "Build Family Chart",
+    "members": "{{count}} members",
+    "protagonist": "Protagonist",
+    "analyses": "{{count}} analyses"
   },
   "calendar": {
     "title": "{{year}} Year at a Glance",
@@ -185,6 +189,9 @@
   },
   "charts": {
     "title": "My Charts",
+    "analyses": "{{count}} readings",
+    "newAnalysis": "New Reading",
+    "unmatched": "Unfiled",
     "systems": "systems",
     "delete": "Delete",
     "ready": "Ready",
