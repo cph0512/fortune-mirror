@@ -858,6 +858,14 @@ export default function WizardApp({ auth, onBack, onLogout }) {
 
   // Charts (命盤庫) state
   const [userCharts, setUserCharts] = useState([]);
+  // Save-chart modal: pops after each analysis where the birth data is new to
+  // this user. `pendingSave` holds the data the modal will persist on confirm.
+  const [showSaveChartModal, setShowSaveChartModal] = useState(false);
+  const [saveChartName, setSaveChartName] = useState("");
+  const [pendingSave, setPendingSave] = useState(null);
+  // Monthly overview expansion + paywall
+  const [expandedMonth, setExpandedMonth] = useState(null);  // 1..12
+  const [showUnlockMonthly, setShowUnlockMonthly] = useState(false);
   const [showAddChart, setShowAddChart] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
   const [expandedChartId, setExpandedChartId] = useState(null);
@@ -876,6 +884,45 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [horoscopeLoading, setHoroscopeLoading] = useState(false);
   const [selectedZodiac, setSelectedZodiac] = useState("");
   const [showHoroscopeDetail, setShowHoroscopeDetail] = useState(false);
+
+  // #7b — Start the chat UI on a specific chart without running a new analysis.
+  // If the chart has any prior reading, the most recent one seeds the chat's
+  // report context so follow-up questions reference it. If not, we still land
+  // the user on the result/chat screen with the chart's raw birthdata so they
+  // can ask general questions.
+  const startChatOnChart = (chart) => {
+    const readings = serverReadings.filter(r => {
+      const bd = r.birthData || {};
+      const cbd = chart.birthData || {};
+      return String(bd.year) === String(cbd.year)
+        && String(bd.month) === String(cbd.month)
+        && String(bd.day) === String(cbd.day);
+    });
+    readings.sort((a, b) => new Date(b.time || b.date || 0) - new Date(a.time || a.date || 0));
+    if (readings.length > 0) {
+      restoreReading(readings[0]);
+    } else {
+      // No prior reading for this chart — synthesize minimal chat context.
+      const bd = chart.birthData || {};
+      if (chart.gender) setGender(chart.gender);
+      setBirthYear(bd.year || "");
+      setBirthMonth(bd.month || "");
+      setBirthDay(bd.day || "");
+      setBirthHour(bd.hour || "");
+      setBirthMinute(bd.minute || "0");
+      if (bd.place) setBirthPlace(bd.place);
+      if (bd.city) setBirthCity(bd.city);
+      const raw = Object.entries(chart.charts || {}).map(([system, text]) => ({ system, text, result: "" }));
+      setRawResults(raw);
+      setFinalResult("");
+      setActiveReadingId(chart.id || null);
+      setChatHistory([]);
+      setReportSummary("");
+      setShowQuickQ(true);
+      setStep(TOTAL_STEPS + 1);
+    }
+    trackEvent("ask_question_clicked", { chart_id: chart.id, has_prior_reading: readings.length > 0 });
+  };
 
   // Restore a past reading into current state (for dashboard)
   const restoreReading = (reading) => {
@@ -972,11 +1019,53 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // Fetch KB from server on mount
   useEffect(() => { fetchKB(); }, []);
 
+  // Migration: enforce at most one primary chart per user, preferring the
+  // earliest createdAt. Older accounts predate the mutex rule (every auto-save
+  // set is_primary=true) so we resolve conflicts by creation order.
+  const ensureOnePrimary = async (charts) => {
+    if (!charts || charts.length === 0) return charts;
+    const primaries = charts.filter(c => c.is_primary);
+    if (primaries.length === 1) return charts;
+    const sorted = [...charts].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    const keep = primaries.length > 1
+      ? [...primaries].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0]
+      : sorted[0];
+    const fixed = charts.map(c => ({ ...c, is_primary: c.id === keep.id }));
+    // Persist the deltas (keep network chatter down — only charts whose flag changed).
+    for (let i = 0; i < fixed.length; i++) {
+      if (fixed[i].is_primary !== charts[i].is_primary) {
+        try { await saveChart(wizardUser, fixed[i]); } catch {}
+      }
+    }
+    return fixed;
+  };
+
+  // Atomic primary toggle. Passing a chart that is currently primary clears it
+  // (no successor is promoted — matches the spec's "手動刪本命盤後不自動補位"
+  // behavior applied to the toggle case too).
+  const togglePrimary = async (chart) => {
+    if (!wizardUser?.email) return;
+    const target = !chart.is_primary;
+    const updates = userCharts.map(c => {
+      if (c.id === chart.id) return { ...c, is_primary: target };
+      if (target && c.is_primary) return { ...c, is_primary: false };
+      return c;
+    });
+    setUserCharts(updates);  // optimistic
+    for (const c of updates) {
+      const before = userCharts.find(x => x.id === c.id);
+      if (before && before.is_primary !== c.is_primary) {
+        try { await saveChart(wizardUser, c); } catch {}
+      }
+    }
+    loadCharts(wizardUser).then(c => setUserCharts(c));
+  };
+
   // Load readings from server when user changes
   useEffect(() => {
     if (wizardUser?.email) {
       loadReadings(wizardUser).then(readings => setServerReadings(readings));
-      loadCharts(wizardUser).then(charts => setUserCharts(charts));
+      loadCharts(wizardUser).then(charts => ensureOnePrimary(charts)).then(charts => setUserCharts(charts));
       // Sync session from server if local is empty or stale
       loadSessionFromServer(wizardUser).then(serverSess => {
         if (!serverSess) return;
@@ -1506,23 +1595,43 @@ ${transitOverlay?.summary || ''}
               rawResults: rawResults,
               monthHighlights: parseMonthHighlights(data.result),
             };
-            saveReading(wizardUser, newReading);
-            setServerReadings(prev => [newReading, ...prev].slice(0, 50));
+            // Chart + reading persistence split:
+            //   * If the birthday matches an existing chart → this reading
+            //     goes straight into the user's library under that chart. No
+            //     prompt, keeps flow fast for follow-up analyses.
+            //   * If it's a new birthday → stash reading + chart data and
+            //     pop the save modal. User can discard; audit.db already has
+            //     the analysis regardless of their choice.
             setActiveReadingId(job_id);
             setChatHistory([]);
-            // Auto-save chart to chart library
-            if (wizardUser?.email && rawResults.length > 0) {
-              const chartName = wizardUser.name || wizardUser.email.split("@")[0];
-              const chartData = {
-                name: chartName,
-                is_primary: true,
-                birthData: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace, city: birthCity },
-                gender: gender,
-                charts: Object.fromEntries(rawResults.filter(r => r.text).map(r => [r.system, r.text])),
-              };
-              saveChart(wizardUser, chartData).then(saved => {
-                if (saved) loadCharts(wizardUser).then(c => setUserCharts(c));
+            const bdMatch = wizardUser?.email ? userCharts.find(c => {
+              const bd = c.birthData || {};
+              return String(bd.year) === String(birthYear)
+                && String(bd.month) === String(birthMonth)
+                && String(bd.day) === String(birthDay);
+            }) : null;
+            if (bdMatch) {
+              saveReading(wizardUser, newReading);
+              setServerReadings(prev => [newReading, ...prev].slice(0, 50));
+            } else if (wizardUser?.email && rawResults.length > 0) {
+              const defaultName = `${birthYear}/${birthMonth}/${birthDay}`;
+              setPendingSave({
+                reading: newReading,
+                chart: {
+                  name: defaultName,
+                  is_primary: userCharts.length === 0,  // first chart → auto-primary
+                  birthData: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace, city: birthCity },
+                  gender: gender,
+                  charts: Object.fromEntries(rawResults.filter(r => r.text).map(r => [r.system, r.text])),
+                  createdAt: Date.now(),
+                },
               });
+              setSaveChartName(defaultName);
+              setShowSaveChartModal(true);
+            } else {
+              // Guest user — keep reading visible locally even without a chart
+              saveReading(wizardUser, newReading);
+              setServerReadings(prev => [newReading, ...prev].slice(0, 50));
             }
             break;
           }
@@ -2132,27 +2241,36 @@ ${hebanRelation === "relations.twin" ? `
                         {/* Expanded: readings list + actions */}
                         {isExpanded && (
                           <div style={{ marginTop: 12 }}>
-                            {/* Quick action: new analysis for this person */}
-                            <button
-                              className="wizard-cta-secondary"
-                              style={{ width: '100%', fontSize: 13, padding: '8px 0', marginBottom: chartReadings.length > 0 ? 10 : 0 }}
-                              onClick={() => {
-                                if (chart.birthData) {
-                                  setBirthYear(chart.birthData.year || "");
-                                  setBirthMonth(chart.birthData.month || "");
-                                  setBirthDay(chart.birthData.day || "");
-                                  setBirthHour(chart.birthData.hour || "");
-                                  setBirthMinute(chart.birthData.minute || "0");
-                                  if (chart.birthData.place) setBirthPlace(chart.birthData.place);
-                                  if (chart.birthData.city) setBirthCity(chart.birthData.city);
-                                }
-                                if (chart.gender) setGender(chart.gender);
-                                setChatHistory([]); setActiveReadingId(null); setFinalResult(""); setRawResults([]); setReportSummary("");
-                                setStep(1);
-                              }}
-                            >
-                              + {t('charts.newAnalysis', { defaultValue: '新分析' })}
-                            </button>
+                            {/* Quick actions: new analysis + ask a question */}
+                            <div style={{ display: 'flex', gap: 8, marginBottom: chartReadings.length > 0 ? 10 : 0 }}>
+                              <button
+                                className="wizard-cta-secondary"
+                                style={{ flex: 1, fontSize: 13, padding: '8px 0' }}
+                                onClick={() => {
+                                  if (chart.birthData) {
+                                    setBirthYear(chart.birthData.year || "");
+                                    setBirthMonth(chart.birthData.month || "");
+                                    setBirthDay(chart.birthData.day || "");
+                                    setBirthHour(chart.birthData.hour || "");
+                                    setBirthMinute(chart.birthData.minute || "0");
+                                    if (chart.birthData.place) setBirthPlace(chart.birthData.place);
+                                    if (chart.birthData.city) setBirthCity(chart.birthData.city);
+                                  }
+                                  if (chart.gender) setGender(chart.gender);
+                                  setChatHistory([]); setActiveReadingId(null); setFinalResult(""); setRawResults([]); setReportSummary("");
+                                  setStep(1);
+                                }}
+                              >
+                                + {t('charts.newAnalysis', { defaultValue: '新分析' })}
+                              </button>
+                              <button
+                                className="wizard-cta-secondary"
+                                style={{ flex: 1, fontSize: 13, padding: '8px 0' }}
+                                onClick={() => startChatOnChart(chart)}
+                              >
+                                💬 {t('charts.askQuestion', { defaultValue: '問事' })}
+                              </button>
+                            </div>
 
                             {/* Readings for this chart */}
                             {chartReadings.map((r, i) => (
@@ -2194,30 +2312,21 @@ ${hebanRelation === "relations.twin" ? `
 
                             {/* Chart actions */}
                             <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
-                              {!chart.is_primary && (
-                                <button
-                                  style={{ background: 'none', border: '1px solid rgba(160,140,255,0.3)', color: 'rgba(160,140,255,0.8)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    for (const c of userCharts) {
-                                      if (c.is_primary) await saveChart(wizardUser, { ...c, is_primary: false });
-                                    }
-                                    await saveChart(wizardUser, { ...chart, is_primary: true });
-                                    loadCharts(wizardUser).then(c => setUserCharts(c));
-                                  }}
-                                >{t('charts.setAsPrimary')}</button>
-                              )}
-                              {!chart.is_primary && (
-                                <button
-                                  style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', color: 'rgba(255,100,100,0.6)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
-                                    const ok = await deleteChart(wizardUser, chart.id);
-                                    if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
-                                  }}
-                                >{t('charts.delete')}</button>
-                              )}
+                              <button
+                                style={{ background: 'none', border: `1px solid ${chart.is_primary ? 'rgba(255,215,100,0.6)' : 'rgba(160,140,255,0.3)'}`, color: chart.is_primary ? 'rgba(255,215,100,0.95)' : 'rgba(160,140,255,0.8)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
+                                onClick={(e) => { e.stopPropagation(); togglePrimary(chart); }}
+                              >{chart.is_primary
+                                ? t('charts.unsetPrimary', { defaultValue: '⭐ 取消本命盤' })
+                                : t('charts.setAsPrimary')}</button>
+                              <button
+                                style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', color: 'rgba(255,100,100,0.6)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
+                                  const ok = await deleteChart(wizardUser, chart.id);
+                                  if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
+                                }}
+                              >{t('charts.delete')}</button>
                             </div>
                           </div>
                         )}
@@ -2426,10 +2535,35 @@ ${hebanRelation === "relations.twin" ? `
   );
 
   // Step 1: Goal
-  const renderGoal = () => (
+  const renderGoal = () => {
+    // #7a — dedupe goals already analysed for this chart. When entering via
+    // "+ 新分析" on an existing chart card, birth data is already set. Match
+    // server readings by birthday and hide goals the user has already run so
+    // they don't pay tokens for a duplicate report.
+    const sameChartAsked = new Set();
+    if (birthYear && birthMonth && birthDay) {
+      for (const r of serverReadings) {
+        const bd = r.birthData || {};
+        if (String(bd.year) === String(birthYear)
+            && String(bd.month) === String(birthMonth)
+            && String(bd.day) === String(birthDay)
+            && r.goal) {
+          sameChartAsked.add(r.goal);
+        }
+      }
+    }
+    const goalsToShow = sameChartAsked.size > 0
+      ? GOALS.filter(g => !sameChartAsked.has(g.key))
+      : GOALS;
+    return (
     <div className="wizard-content">
       <div className="wizard-question">{goal === "goal.love" && loveSub === "" ? t('goal.loveStatus') : t('goal.question')}</div>
       <div className="wizard-subtitle">{goal === "goal.love" && loveSub === "" ? t('goal.loveStatusSub') : t('goal.subtitle')}</div>
+      {sameChartAsked.size > 0 && goalsToShow.length < GOALS.length && (
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+          {t('goal.dedupeHint', { defaultValue: '已分析過的主題不再顯示。想重看之前的內容請回命盤庫點歷史紀錄。' })}
+        </div>
+      )}
       <div className="wizard-options">
         {goal === "goal.love" && loveSub === "" ? (
           <>
@@ -2445,8 +2579,8 @@ ${hebanRelation === "relations.twin" ? `
               <span className="wizard-option-text">{t('goal.back')}</span>
             </div>
           </>
-        ) : (
-          GOALS.map(g => (
+        ) : goalsToShow.length > 0 ? (
+          goalsToShow.map(g => (
             <div key={g.key} className={`wizard-option ${goal === g.key ? "selected" : ""}`}
               onClick={() => {
                 setGoal(g.key);
@@ -2462,10 +2596,15 @@ ${hebanRelation === "relations.twin" ? `
               <span className="wizard-option-arrow">›</span>
             </div>
           ))
+        ) : (
+          <div style={{ padding: 20, textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
+            {t('goal.allDone', { defaultValue: '這張命盤所有主題都已分析過。可以改問「問事」或回命盤庫看歷史。' })}
+          </div>
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   // Step 2: Birthday + Time
   const renderBirthday = () => {
@@ -2762,12 +2901,13 @@ ${hebanRelation === "relations.twin" ? `
             {translating && <span className="wizard-translate-loading">{t('result.translating')}</span>}
           </div>
 
-          {/* Month Quick Reference — only for 流年/monthly analysis */}
+          {/* Month Quick Reference — grid is always shown on the result page so
+              unlocking the yearly forecast is discoverable even when the user
+              picked a non-monthly goal. A cell with real data expands inline;
+              an empty cell opens the unlock modal. */}
           {(() => {
-            const isMonthlyAnalysis = /流年|逐月|月份|每月|month.by.month|monthly|year.*forecast|月別/i.test(displayResult);
-            if (!isMonthlyAnalysis) return null;
             const highlights = parseMonthHighlights(displayResult);
-            if (highlights.length === 0) return null;
+            const hasAnyData = highlights.length > 0;
             const year = new Date().getFullYear();
             const allMonths = Array.from({ length: 12 }, (_, i) => {
               const found = highlights.find(h => h.month === i + 1);
@@ -2776,20 +2916,39 @@ ${hebanRelation === "relations.twin" ? `
             const toneColors = { positive: "#4caf50", caution: "#ff9800", neutral: "#90caf9", default: "rgba(255,255,255,0.1)" };
             const toneLabels = { positive: t('calendar.good'), caution: "!", neutral: "", default: "" };
             const monthNames = t('calendar.months', { returnObjects: true });
+            const onCellClick = (m) => {
+              if (m.description) {
+                setExpandedMonth(expandedMonth === m.month ? null : m.month);
+              } else {
+                trackEvent("unlock_monthly_clicked", { month: m.month, source: hasAnyData ? "partial" : "locked" });
+                setShowUnlockMonthly(true);
+              }
+            };
             return (
               <div className="wizard-month-overview">
                 <div className="wizard-month-overview-title">{t('calendar.title', { year })}</div>
                 <div className="wizard-month-grid">
                   {allMonths.map(m => (
                     <div key={m.month}
-                      className={`wizard-month-cell ${m.tone}`}
-                      title={m.description}
-                      style={{ borderBottom: `3px solid ${toneColors[m.tone]}` }}>
+                      className={`wizard-month-cell ${m.tone} ${expandedMonth === m.month ? 'expanded' : ''}`}
+                      title={m.description || t('calendar.locked', { defaultValue: '點擊解鎖' })}
+                      style={{ borderBottom: `3px solid ${toneColors[m.tone]}`, cursor: 'pointer', opacity: m.description ? 1 : 0.55 }}
+                      onClick={() => onCellClick(m)}>
                       <span className="wizard-month-num">{monthNames[m.month - 1]}</span>
                       {toneLabels[m.tone] && <span className="wizard-month-badge">{toneLabels[m.tone]}</span>}
+                      {!m.description && <span className="wizard-month-badge" style={{ opacity: 0.7 }}>🔒</span>}
                     </div>
                   ))}
                 </div>
+                {expandedMonth && (() => {
+                  const m = allMonths.find(x => x.month === expandedMonth);
+                  if (!m?.description) return null;
+                  return (
+                    <div style={{ marginTop: 8, padding: '10px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: 8, borderLeft: `3px solid ${toneColors[m.tone]}`, fontSize: 13, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)' }}>
+                      <strong>{monthNames[m.month - 1]}</strong>：{m.description}
+                    </div>
+                  );
+                })()}
                 <div className="wizard-month-legend">
                   <span className="wizard-month-legend-item"><span style={{ background: toneColors.positive }} className="wizard-month-dot" /> {t('calendar.favorable')}</span>
                   <span className="wizard-month-legend-item"><span style={{ background: toneColors.caution }} className="wizard-month-dot" /> {t('calendar.caution')}</span>
@@ -3219,6 +3378,7 @@ ${hebanRelation === "relations.twin" ? `
                         '八字': baziChart,
                         ...(astroChart ? { '西洋占星': astroChart } : {}),
                       },
+                      createdAt: Date.now(),
                     };
                     const saved = await saveChart(wizardUser, chartData);
                     if (saved) {
@@ -3292,6 +3452,103 @@ ${hebanRelation === "relations.twin" ? `
                 {t('auth.forgotPassword')}
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {showUnlockMonthly && (
+        <div className="wizard-auth-overlay" onClick={() => setShowUnlockMonthly(false)}>
+          <div className="wizard-auth-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="wizard-auth-title">
+              {t('calendar.unlockTitle', { defaultValue: `解鎖 ${new Date().getFullYear()} 年每月運勢`, year: new Date().getFullYear() })}
+            </div>
+            <div className="wizard-auth-subtitle">
+              {t('calendar.unlockDesc', { defaultValue: '幫你逐月排出今年的運勢起伏：哪個月是好時機、哪個月要小心、為什麼。' })}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                className="wizard-cta"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  trackEvent("unlock_monthly_confirmed", { source: "modal" });
+                  setShowUnlockMonthly(false);
+                  // TODO(payment): insert billing gate here before dispatching
+                  // the analysis. For now the unlock is free — the hook above
+                  // is what the billing step will check against.
+                  setGoal("goal.general");
+                  setGoalPrompt("goal.generalPrompt");
+                  setLoveSub("");
+                  setStep(birthYear && birthMonth && birthDay ? 4 : 1);
+                }}
+              >{t('calendar.unlockNow', { defaultValue: '立即解鎖' })}</button>
+              <button
+                className="wizard-cta"
+                style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+                onClick={() => {
+                  trackEvent("unlock_monthly_dismissed");
+                  setShowUnlockMonthly(false);
+                }}
+              >{t('calendar.unlockLater', { defaultValue: '稍後再說' })}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSaveChartModal && pendingSave && (
+        <div className="wizard-auth-overlay" onClick={() => {}}>
+          <div className="wizard-auth-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="wizard-auth-title">
+              {t('charts.saveChartTitle', { defaultValue: '儲存此命盤？' })}
+            </div>
+            <div className="wizard-auth-subtitle">
+              {t('charts.saveChartDesc', { defaultValue: '儲存後可以在我的命盤庫隨時回看、追問、做更多分析。不儲存則這次結果只在本次可見。' })}
+            </div>
+            <input
+              className="wizard-auth-input"
+              placeholder={t('charts.nameLabel')}
+              value={saveChartName}
+              onChange={e => setSaveChartName(e.target.value)}
+              style={{ marginTop: 8 }}
+            />
+            {pendingSave.chart.is_primary && (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(255,215,100,0.9)' }}>
+                ⭐ {t('charts.firstChartNatal', { defaultValue: '這是你第一張命盤，會自動設為本命盤。之後可在命盤庫切換。' })}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button
+                className="wizard-cta"
+                style={{ flex: 1 }}
+                onClick={async () => {
+                  const name = saveChartName.trim() || t('charts.untitled', { defaultValue: '未命名' });
+                  const reading = { ...pendingSave.reading };
+                  const chart = { ...pendingSave.chart, name };
+                  saveReading(wizardUser, reading);
+                  setServerReadings(prev => [reading, ...prev].slice(0, 50));
+                  try {
+                    await saveChart(wizardUser, chart);
+                    const fresh = await loadCharts(wizardUser);
+                    setUserCharts(fresh);
+                  } catch {}
+                  trackEvent("chart_saved", { is_primary: chart.is_primary });
+                  setShowSaveChartModal(false);
+                  setPendingSave(null);
+                }}
+              >{t('charts.save', { defaultValue: '儲存' })}</button>
+              <button
+                className="wizard-cta"
+                style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+                onClick={() => {
+                  // Discard: neither chart nor reading is kept in the user-
+                  // facing stores. The audit DB already has the full record
+                  // from handle_fortune, so admins can still see what they
+                  // tried.
+                  trackEvent("chart_discarded", { goal });
+                  setShowSaveChartModal(false);
+                  setPendingSave(null);
+                }}
+              >{t('charts.dontSave', { defaultValue: '不儲存' })}</button>
+            </div>
           </div>
         </div>
       )}
