@@ -196,6 +196,11 @@ async function saveReading(user, reading) {
         id: reading.id || `save_${Date.now()}`,
         time: reading.date || new Date().toISOString(),
         finalResult: reading.result || "",
+        // Decision advisor records piggy-back on the reading schema by
+        // stringifying the structured JSON into finalResult so the existing
+        // /api/fortune-save endpoint doesn't need a migration. The frontend
+        // detects goal==='decision' and JSON.parses this field back.
+        ...(reading.decisionResult ? { finalResult: JSON.stringify(reading.decisionResult) } : {}),
         gender: reading.gender || "",
         goal: reading.goal || "",
         goalPrompt: reading.goalPrompt || "",
@@ -1159,6 +1164,25 @@ ${question}
       } else {
         setDecisionStatus("result");
         trackEvent("decision_completed", { type: parsed.type, options: parsed.options?.length || 0 });
+        // Persist the decision under the chart (or unfiled if guest) so it
+        // shows up alongside analyses in the chart library. The raw JSON
+        // lives in `decisionResult`; the dashboard history card knows to
+        // dispatch back to the modal instead of restoreReading()'s report view.
+        if (wizardUser?.email) {
+          const decisionRecord = {
+            id: `decision_${job_id}`,
+            date: new Date().toISOString(),
+            goal: "decision",
+            goalPrompt: question,
+            decisionResult: parsed,
+            result: "",
+            birthData: bd,
+            gender: chart?.gender || wizardUser?.gender || "",
+            source: "b2c",
+          };
+          saveReading(wizardUser, decisionRecord);
+          setServerReadings(prev => [decisionRecord, ...prev].slice(0, 50));
+        }
       }
     } catch (e) {
       console.error("[decision] error:", e);
@@ -1206,6 +1230,35 @@ ${question}
       setStep(TOTAL_STEPS + 1);
     }
     trackEvent("ask_question_clicked", { chart_id: chart.id, has_prior_reading: readings.length > 0 });
+  };
+
+  // Click handler for history cards. Decisions get their own path so we don't
+  // spin up the full analysis result screen for a quick decision re-check.
+  const openHistoryCard = (reading) => {
+    if (reading?.goal === "decision") {
+      let parsed = reading.decisionResult;
+      if (!parsed && reading.finalResult) {
+        try { parsed = JSON.parse(reading.finalResult); } catch { parsed = null; }
+      }
+      if (!parsed) return;
+      // Find the chart this decision was anchored to (by birthData) so the
+      // modal header shows the right name.
+      const bd = reading.birthData || {};
+      const anchor = userCharts.find(c => {
+        const cb = c.birthData || {};
+        return String(cb.year) === String(bd.year)
+          && String(cb.month) === String(bd.month)
+          && String(cb.day) === String(bd.day);
+      }) || null;
+      setDecisionChart(anchor);
+      setDecisionQuestion(reading.goalPrompt || "");
+      setDecisionResult(parsed);
+      setDecisionStatus(parsed.type === "blocked" ? "blocked" : "result");
+      setDecisionError("");
+      setShowDecisionModal(true);
+      return;
+    }
+    restoreReading(reading);
   };
 
   // Restore a past reading into current state (for dashboard)
@@ -2594,7 +2647,7 @@ ${hebanRelation === "relations.twin" ? `
                                   background: 'rgba(255,255,255,0.04)', cursor: 'pointer',
                                   border: '1px solid rgba(255,255,255,0.06)',
                                 }}
-                                onClick={() => restoreReading(r)}
+                                onClick={() => openHistoryCard(r)}
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
@@ -2671,7 +2724,7 @@ ${hebanRelation === "relations.twin" ? `
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => restoreReading(r)}>
+                        <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openHistoryCard(r)}>
                           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
                             {(() => {
                               let raw = r.goal || r.goalPrompt || '';
@@ -3472,10 +3525,10 @@ ${hebanRelation === "relations.twin" ? `
                           {chart.name}
                         </div>
                         {chartReadings.map((r, i) => (
-                          <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
+                          <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => openHistoryCard(r)}>
                             <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                             <div className="wizard-history-card-title">
-                              {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                              {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k === 'decision') { const q = r.goalPrompt || ''; const short = q.length > 24 ? q.slice(0, 24) + '…' : q; return `🎯 ${t('decision.cta', { defaultValue: '決策建議' })}${short ? '：' + short : ''}`; } if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                               {r.chat?.length > 0 ? ` (${r.chat.length / 2 | 0} Q&A)` : ''}
                             </div>
                           </div>
@@ -3489,10 +3542,10 @@ ${hebanRelation === "relations.twin" ? `
                         {t('charts.unmatched', { defaultValue: '未歸類' })}
                       </div>
                       {unmatched.map((r, i) => (
-                        <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
+                        <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => openHistoryCard(r)}>
                           <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                           <div className="wizard-history-card-title">
-                            {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
+                            {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k === 'decision') { const q = r.goalPrompt || ''; const short = q.length > 24 ? q.slice(0, 24) + '…' : q; return `🎯 ${t('decision.cta', { defaultValue: '決策建議' })}${short ? '：' + short : ''}`; } if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                             {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
                           </div>
                         </div>
