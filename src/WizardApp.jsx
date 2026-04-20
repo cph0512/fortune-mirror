@@ -58,15 +58,6 @@ const AUTH_KEY = "wizard-auth";
 const AUTH_TOKEN_KEY = "wizard-auth-token";
 const VISITOR_ID_KEY = "fortune-visitor-id";
 
-function formatReadingLabel(reading, t) {
-  let raw = (reading.goalPrompt || reading.goal || '').replace(/\s*\(chat\)\s*/g, '').trim();
-  if (raw === 'heban') return t('account.featureHeban');
-  if (raw.startsWith('goal.') && raw.endsWith('Prompt')) raw = raw.slice(0, -'Prompt'.length);
-  if (raw.startsWith('goal.')) return t(raw);
-  if (raw.startsWith('合盤') || raw.startsWith('Compatibility')) return raw;
-  return raw || t('history.analysis');
-}
-
 function getVisitorId() {
   let vid = localStorage.getItem(VISITOR_ID_KEY);
   if (!vid) {
@@ -496,68 +487,73 @@ const HEBAN_SYSTEM_PROMPT_ZH = `你是「命理三鏡」的關係分析師。
 中立原則：不可假設兩人的職業、行業、生活背景。
 語氣：溫暖有洞察力，正面為主但誠實，具體有畫面感。`;
 
-const GOAL_FRAMEWORK = {
-  "goal.health": {
-    section4Title: "健康與養生——你的現況與趨勢",
-    section4Body: `（必須寫 5-6 個飽滿的自然段落，篇幅充足，不可草草帶過。必須具體涵蓋以下面向，每項至少一段：
+// Goal-specific framework for section 4 (topic deep-dive) and section 5
+// (12-month breakdown). Kept as a function (not a const) so the current year
+// interpolates at call time instead of at module load.
+function getGoalFramework(y) {
+  return {
+    "goal.health": {
+      section4Title: "健康與養生——你的現況與趨勢",
+      section4Body: `（必須寫 5-6 個飽滿的自然段落，篇幅充足，不可草草帶過。必須具體涵蓋以下面向，每項至少一段：
 1. 體質基底：你天生體質偏強還是偏弱？哪些系統/部位是先天弱點（消化、循環、呼吸、神經、內分泌、骨骼關節、肝膽、腎系統...依排盤挑最明顯的 2-3 項深入說明，要具體到身體部位）。
 2. 近期身心狀態：睡眠品質、食慾、精力、情緒壓力之間如何互相拉扯？現在是消耗期還是修復期？疲倦感來源是身體還是心理？
 3. 慢性累積趨勢：哪些小症狀若長期忽視會滾成慢性問題？免疫力、代謝速度、老化節奏的走向？
 4. 壓力源與修復資源：哪些人際/工作/環境正在消耗你的健康？你身邊有哪些資源/條件可以幫你修復（照顧者、財務能支持就醫、時間彈性）？兩者的拉扯關係如何？
 5. 最需要特別留意的健康面向：依排盤格局，未來 1-3 年哪個系統/部位是主要課題？
 6. 跨系統交叉訊號：若多個系統同時指向某個健康面向（例如消化、情緒、睡眠），點出來並解釋意義。）`,
-    section5Title: "${_y} 年 12 個月健康走勢",
-    section5Body: `（必須逐月分析 12 個月，從 1 月到 12 月全部列出，不可跳月也不可只挑幾個月。每個月用 2-4 句具體說明：
+      section5Title: `${y} 年 12 個月健康走勢`,
+      section5Body: `（必須逐月分析 12 個月，從 1 月到 12 月全部列出，不可跳月也不可只挑幾個月。每個月用 2-4 句具體說明：
 - 該月身心狀態主調（體力充沛／容易疲倦／情緒敏感／壓力大／適合休養／免疫偏弱...）
 - 該月最容易出現的身體訊號（睡眠、消化、呼吸、情緒、免疫、頭痛、筋骨...挑最可能的 1-2 項）
 - 該月適合做什麼保養（健康檢查時機、運動強度、飲食重點、作息調整、情緒紓壓）
-格式：每月獨立一段，用「${_y}年 X 月」開頭。12 段全部都要寫，禁止用「其他月份大致類似」帶過。）`
-  },
-  "goal.wealth": {
-    section4Title: "財富與投資——你的現況與趨勢",
-    section4Body: `（必須寫 5-6 段飽滿內容：
+格式：每月獨立一段，用「${y}年 X 月」開頭。12 段全部都要寫，禁止用「其他月份大致類似」帶過。）`
+    },
+    "goal.wealth": {
+      section4Title: "財富與投資——你的現況與趨勢",
+      section4Body: `（必須寫 5-6 段飽滿內容：
 1. 財富本質：穩定積累型、高爆發型、還是靠人合作型？錢的性格是什麼樣？
 2. 收入結構：主業、副業、投資、被動收入的狀態與平衡。
 3. 守財能力：容易存錢還是漏財？錢進來後通常跑去哪？
 4. 近期財運趨勢：進攻期還是守成期？是在賺錢季還是調整季？
 5. 投資 vs 風險：目前格局適合承擔多大風險？哪些類型投資符合你？
 6. 跨系統共鳴：若多系統都指向特定財務主題（如合作、不動產、創業），點出並說明。）`,
-    section5Title: "${_y} 年 12 個月財運走勢",
-    section5Body: `（必須逐月分析 12 個月全部都要寫。每月 2-4 句：
+      section5Title: `${y} 年 12 個月財運走勢`,
+      section5Body: `（必須逐月分析 12 個月全部都要寫。每月 2-4 句：
 - 該月財運主調（進財月／守財月／破財風險月／投資窗口／合作機會／簽約吉時...）
 - 該月最可能發生的財務事件
 - 該月具體建議（簽約時機、投資動作、開銷控制、收帳催款）
-格式：「${_y}年 X 月」開頭，每月獨立一段。）`
-  },
-  "goal.love": {
-    section4Title: "感情與關係——你的現況與趨勢",
-    section4Body: `（必須寫 5-6 段飽滿內容：感情基底特質／目前關係狀態（若有伴，談伴侶互動；若單身，談會遇到什麼樣的人）／桃花與穩定的拉扯／對方輪廓或理想對象特質／近期關係主題／跨系統共鳴訊號。）`,
-    section5Title: "${_y} 年 12 個月感情走勢",
-    section5Body: `（12 個月全部逐月分析。每月 2-4 句：桃花活躍度／穩定或動盪／吸引力高低／衝突或分合可能／具體建議（表白、溝通、獨處、經營）。「${_y}年 X 月」格式。）`
-  },
-  "goal.career": {
-    section4Title: "事業與工作——你的現況與趨勢",
-    section4Body: `（必須寫 5-6 段飽滿內容：天賦與適合的工作方向／目前事業階段（開創、擴張、穩定、轉型）／升遷或轉職訊號／貴人與阻力的來源／近期最關鍵的事業主題／跨系統共鳴訊號。）`,
-    section5Title: "${_y} 年 12 個月事業走勢",
-    section5Body: `（12 個月全部逐月分析。每月 2-4 句：升遷／轉職／合作／衝突／出差／考試／創業窗口 + 具體建議。「${_y}年 X 月」格式。）`
-  },
-  "goal.general": {
-    section4Title: "今年整體運勢——你的現況與趨勢",
-    section4Body: `（必須寫 5-6 段飽滿內容：今年主題／事業財運面／感情人際面／健康養生面／最需要注意的事／跨系統共鳴訊號。）`,
-    section5Title: "${_y} 年 12 個月運勢走勢",
-    section5Body: `（12 個月全部逐月分析。每月 2-4 句：該月整體能量 + 事業/財運/感情/健康挑 1-2 個亮點 + 建議。「${_y}年 X 月」格式。）`
-  },
-};
+格式：「${y}年 X 月」開頭，每月獨立一段。）`
+    },
+    "goal.love": {
+      section4Title: "感情與關係——你的現況與趨勢",
+      section4Body: `（必須寫 5-6 段飽滿內容：感情基底特質／目前關係狀態（若有伴，談伴侶互動；若單身，談會遇到什麼樣的人）／桃花與穩定的拉扯／對方輪廓或理想對象特質／近期關係主題／跨系統共鳴訊號。）`,
+      section5Title: `${y} 年 12 個月感情走勢`,
+      section5Body: `（12 個月全部逐月分析。每月 2-4 句：桃花活躍度／穩定或動盪／吸引力高低／衝突或分合可能／具體建議（表白、溝通、獨處、經營）。「${y}年 X 月」格式。）`
+    },
+    "goal.career": {
+      section4Title: "事業與工作——你的現況與趨勢",
+      section4Body: `（必須寫 5-6 段飽滿內容：天賦與適合的工作方向／目前事業階段（開創、擴張、穩定、轉型）／升遷或轉職訊號／貴人與阻力的來源／近期最關鍵的事業主題／跨系統共鳴訊號。）`,
+      section5Title: `${y} 年 12 個月事業走勢`,
+      section5Body: `（12 個月全部逐月分析。每月 2-4 句：升遷／轉職／合作／衝突／出差／考試／創業窗口 + 具體建議。「${y}年 X 月」格式。）`
+    },
+    "goal.general": {
+      section4Title: "今年整體運勢——你的現況與趨勢",
+      section4Body: `（必須寫 5-6 段飽滿內容：今年主題／事業財運面／感情人際面／健康養生面／最需要注意的事／跨系統共鳴訊號。）`,
+      section5Title: `${y} 年 12 個月運勢走勢`,
+      section5Body: `（12 個月全部逐月分析。每月 2-4 句：該月整體能量 + 事業/財運/感情/健康挑 1-2 個亮點 + 建議。「${y}年 X 月」格式。）`
+    },
+  };
+}
 
 function getWizardSystemPromptZh(goalKey) {
   const _now = new Date();
   const _y = _now.getFullYear(), _m = _now.getMonth() + 1, _d = _now.getDate();
-  const fw = GOAL_FRAMEWORK[goalKey] || GOAL_FRAMEWORK["goal.general"];
-  // 手動展開 ${_y} 佔位（因為 fw 內容是字串常量）
-  const s4Title = fw.section4Title.replace(/\$\{_y\}/g, _y);
-  const s4Body = fw.section4Body.replace(/\$\{_y\}/g, _y);
-  const s5Title = fw.section5Title.replace(/\$\{_y\}/g, _y);
-  const s5Body = fw.section5Body.replace(/\$\{_y\}/g, _y);
+  const framework = getGoalFramework(_y);
+  const fw = framework[goalKey] || framework["goal.general"];
+  const s4Title = fw.section4Title;
+  const s4Body = fw.section4Body;
+  const s5Title = fw.section5Title;
+  const s5Body = fw.section5Body;
   return `你是「命理三鏡」的命運顧問，用溫暖自然的語氣為一般大眾解讀命運。
 
 核心規則（必須嚴格遵守）：
@@ -2228,7 +2224,7 @@ ${hebanRelation === "relations.twin" ? `
                               {isExpanded ? '▾' : '▸'} {chart.name} {chart.is_primary ? '⭐' : ''}
                             </div>
                             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                              {chartReadings.length > 0 ? t('charts.analyses', { count: chartReadings.length }) : ''}
+                              {chartReadings.length > 0 ? `${chartReadings.length} ${t('charts.analyses', { defaultValue: '筆分析' })}` : ''}
                             </div>
                           </div>
                           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
@@ -2285,7 +2281,13 @@ ${hebanRelation === "relations.twin" ? `
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
-                                    {formatReadingLabel(r, t)}
+                                    {(() => {
+                                      let raw = r.goal || r.goalPrompt || '';
+                                      const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
+                                      if (baseKey.startsWith('goal.')) return t(baseKey);
+                                      if (raw.startsWith('合盤')) return raw;
+                                      return raw || t('history.analysis');
+                                    })()}
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     {r.chat?.length > 0 && (
@@ -2425,11 +2427,11 @@ ${hebanRelation === "relations.twin" ? `
                             <div style={{ flex: 1, cursor: 'pointer', textAlign: 'center' }} onClick={() => setShowFamily(true)}>
                               <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{fname}</div>
                               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-                                {memberCount > 0 ? t('family.members', { count: memberCount }) : ''}
+                                {memberCount > 0 ? `${memberCount} ${t('family.members', { defaultValue: '位成員' })}` : ''}
                                 {protoName ? ` · ${t('family.protagonist', { defaultValue: '主角' })}：${protoName}` : ''}
                               </div>
                               {saves.length > 1 && (
-                                <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{t('family.analyses', { count: saves.length })}</div>
+                                <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{saves.length} {t('family.analyses', { defaultValue: '次分析' })}</div>
                               )}
                             </div>
                             {wizardUser && (
@@ -3141,7 +3143,7 @@ ${hebanRelation === "relations.twin" ? `
                           <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                             <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                             <div className="wizard-history-card-title">
-                              {formatReadingLabel(r, t)}
+                              {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                               {r.chat?.length > 0 ? ` (${r.chat.length / 2 | 0} Q&A)` : ''}
                             </div>
                           </div>
@@ -3158,7 +3160,7 @@ ${hebanRelation === "relations.twin" ? `
                         <div key={r.id || r.time || i} className="wizard-history-card" onClick={() => restoreReading(r)}>
                           <div className="wizard-history-card-date">{new Date(r.date || r.time).toLocaleDateString()}</div>
                           <div className="wizard-history-card-title">
-                            {formatReadingLabel(r, t)}
+                            {(() => { let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim(); if (k === 'heban') return t('account.featureHeban'); if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length); return k.startsWith('goal.') ? t(k) : k || t('history.analysis'); })()}
                             {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
                           </div>
                         </div>
