@@ -439,6 +439,13 @@
     "openHint": "請改用是非題或選擇題的方式提問，例如：我該不該接受這個 offer？",
     "askAnother": "問另一個決定",
     "error": "分析失敗",
-    "retry": "重試"
+    "retry": "重試",
+    "askDateTitle": "需要具體日期才能精算流日",
+    "askDateHint": "選日期（必填）+ 時辰（選填，有就精算到流時）",
+    "askDateOptional": "不選時間也可以，只是只能精算到「流日」層級，無法精算到「流時」。",
+    "askChartTitle": "請選擇這個決策要以哪張命盤為基礎",
+    "continue": "繼續分析",
+    "backToQuestion": "回去改問題",
+    "needChart": "決策建議必須基於完整命盤。請先登入並建立一張命盤，再使用決策建議。"
   }
 }

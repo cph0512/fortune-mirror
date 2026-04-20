@@ -437,6 +437,13 @@
     "openHint": "Please rephrase as a yes/no or multiple-choice question. E.g. \"Should I accept this offer?\"",
     "askAnother": "Ask another decision",
     "error": "Analysis failed",
-    "retry": "Retry"
+    "retry": "Retry",
+    "askDateTitle": "A specific date is needed to compute the daily transits",
+    "askDateHint": "Pick a date (required) + time (optional — enables hourly precision)",
+    "askDateOptional": "You can skip the time; the analysis will stay at daily precision instead of hourly.",
+    "askChartTitle": "Which chart should this decision be anchored to?",
+    "continue": "Continue",
+    "backToQuestion": "Back to question",
+    "needChart": "Decision Advisor needs a chart. Please log in and build a chart first."
   }
 }

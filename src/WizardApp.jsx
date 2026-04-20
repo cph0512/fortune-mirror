@@ -965,6 +965,11 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [decisionStatus, setDecisionStatus] = useState("input");
   const [decisionResult, setDecisionResult] = useState(null);
   const [decisionError, setDecisionError] = useState("");
+  // When the question has no parseable date, switch to status="need_date" and
+  // render an inline date/time picker. On 繼續 we use these instead of
+  // re-parsing the question string.
+  const [decisionDateOverride, setDecisionDateOverride] = useState("");  // "YYYY-MM-DD"
+  const [decisionTimeOverride, setDecisionTimeOverride] = useState("");  // "HH:MM" (optional)
   // Chat-only view: when user enters via "問事" on a chart card they want to
   // dive straight into the Q&A UI without re-reading the full report.
   const [chatOnlyMode, setChatOnlyMode] = useState(false);
@@ -1089,6 +1094,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     setDecisionQuestion("");
     setDecisionResult(null);
     setDecisionError("");
+    setDecisionDateOverride("");
+    setDecisionTimeOverride("");
     setDecisionStatus("input");
     setShowDecisionModal(true);
     trackEvent("decision_started", { entry: entrySource || "unknown", has_chart: !!chart });
@@ -1126,25 +1133,43 @@ export default function WizardApp({ auth, onBack, onLogout }) {
     //   4. 任一層疊宮計算失敗 → 中止, 不送 AI
     // ════════════════════════════════════════════════════════════
 
-    // Step 1. Date 必須
-    const preDt = parseQuestionDateTime(question);
+    // Step 1. 日期 — 先看問題能不能解析；不能就改成 need_date 狀態讓使用者
+    // 透過日期選擇器補資料，**不要 block**。使用者已經給的 override 也接受。
+    let preDt = parseQuestionDateTime(question);
+    if (!preDt && decisionDateOverride) {
+      const [y, m, d] = decisionDateOverride.split("-").map(s => parseInt(s, 10));
+      if (y && m && d) {
+        let h = null, min = null;
+        if (decisionTimeOverride) {
+          const [hh, mm] = decisionTimeOverride.split(":").map(s => parseInt(s, 10));
+          if (!isNaN(hh)) { h = hh; min = isNaN(mm) ? 0 : mm; }
+        }
+        preDt = { year: y, month: m, day: d, hour: h, minute: min };
+      }
+    }
     if (!preDt) {
-      setDecisionError(
-        t('decision.needDate', {
-          defaultValue: '請在問題中註明具體日期，才能精算到「流日」層級。例如：\n• 「明天」「後天」「下週一」\n• 「5/10」「5月10日」\n• 「下個月 15 號」\n若可能，也加上時間（如「下午 3 點」）可精算到「流時」。'
-        })
-      );
-      setDecisionStatus("input");
-      trackEvent("decision_blocked", { reason: "missing_date" });
+      // Pre-fill picker with today to reduce friction; user can adjust.
+      if (!decisionDateOverride) {
+        const n = new Date();
+        setDecisionDateOverride(`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`);
+      }
+      setDecisionStatus("need_date");
+      trackEvent("decision_need_date");
       return;
     }
 
-    // Step 2. 命盤 + 出生資料 必須
-    const chart = decisionChart;
+    // Step 2. 命盤 — 缺盤就切到 need_chart，列出可用盤給使用者挑；沒有盤
+    // 就顯示建立命盤的 CTA（真的沒盤能用時才是 block case）。
+    let chart = decisionChart;
     if (!chart?.birthData?.year) {
+      if (userCharts?.length > 0) {
+        setDecisionStatus("need_chart");
+        trackEvent("decision_need_chart", { available: userCharts.length });
+        return;
+      }
       setDecisionError(
         t('decision.needChart', {
-          defaultValue: '決策建議必須基於完整命盤。請先登入並選擇一張已建立的命盤（或先做一次命盤分析），再來使用決策建議。'
+          defaultValue: '決策建議必須基於完整命盤。請先登入並建立一張命盤，再使用決策建議。'
         })
       );
       setDecisionStatus("input");
@@ -4082,6 +4107,76 @@ ${hebanRelation === "relations.twin" ? `
                   onClick={runDecision}
                 >{t('decision.analyze', { defaultValue: '開始分析' })}</button>
               </>
+            )}
+
+            {decisionStatus === 'need_date' && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 14, color: 'rgba(255,215,100,0.9)', marginBottom: 12 }}>
+                  📅 {t('decision.askDateTitle', { defaultValue: '需要具體日期才能精算流日' })}
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', marginBottom: 10, lineHeight: 1.7 }}>
+                  {t('decision.askDateHint', { defaultValue: '選日期（必填）+ 時辰（選填，有就精算到流時）' })}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <input
+                    type="date"
+                    value={decisionDateOverride}
+                    onChange={e => setDecisionDateOverride(e.target.value)}
+                    style={{ padding: '8px 10px', background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14 }}
+                  />
+                  <input
+                    type="time"
+                    placeholder="時間（選填）"
+                    value={decisionTimeOverride}
+                    onChange={e => setDecisionTimeOverride(e.target.value)}
+                    style={{ padding: '8px 10px', background: '#1e293b', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', fontSize: 14 }}
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
+                  {t('decision.askDateOptional', { defaultValue: '不選時間也可以，只是只能精算到「流日」層級，無法精算到「流時」。' })}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="wizard-cta"
+                    style={{ flex: 1 }}
+                    disabled={!decisionDateOverride}
+                    onClick={runDecision}
+                  >{t('decision.continue', { defaultValue: '繼續分析' })}</button>
+                  <button
+                    className="wizard-cta"
+                    style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+                    onClick={() => { setDecisionStatus('input'); }}
+                  >{t('decision.backToQuestion', { defaultValue: '回去改問題' })}</button>
+                </div>
+              </div>
+            )}
+
+            {decisionStatus === 'need_chart' && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 14, color: 'rgba(160,140,255,0.95)', marginBottom: 12 }}>
+                  📋 {t('decision.askChartTitle', { defaultValue: '請選擇這個決策要以哪張命盤為基礎' })}
+                </div>
+                <div style={{ maxHeight: 280, overflow: 'auto', marginBottom: 12 }}>
+                  {userCharts.map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => { setDecisionChart(c); setTimeout(runDecision, 0); }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', marginBottom: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, cursor: 'pointer', color: '#fff' }}
+                    >
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{c.name} {c.is_primary && '⭐'}</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                        {c.birthData?.year}/{c.birthData?.month}/{c.birthData?.day}
+                        {c.gender && ` · ${c.gender === '男' ? t('welcome.male') : t('welcome.female')}`}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="wizard-cta"
+                  style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}
+                  onClick={() => setDecisionStatus('input')}
+                >{t('decision.backToQuestion', { defaultValue: '回去改問題' })}</button>
+              </div>
             )}
 
             {decisionStatus === 'analyzing' && (
