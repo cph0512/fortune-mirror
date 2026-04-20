@@ -146,6 +146,7 @@
     "chatHistory": "歷史詢問",
     "askMode": "問事 — 直接提問，系統依命盤資料回答",
     "showFullReport": "查看完整分析報告",
+    "decisionCtaInResult": "決策建議",
     "chatTitle": "你的命盤還藏著這些沒說完",
     "chatSubtitle": "點選下方問題，或輸入你想問的"
   },
@@ -414,5 +415,24 @@
       "accountLabel": "帳號：", "lastActive": "最後活動：", "times": "次"
     },
     "footer": "僅供參考，不構成人生重大決策依據"
+  },
+  "decision": {
+    "cta": "決策建議",
+    "title": "決策建議",
+    "anchoredOn": "以命盤「{{name}}」為基礎",
+    "guestMode": "訪客模式 — 建議先建立命盤獲得更準確的能量評估",
+    "inputHint": "用是非題或選擇題格式，例如：我該不該接受這個 offer？／A 公司 vs B 公司 vs C 公司？／3/15 下午 2 點開會適不適合？",
+    "placeholder": "輸入你要做的決定...",
+    "analyze": "開始分析",
+    "analyzing": "分析中...",
+    "winner": "推薦",
+    "summary": "綜合建議",
+    "recommend": "建議採取",
+    "gap": "分差",
+    "timeAnchor": "時間錨點",
+    "openHint": "請改用是非題或選擇題的方式提問，例如：我該不該接受這個 offer？",
+    "askAnother": "問另一個決定",
+    "error": "分析失敗",
+    "retry": "重試"
   }
 }

@@ -488,6 +488,94 @@ const HEBAN_SYSTEM_PROMPT_ZH = `你是「命理三鏡」的關係分析師。
 中立原則：不可假設兩人的職業、行業、生活背景。
 語氣：溫暖有洞察力，正面為主但誠實，具體有畫面感。`;
 
+// ============================================================
+// DECISION ADVISOR (#8)
+// ============================================================
+// Hard block list — keyword pre-filter applied BEFORE any LLM call. The LLM
+// classifier runs as a second safety net inside the analysis step so that
+// softer rewrites ("if I don't make it, ...") still get caught. The keywords
+// below cover direct self-harm, suicide, and violent intent across zh/en/ja.
+const DECISION_BLOCK_KEYWORDS = [
+  "自殺", "自杀", "自我了斷", "輕生", "自傷", "自残",
+  "結束生命", "结束生命", "不想活", "活不下去", "想死", "去死",
+  "殺人", "杀人", "殺了", "殺死", "杀死", "害死", "下毒",
+  "suicide", "kill myself", "end my life", "end it all", "self-harm",
+  "murder", "kill someone", "poison someone",
+  "死にたい", "自殺", "自傷", "殺す", "殺し",
+];
+
+const DECISION_SAFETY_MESSAGE = {
+  "zh-TW": "此類問題涉及生命安全，命理工具無法也不應該回應。\n如果你正在經歷困難，請聯繫：\n・台灣 1925（安心專線）｜1995（生命線）｜1980（張老師）\n・日本 いのちの電話 0120-783-556\n・US 988 Suicide & Crisis Lifeline",
+  "en": "This question touches on life safety. Fortune tools are not the right resource here.\nIf you're going through something hard, please reach out:\n• Taiwan 1925 / 1995 / 1980\n• Japan いのちの電話 0120-783-556\n• US 988 Suicide & Crisis Lifeline",
+  "ja": "この質問は命の安全に関わるため、占いでは答えられません。\n困っているときはご連絡ください：\n・日本 いのちの電話 0120-783-556\n・台湾 1925／1995／1980\n・US 988 Suicide & Crisis Lifeline",
+};
+
+function decisionSystemPrompt(langLabel) {
+  // The LLM returns a strict JSON envelope so the frontend can render option
+  // cards without heuristic parsing. Schema mirrors DecisionSession in the
+  // spec (#8.6). The analysis layers are framed so the model cross-references
+  // 本命 / 流年 / 流月 (and 流日時 when time_anchor is set) instead of freely
+  // associating. `notes` doubles as the safety payload for type=blocked.
+  const safetyZh = DECISION_SAFETY_MESSAGE["zh-TW"].replace(/\n/g, "\\n");
+  const safetyEn = DECISION_SAFETY_MESSAGE["en"].replace(/\n/g, "\\n");
+  const safetyJa = DECISION_SAFETY_MESSAGE["ja"].replace(/\n/g, "\\n");
+  return `你是「命理三鏡」的決策建議顧問。根據排盤資料（本命 + 流年 + 流月，若 time_anchor 有值則加流日流時）為使用者評估選項。
+
+**輸出必須是合法 JSON，僅輸出 JSON，不要任何 markdown 或說明文字。** Schema:
+{
+  "type": "yesno" | "multi" | "timed" | "open" | "blocked",
+  "question_summary": string,
+  "time_anchor": string | null,  // ISO 8601 if timed, else null
+  "options": [
+    {
+      "label": string,
+      "score": number 0-100,
+      "keyPoints": [string, string, string],
+      "analysis": string  // 4 層交叉：本命 / 流年 / 流月 / 流日時（若 timed）。自然語言段落，不露術語。
+    }
+  ],
+  "recommendation": string,  // options[i].label 的某一個；open/blocked 留空
+  "gap": "顯著" | "邊際" | "",  // 分差 >15 → 顯著；open/blocked 留空
+  "notes": string  // 對應 type 給不同內容（見下）
+}
+
+分類規則：
+- yesno：是非題。options = [{label:"接受/去/選A", ...}, {label:"拒絕/不去/選B", ...}]。
+- multi：多選題。options = 每個明確選項各一個。
+- timed：題目含具體時間。time_anchor 填 ISO；options = [{label:"去/接", ...}, {label:"不去/拒", ...}]。
+- open：題目太模糊（「未來如何」「我最近怎辦」）。options = []；recommendation = ""；gap = ""；notes = 用使用者語言說明「此問題不符合決策建議格式，請重新描述為是非題或選擇題」並給 2-3 個範例。
+- blocked：涉及生命安全、自殺自傷、殺人、重大犯罪決策。options = []；recommendation = ""；gap = ""；notes 一律用使用者語言的安全文案：
+  - zh-TW：${safetyZh}
+  - en：${safetyEn}
+  - ja：${safetyJa}
+
+評分規則（yesno/multi/timed 適用）：
+- 以本命格局為底（30%）+ 流年能量（30%）+ 流月走勢（25%）+ 流日流時疊宮（15%，沒時間則把 15% 平均分給前三）。
+- 分數 0-100；正負判斷依排盤吉凶（化祿/化權/化科/祿存/天馬 正向；化忌/地劫地空/羊陀火鈴 負向；疊宮衝剋扣分；三合/六合/拱照加分）。
+- keyPoints：三個最關鍵的點，具體到格局（不暴露術語）。
+- analysis：至少 4 段，每層一段。若 timed 再加第 4 段談那個具體日時的疊宮。
+
+綜合建議：
+- recommendation 填評分最高的 option.label。
+- gap：分差 >15 填「顯著」，否則「邊際」。
+- notes：即使選贏家也要列關鍵風險（1-2 項）。
+
+表達風格：
+- 禁止出現任何命理系統名稱（紫微、八字、星盤、命盤、排盤）或專有術語（四化、化祿、宮位、相位、星座、主星）。
+- 自然語言、日常口吻。
+- 使用者語言為 "${langLabel}"，所有 label、keyPoints、analysis、notes、recommendation 都必須是此語言。
+
+絕對禁止：
+- 不要評論情感道德面。只做能量分析。
+- 不要替使用者選擇傷害他人、違法、違反安全線的行為。`;
+}
+
+function hitsDecisionBlockList(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return DECISION_BLOCK_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()));
+}
+
 // Goal-specific framework for section 4 (topic deep-dive) and section 5
 // (12-month breakdown). Kept as a function (not a const) so the current year
 // interpolates at call time instead of at module load.
@@ -863,6 +951,16 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // Monthly overview expansion + paywall
   const [expandedMonth, setExpandedMonth] = useState(null);  // 1..12
   const [showUnlockMonthly, setShowUnlockMonthly] = useState(false);
+  // #8 Decision Advisor — modal state. decisionChart=null means "guest mode"
+  // (home CTA with no chart selected); otherwise the chart the decision is
+  // anchored to. `status` drives the modal view stack: input form →
+  // analyzing spinner → result cards (or blocked/error screens).
+  const [showDecisionModal, setShowDecisionModal] = useState(false);
+  const [decisionChart, setDecisionChart] = useState(null);
+  const [decisionQuestion, setDecisionQuestion] = useState("");
+  const [decisionStatus, setDecisionStatus] = useState("input");
+  const [decisionResult, setDecisionResult] = useState(null);
+  const [decisionError, setDecisionError] = useState("");
   // Chat-only view: when user enters via "問事" on a chart card they want to
   // dive straight into the Q&A UI without re-reading the full report.
   const [chatOnlyMode, setChatOnlyMode] = useState(false);
@@ -890,6 +988,127 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [horoscopeLoading, setHoroscopeLoading] = useState(false);
   const [selectedZodiac, setSelectedZodiac] = useState("");
   const [showHoroscopeDetail, setShowHoroscopeDetail] = useState(false);
+
+  // #8 — Open the decision advisor modal anchored to a chart (null → guest).
+  const openDecision = (chart, entrySource) => {
+    setDecisionChart(chart || null);
+    setDecisionQuestion("");
+    setDecisionResult(null);
+    setDecisionError("");
+    setDecisionStatus("input");
+    setShowDecisionModal(true);
+    trackEvent("decision_started", { entry: entrySource || "unknown", has_chart: !!chart });
+  };
+
+  // #8 — Run classification + decision analysis. Returns parsed JSON or an
+  // error payload. Uses the existing /api/fortune poll loop so infra stays
+  // single-track.
+  const runDecision = async () => {
+    const question = decisionQuestion.trim();
+    if (!question) return;
+    // Client-side keyword pre-filter — don't even call the LLM for obvious
+    // self-harm / violence terms. Saves tokens and guarantees the safety
+    // message shows even if the LLM misclassifies.
+    if (hitsDecisionBlockList(question)) {
+      setDecisionResult({
+        type: "blocked",
+        question_summary: question,
+        time_anchor: null,
+        options: [],
+        recommendation: "",
+        gap: "",
+        notes: DECISION_SAFETY_MESSAGE[currentLang] || DECISION_SAFETY_MESSAGE["zh-TW"],
+      });
+      setDecisionStatus("blocked");
+      trackEvent("decision_blocked", { reason: "keyword_prefilter" });
+      return;
+    }
+
+    setDecisionStatus("analyzing");
+    try {
+      const chart = decisionChart;
+      const chartsText = chart?.charts
+        ? Object.entries(chart.charts).map(([sys, text]) => `【${sys}】\n${text}`).join("\n\n===\n\n")
+        : "（無命盤資料，請根據常識與問題本身判斷，options 仍需給出評分但註明資料不足）";
+      const bd = chart?.birthData || {};
+      const bdLine = bd.year
+        ? `- 出生：${bd.year}/${bd.month}/${bd.day} ${bd.hour || 0}:${bd.minute || 0}\n- 性別：${chart?.gender || "未指定"}\n- 出生地：${bd.place || "未指定"}`
+        : "- 無出生資料（訪客模式）";
+      const today = new Date();
+      const userPrompt = `## 時間基準
+今天是 ${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}。
+
+## 排盤資料
+${chartsText}
+
+## 用戶資料
+${bdLine}
+
+## 使用者問題
+${question}
+
+請依系統指令分類並輸出 JSON。`;
+
+      const langLabel = LANG_AI[currentLang] || "繁體中文";
+      const submitRes = await fetch(API_BACKEND, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          images: [],
+          system: decisionSystemPrompt(langLabel),
+          prompt: userPrompt,
+          visitor_id: getVisitorId(),
+          user: wizardUser?.email || null,
+          user_name: wizardUser?.name || "",
+          goal: "decision",
+          job_type: "decision",
+          chart_id: chart?.id || "",
+          birth_data: bd,
+        }),
+      });
+      if (!submitRes.ok) throw new Error(`submit ${submitRes.status}`);
+      const { job_id } = await submitRes.json();
+
+      let resultText = "";
+      for (let i = 0; i < 120; i++) {
+        await new Promise(r => setTimeout(r, 2500));
+        const pollRes = await fetch(`${API_BACKEND}/${job_id}`);
+        if (!pollRes.ok) continue;
+        const data = await pollRes.json();
+        if (data.status === "done") { resultText = data.result || ""; break; }
+      }
+      if (!resultText) throw new Error("timeout");
+
+      // Model sometimes wraps JSON in a ```json fence despite the instructions;
+      // strip it defensively before parsing.
+      const cleaned = resultText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+      let parsed;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (e) {
+        // Last-ditch: find the first { and last } and try again.
+        const m = cleaned.match(/\{[\s\S]*\}/);
+        if (m) parsed = JSON.parse(m[0]);
+        else throw e;
+      }
+
+      setDecisionResult(parsed);
+      trackEvent("decision_type_detected", { type: parsed.type });
+      if (parsed.type === "blocked") {
+        trackEvent("decision_blocked", { reason: "llm_classifier" });
+        setDecisionStatus("blocked");
+      } else if (parsed.type === "open") {
+        setDecisionStatus("result");  // still result screen, rendered differently
+      } else {
+        setDecisionStatus("result");
+        trackEvent("decision_completed", { type: parsed.type, options: parsed.options?.length || 0 });
+      }
+    } catch (e) {
+      console.error("[decision] error:", e);
+      setDecisionError(e.message || "error");
+      setDecisionStatus("error");
+    }
+  };
 
   // #7b — Start the chat UI on a specific chart without running a new analysis.
   // If the chart has any prior reading, the most recent one seeds the chat's
@@ -2288,6 +2507,19 @@ ${hebanRelation === "relations.twin" ? `
                 {t('goal.back')}
               </button>
             )}
+            {/* #8 — Decision Advisor CTA under the horoscope block. If the
+                user has a primary chart, auto-use it; otherwise fall back to
+                guest mode so visitors can still try the feature. */}
+            <button
+              className="wizard-cta"
+              style={{ marginTop: 12, background: 'linear-gradient(135deg, rgba(160,140,255,0.9), rgba(200,140,255,0.9))' }}
+              onClick={() => {
+                const primary = userCharts.find(c => c.is_primary) || userCharts[0] || null;
+                openDecision(primary, "home");
+              }}
+            >
+              🎯 {t('decision.cta', { defaultValue: '決策建議' })}
+            </button>
           </div>
 
           {/* Charts Library (命盤庫) — grouped with readings */}
@@ -2374,6 +2606,13 @@ ${hebanRelation === "relations.twin" ? `
                                 onClick={() => startChatOnChart(chart)}
                               >
                                 💬 {t('charts.askQuestion', { defaultValue: '問事' })}
+                              </button>
+                              <button
+                                className="wizard-cta-secondary"
+                                style={{ flex: 1, fontSize: 13, padding: '8px 0' }}
+                                onClick={() => openDecision(chart, "library")}
+                              >
+                                🎯 {t('decision.cta', { defaultValue: '決策建議' })}
                               </button>
                             </div>
 
@@ -3315,6 +3554,23 @@ ${hebanRelation === "relations.twin" ? `
 
           {/* Chat follow-up */}
           <div style={{ height: 32 }} />
+          <button
+            className="wizard-cta"
+            style={{ width: '100%', marginBottom: 16, background: 'linear-gradient(135deg, rgba(160,140,255,0.9), rgba(200,140,255,0.9))' }}
+            onClick={() => {
+              // Find the chart matching the current birthdata, or fall back to
+              // the primary chart so the advisor always has chart context.
+              const matching = userCharts.find(c => {
+                const bd = c.birthData || {};
+                return String(bd.year) === String(birthYear)
+                  && String(bd.month) === String(birthMonth)
+                  && String(bd.day) === String(birthDay);
+              }) || userCharts.find(c => c.is_primary) || null;
+              openDecision(matching, "analysis_result");
+            }}
+          >
+            🎯 {t('decision.cta', { defaultValue: '決策建議' })}
+          </button>
           <div className="wizard-chat">
             <div className="wizard-question" style={{ fontSize: 18, marginBottom: 8 }}>{t('result.chatTitle')}</div>
             <div className="wizard-subtitle" style={{ marginTop: 0, marginBottom: 20 }}>{t('result.chatSubtitle')}</div>
@@ -3628,6 +3884,144 @@ ${hebanRelation === "relations.twin" ? `
               }}>
                 {t('auth.forgotPassword')}
               </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showDecisionModal && (
+        <div className="wizard-auth-overlay" onClick={() => { if (decisionStatus !== 'analyzing') setShowDecisionModal(false); }}>
+          <div className="wizard-auth-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', overflow: 'auto' }}>
+            {decisionStatus !== 'analyzing' && (
+              <button className="wizard-auth-close" onClick={() => setShowDecisionModal(false)}>✕</button>
+            )}
+            <div className="wizard-auth-title">🎯 {t('decision.title', { defaultValue: '決策建議' })}</div>
+            {decisionChart?.name && (
+              <div className="wizard-auth-subtitle">
+                {t('decision.anchoredOn', { defaultValue: '以命盤「{{name}}」為基礎', name: decisionChart.name })}
+              </div>
+            )}
+            {!decisionChart && (
+              <div className="wizard-auth-subtitle">
+                {t('decision.guestMode', { defaultValue: '訪客模式 — 建議先建立命盤獲得更準確的能量評估' })}
+              </div>
+            )}
+
+            {decisionStatus === 'input' && (
+              <>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 12, marginBottom: 8 }}>
+                  {t('decision.inputHint', { defaultValue: '用是非題或選擇題格式，例如：我該不該接受這個 offer？／A 公司 vs B 公司 vs C 公司？／3/15 下午 2 點開會適不適合？' })}
+                </div>
+                <textarea
+                  className="wizard-auth-input"
+                  style={{ minHeight: 90, resize: 'vertical', fontFamily: 'inherit' }}
+                  placeholder={t('decision.placeholder', { defaultValue: '輸入你要做的決定...' })}
+                  value={decisionQuestion}
+                  onChange={e => setDecisionQuestion(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runDecision(); }}
+                />
+                <button
+                  className="wizard-cta"
+                  style={{ marginTop: 12 }}
+                  disabled={!decisionQuestion.trim()}
+                  onClick={runDecision}
+                >{t('decision.analyze', { defaultValue: '開始分析' })}</button>
+              </>
+            )}
+
+            {decisionStatus === 'analyzing' && (
+              <div style={{ textAlign: 'center', padding: 40 }}>
+                <div className="wizard-loading-anim" style={{ margin: "0 auto 20px", width: 80, height: 80 }}>
+                  <div className="wizard-loading-ring" />
+                  <div className="wizard-loading-ring" />
+                  <div className="wizard-loading-ring" />
+                  <div className="wizard-loading-star wizard-diamond" style={{ fontSize: 20, inset: 24 }}></div>
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.7)' }}>{t('decision.analyzing', { defaultValue: '分析中...' })}</div>
+              </div>
+            )}
+
+            {decisionStatus === 'blocked' && decisionResult && (
+              <div style={{ marginTop: 16, padding: '16px 18px', background: 'rgba(255,100,100,0.12)', border: '1px solid rgba(255,100,100,0.3)', borderRadius: 10, whiteSpace: 'pre-wrap', lineHeight: 1.7, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>
+                {decisionResult.notes || DECISION_SAFETY_MESSAGE[currentLang] || DECISION_SAFETY_MESSAGE["zh-TW"]}
+              </div>
+            )}
+
+            {decisionStatus === 'result' && decisionResult && decisionResult.type === 'open' && (
+              <div style={{ marginTop: 16, padding: '16px 18px', background: 'rgba(255,200,100,0.1)', border: '1px solid rgba(255,200,100,0.3)', borderRadius: 10, whiteSpace: 'pre-wrap', lineHeight: 1.7, color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>
+                {decisionResult.notes || t('decision.openHint', { defaultValue: '請改用是非題或選擇題的方式提問，例如：我該不該接受這個 offer？' })}
+              </div>
+            )}
+
+            {decisionStatus === 'result' && decisionResult && decisionResult.options?.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                {decisionResult.time_anchor && (
+                  <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.8)', marginBottom: 8 }}>
+                    ⏱ {t('decision.timeAnchor', { defaultValue: '時間錨點' })}：{decisionResult.time_anchor}
+                  </div>
+                )}
+                {decisionResult.options.map((opt, i) => {
+                  const score = typeof opt.score === 'number' ? opt.score : 0;
+                  const isWinner = opt.label === decisionResult.recommendation;
+                  const tone = score >= 70 ? '#4caf50' : score >= 50 ? '#90caf9' : '#ff9800';
+                  return (
+                    <div key={i} style={{ marginBottom: 16, padding: '14px 16px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: isWinner ? '1px solid rgba(255,215,100,0.5)' : '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                      {isWinner && <div style={{ position: 'absolute', top: -10, right: 12, background: '#f1c40f', color: '#0f172a', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>⭐ {t('decision.winner', { defaultValue: '推薦' })}</div>}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{opt.label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: tone }}>{score}<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>/100</span></div>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 10 }}>
+                        <div style={{ width: `${score}%`, height: '100%', background: tone }} />
+                      </div>
+                      {opt.keyPoints?.length > 0 && (
+                        <ul style={{ margin: '0 0 10px 18px', padding: 0, fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.65 }}>
+                          {opt.keyPoints.map((kp, j) => <li key={j}>{kp}</li>)}
+                        </ul>
+                      )}
+                      {opt.analysis && (
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                          {opt.analysis}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {decisionResult.recommendation && (
+                  <div style={{ marginTop: 16, padding: '14px 16px', background: 'rgba(160,140,255,0.1)', borderRadius: 10, border: '1px solid rgba(160,140,255,0.3)' }}>
+                    <div style={{ fontSize: 13, color: 'rgba(160,140,255,0.9)', fontWeight: 700, marginBottom: 6 }}>
+                      {t('decision.summary', { defaultValue: '綜合建議' })}
+                    </div>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', marginBottom: 8 }}>
+                      {t('decision.recommend', { defaultValue: '建議採取' })}：<b>{decisionResult.recommendation}</b>
+                      {decisionResult.gap && <span style={{ marginLeft: 10, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                        ({t('decision.gap', { defaultValue: '分差' })}: {decisionResult.gap})
+                      </span>}
+                    </div>
+                    {decisionResult.notes && (
+                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                        {decisionResult.notes}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <button
+                  className="wizard-cta"
+                  style={{ marginTop: 16, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)' }}
+                  onClick={() => { setDecisionStatus('input'); setDecisionResult(null); }}
+                >{t('decision.askAnother', { defaultValue: '問另一個決定' })}</button>
+              </div>
+            )}
+
+            {decisionStatus === 'error' && (
+              <div style={{ marginTop: 16, padding: '14px 16px', background: 'rgba(255,100,100,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>
+                {t('decision.error', { defaultValue: '分析失敗' })}: {decisionError}
+                <button
+                  className="wizard-cta"
+                  style={{ marginTop: 10, background: 'rgba(255,255,255,0.08)' }}
+                  onClick={() => setDecisionStatus('input')}
+                >{t('decision.retry', { defaultValue: '重試' })}</button>
+              </div>
             )}
           </div>
         </div>

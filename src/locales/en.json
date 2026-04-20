@@ -413,5 +413,24 @@
       "accountLabel": "Account: ", "lastActive": "Last active: ", "times": " times"
     },
     "footer": "For reference only, not a basis for major life decisions"
+  },
+  "decision": {
+    "cta": "Decision Advisor",
+    "title": "Decision Advisor",
+    "anchoredOn": "Based on the chart \"{{name}}\"",
+    "guestMode": "Guest mode — build a chart first for more precise readings",
+    "inputHint": "Use yes/no or multiple-choice format. E.g. \"Should I accept this offer?\", \"Company A vs B vs C?\", \"Is 3/15 2pm a good time for the meeting?\"",
+    "placeholder": "What decision are you weighing?",
+    "analyze": "Analyze",
+    "analyzing": "Analyzing...",
+    "winner": "Recommend",
+    "summary": "Summary",
+    "recommend": "Suggested path",
+    "gap": "Gap",
+    "timeAnchor": "Time anchor",
+    "openHint": "Please rephrase as a yes/no or multiple-choice question. E.g. \"Should I accept this offer?\"",
+    "askAnother": "Ask another decision",
+    "error": "Analysis failed",
+    "retry": "Retry"
   }
 }
