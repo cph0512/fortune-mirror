@@ -1118,7 +1118,15 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       return;
     }
 
-    // Decision 必須有流日: 先嘗試 parse, 若沒抓到日期 → 要求使用者補
+    // ════════════════════════════════════════════════════════════
+    // 決策建議強制規則 (不可繞過):
+    //   1. 必須有具體日期 (才能算流日)
+    //   2. 必須有命盤 (本命盤 — 才能疊流日)
+    //   3. 必須成功計算本命+大限+流年+流月+流日 (+流時 if 可用)
+    //   4. 任一層疊宮計算失敗 → 中止, 不送 AI
+    // ════════════════════════════════════════════════════════════
+
+    // Step 1. Date 必須
     const preDt = parseQuestionDateTime(question);
     if (!preDt) {
       setDecisionError(
@@ -1131,38 +1139,58 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       return;
     }
 
+    // Step 2. 命盤 + 出生資料 必須
+    const chart = decisionChart;
+    if (!chart?.birthData?.year) {
+      setDecisionError(
+        t('decision.needChart', {
+          defaultValue: '決策建議必須基於完整命盤。請先登入並選擇一張已建立的命盤（或先做一次命盤分析），再來使用決策建議。'
+        })
+      );
+      setDecisionStatus("input");
+      trackEvent("decision_blocked", { reason: "missing_chart" });
+      return;
+    }
+
     setDecisionStatus("analyzing");
     try {
-      const chart = decisionChart;
-      const chartsText = chart?.charts
-        ? Object.entries(chart.charts).map(([sys, text]) => `【${sys}】\n${text}`).join("\n\n===\n\n")
-        : "（無命盤資料，請根據常識與問題本身判斷，options 仍需給出評分但註明資料不足）";
-      const bd = chart?.birthData || {};
-      const bdLine = bd.year
-        ? `- 出生：${bd.year}/${bd.month}/${bd.day} ${bd.hour || 0}:${bd.minute || 0}\n- 性別：${chart?.gender || "未指定"}\n- 出生地：${bd.place || "未指定"}`
-        : "- 無出生資料（訪客模式）";
+      const chartsText = Object.entries(chart.charts || {}).map(([sys, text]) => `【${sys}】\n${text}`).join("\n\n===\n\n");
+      const bd = chart.birthData;
+      const bdLine = `- 出生：${bd.year}/${bd.month}/${bd.day} ${bd.hour || 0}:${bd.minute || 0}\n- 性別：${chart?.gender || "未指定"}\n- 出生地：${bd.place || "未指定"}`;
       const today = new Date();
-
-      // Pre-compute 流日/流時 overlay — required for decision advisor.
-      let dayHourBlock = "";
       const dt = preDt;
-      if (dt && chart?.birthData?.year) {
-        try {
-          const pb = chart.birthData;
-          const rawChart = calculateChart(
-            parseInt(pb.year), parseInt(pb.month), parseInt(pb.day),
-            parseInt(pb.hour || 0), parseInt(pb.minute || 0),
-            chart.gender || "男"
-          );
-          const overlay = calculateDayHourOverlay(
-            rawChart, dt.year, dt.month, dt.day, dt.hour, dt.minute
-          );
-          if (overlay?.summary) {
-            dayHourBlock = `\n## 精算流日/流時疊宮（請直接引用，勿自推）\n${overlay.summary}\n`;
-          }
-        } catch (e) {
-          console.warn("[decision] day/hour overlay failed:", e);
-        }
+
+      // Step 3. 疊宮到極致 — 強制計算, 失敗即中止
+      let dayHourBlock = "";
+      try {
+        const rawChart = calculateChart(
+          parseInt(bd.year), parseInt(bd.month), parseInt(bd.day),
+          parseInt(bd.hour || 0), parseInt(bd.minute || 0),
+          chart.gender || "男"
+        );
+        if (!rawChart || !rawChart.gongs) throw new Error("本命盤計算失敗");
+
+        // 大限 / 流年 / 流月 overlay — 必須
+        const transitOverlay = calculateTransitOverlay(rawChart);
+        if (!transitOverlay) throw new Error("大限/流年/流月疊宮計算失敗");
+
+        // 流日 (+ 流時) overlay — 必須
+        const dayHourOverlay = calculateDayHourOverlay(
+          rawChart, dt.year, dt.month, dt.day, dt.hour, dt.minute
+        );
+        if (!dayHourOverlay?.summary) throw new Error("流日疊宮計算失敗");
+
+        dayHourBlock = `\n## 精算流日${dt.hour !== null ? '/流時' : ''}疊宮（請直接引用，勿自推）\n${dayHourOverlay.summary}\n`;
+      } catch (e) {
+        console.error("[decision] overlay computation failed:", e);
+        setDecisionError(
+          t('decision.overlayFailed', {
+            defaultValue: '命理疊宮計算失敗：' + e.message + '。請重試，或聯繫管理員。'
+          })
+        );
+        setDecisionStatus("input");
+        trackEvent("decision_blocked", { reason: "overlay_failed", error: e.message });
+        return;
       }
 
       const timeAnchorLine = `使用者決策日期：${dt.year}/${dt.month}/${dt.day}${dt.hour !== null ? ` ${String(dt.hour).padStart(2,'0')}:${String(dt.minute||0).padStart(2,'0')}` : '（未指定具體時間，僅算到流日）'}`;
