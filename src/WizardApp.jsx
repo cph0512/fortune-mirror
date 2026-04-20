@@ -2333,7 +2333,7 @@ ${hebanRelation === "relations.twin" ? `
                               {isExpanded ? '▾' : '▸'} {chart.name} {chart.is_primary ? '⭐' : ''}
                             </div>
                             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                              {chartReadings.length > 0 ? `${chartReadings.length} ${t('charts.analyses', { defaultValue: '筆分析' })}` : ''}
+                              {chartReadings.length > 0 ? t('charts.analyses', { count: chartReadings.length, defaultValue: '{{count}} 筆分析' }) : ''}
                             </div>
                           </div>
                           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
@@ -2545,11 +2545,11 @@ ${hebanRelation === "relations.twin" ? `
                             <div style={{ flex: 1, cursor: 'pointer', textAlign: 'center' }} onClick={() => setShowFamily(true)}>
                               <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{fname}</div>
                               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-                                {memberCount > 0 ? `${memberCount} ${t('family.members', { defaultValue: '位成員' })}` : ''}
+                                {memberCount > 0 ? t('family.members', { count: memberCount, defaultValue: '{{count}} 位成員' }) : ''}
                                 {protoName ? ` · ${t('family.protagonist', { defaultValue: '主角' })}：${protoName}` : ''}
                               </div>
                               {saves.length > 1 && (
-                                <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{saves.length} {t('family.analyses', { defaultValue: '次分析' })}</div>
+                                <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{t('family.analyses', { count: saves.length, defaultValue: '{{count}} 次分析' })}</div>
                               )}
                             </div>
                             {wizardUser && (
