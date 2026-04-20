@@ -5,15 +5,14 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 ---
 
 ## 🎯 Current State
-- **Status**: in-progress — **待 lab 驗證**
-- **Branch**: `lab` (commit 63e1f0f: goal-aware prompt + oai 路由)
-- **Working on**: 驗證 goal-aware deep analysis prompt (健康/財富/感情/事業/綜合 各自 5-6 段 + 12 個月逐月走勢) 在 lab.destinytelling.life 的效果
-- **Next step**:
-  1. 等 auto-deploy (每 2 分鐘) 推上 lab 站
-  2. 走一次完整健康/財運分析, 驗證: 5+ 段飽滿 / 12 個月全寫 / 回應時間 ≤ 原 2x / token ≤ +50%
-  3. 通過 → `git checkout main && git merge lab --ff-only && git push` 上 destinytelling.life
-  4. 失敗 → 調整 prompt, 重新迭代
-- **Blockers**: 無 (等 lab 結果)
+- **Status**: in-progress — **資安修復剛 deploy, 待驗證**
+- **Branch**: `lab` 和 `main` 已 merged 同步
+- **Lab provider**: Gemini 3.1 (Flash-Lite / Pro-Preview)
+- **Test provider**: Claude 4 (Opus)
+- **OAI provider**: OpenAI GPT-5
+- **Working on**: 等 sandbox deploy 完成後驗證資安修復 6 項測試 (見 Session Log)
+- **Next step**: 使用者 rotate keys + 跑測試清單 + 看是否要把 goal-aware prompt/疊宮強制推上 prod (main)
+- **Blockers**: 使用者需手動 rotate 5 把 API key / admin pw (外洩風險)
 
 ## 🔥 Recent Change (2026-04-19)
 - `src/WizardApp.jsx`: `getWizardSystemPromptZh(goalKey)` 改 goal-aware
@@ -75,6 +74,66 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 - **i18n**: 繁中 / English / 日本語 三語支援
 
 ## 📜 Session Log
+### 2026-04-21 06:15 (m4pro, claude) — 重大 session, 做了很多事
+
+**三站架構確認**
+- test.destinytelling.life = Claude (fortune-sandbox Cloud Run)
+- lab.destinytelling.life = **Gemini 3.1** (fortune-lab Cloud Run, 新切換)
+- oai.destinytelling.life = OpenAI gpt-5 (codex-fortune-api m4pro:8788)
+
+**Gemini 3.1 上線 lab** (從 Claude 切換, commit efef231..63e1f0f)
+- `gemini-3.1-flash-lite-preview` (default) / `gemini-3.1-pro-preview` (deep)
+- Pricing table 修正 (原本 log 用 Sonnet 費率算 Gemini, 顯示 30x 超貴)
+- Thinking tokens 計算 + 成本: 實際 Pro ~$0.05-0.10/次, Flash-Lite ~$0.005
+
+**UI/UX 改善**
+- Goal-aware 主動展開新分析 section (reset on re-analysis)
+- i18n bug 修: `{{count}}` 顯示問題 (charts.analyses/family.members/family.analyses)
+- 月份排序 bug 修 (12 月逐月 + 強制 1→12 順序)
+- Dashboard 月曆解鎖 regex 修 (parseMonthHighlights 加 '個月'/'月走勢')
+
+**決策 Advisor 強制疊宮 (寫死)**
+- parseQuestionDateTime 擴充: 明天/後天/今天/下週X/下個月X號 (中英日)
+- runDecision 三階段強制檢查: 日期 + 命盤 + 疊宮 全部必須
+- 本命 + 大限 + 流年 + 流月 + 流日 (+流時 if given) 全跑成功才送 AI
+- AI prompt 加「以流日為主判據」強制規則
+
+**KB 同步 (三站 137 條 union)**
+- merge lab 114 + sandbox 106 + public 101 → 137 unique entries
+- 全部寫入 6 個位置 (3 backend + 3 frontend)
+- Backup: ~/kb-backup-20260420-2306
+
+**資安修復 (稽核 5 條全修)**
+- sandbox: bcrypt 密碼 (lazy upgrade) + session token + owner/admin check
+- sandbox: admin `?pw=` → 只接 Bearer header (+ 前端 admin panel 全改)
+- sandbox: 新增本地 `/api/fortune-session` 實作 (file-backed)
+- lab: handle_proxy 改 session.request (保留 DELETE) + 轉 Authorization header
+- lab: 補 fortune-charts / fortune-save/delete / fortune-session / fortune-logout 路由
+- oai: path traversal 修 (path.resolve + inside-dir check), "change-me" 移除
+- scheduler.py: CORS 加 DELETE (刪命盤 bug 修)
+
+**⏳ 進行中 (restart 後要驗證)**
+- fortune-sandbox Cloud Run deploy: 背景跑中 (lab 已完成)
+- 使用者需要自己 rotate 以下 key (外洩風險):
+  - ANTHROPIC_API_KEY (硬編碼在 deploy.sh + git history)
+  - OPENAI_API_KEY (.env tracked in git)
+  - GEMINI_API_KEY (對話出現過)
+  - ADMIN_PASSWORD (admin2026/cph2026)
+  - AUDIT_WRITE_TOKEN
+
+**測試清單 (restart 後)**
+1. 舊帳號登入 → 看 log 有 `[SECURITY] upgraded legacy plaintext → bcrypt`
+2. 無痕訪問 test.destinytelling.life/api/fortune-users → 應 401
+3. A 用戶查 B 用戶 saves → 應 403
+4. 登入後重整頁面 → session restore 應 work (前: 404 silent)
+5. Lab 刪除命盤 → 應成功 (前: DELETE 被改 POST, drop auth)
+
+**Commit 歷史 (lab 分支, 最近 session)**
+- `efef231` Gemini pricing fix
+- merged lab→main (fc06b87) 含 goal-aware + 監月份 + i18n count fix
+- `7d7d7e4` decision 疊宮強制規則
+- `0f9a50f` lab proxy 資安修 (轉 Authorization + 保留 method)
+
 ### 2026-04-19 23:55 (m4pro, claude)
 - 修復用戶回報「健康分析太短」問題
 - 改: `src/WizardApp.jsx` — `getWizardSystemPromptZh` 改 goal-aware, 加 GOAL_FRAMEWORK
