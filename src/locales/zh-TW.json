@@ -182,9 +182,9 @@
     "chartDesc": "加入父母、手足、配偶的命盤，揭示家庭能量如何塑造你的命運",
     "buildChart": "建立家族命盤",
     "analysisError": "分析失敗",
-    "members": "{{count}} 位成員",
+    "members": "位成員",
     "protagonist": "主角",
-    "analyses": "{{count}} 次分析"
+    "analyses": "次分析"
   },
   "calendar": {
     "title": "{{year}} 年度月份總覽",
@@ -201,7 +201,7 @@
   },
   "charts": {
     "title": "我的命盤庫",
-    "analyses": "{{count}} 筆分析",
+    "analyses": "筆分析",
     "newAnalysis": "新分析",
     "unmatched": "未歸類紀錄",
     "saveChartTitle": "儲存此命盤？",
@@ -422,7 +422,13 @@
     "anchoredOn": "以命盤「{{name}}」為基礎",
     "guestMode": "訪客模式 — 建議先建立命盤獲得更準確的能量評估",
     "inputHint": "用是非題或選擇題格式，例如：我該不該接受這個 offer？／A 公司 vs B 公司 vs C 公司？／3/15 下午 2 點開會適不適合？",
-    "placeholder": "輸入你要做的決定...",
+    "placeholder": "列出你在考慮的選項 —— 可以是二選一，也可以多個方案",
+    "examplesLabel": "試試這些例子",
+    "examples": [
+      "3/15 下午兩點適合做客戶提案嗎？",
+      "我該接受這份 offer 嗎？",
+      "今天應該去剪頭髮嗎？"
+    ],
     "analyze": "開始分析",
     "analyzing": "分析中...",
     "winner": "推薦",

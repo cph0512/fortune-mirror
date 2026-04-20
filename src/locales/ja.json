@@ -180,9 +180,9 @@
     "chartTitle": "家族命盤分析",
     "chartDesc": "家族を追加して、家庭のエネルギーが運命にどう影響するかを解き明かします",
     "buildChart": "家族命盤を作成",
-    "members": "{{count}} 名",
+    "members": "名",
     "protagonist": "主役",
-    "analyses": "{{count}} 件の鑑定"
+    "analyses": "件の鑑定"
   },
   "calendar": {
     "title": "{{year}}年 月別運勢一覧",
@@ -199,7 +199,7 @@
   },
   "charts": {
     "title": "マイ命盤",
-    "analyses": "{{count}} 件",
+    "analyses": "件",
     "newAnalysis": "新しい鑑定",
     "unmatched": "未分類",
     "saveChartTitle": "この命盤を保存しますか？",
@@ -420,7 +420,13 @@
     "anchoredOn": "命盤「{{name}}」に基づく",
     "guestMode": "ゲストモード — より正確な鑑定のため、命盤の作成をおすすめします",
     "inputHint": "「はい/いいえ」または選択式で質問してください。例：このオファーを受けるべき？／A社 vs B社 vs C社？／3/15 14時の会議は良い？",
-    "placeholder": "迷っている決定を入力してください...",
+    "placeholder": "検討している選択肢を教えてください（2つ以上）",
+    "examplesLabel": "例を試す",
+    "examples": [
+      "3/15 14時は顧客提案に適してる？",
+      "このオファーを受けるべき？",
+      "今日髪を切るべき？"
+    ],
     "analyze": "分析開始",
     "analyzing": "分析中...",
     "winner": "推奨",

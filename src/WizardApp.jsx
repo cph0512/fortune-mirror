@@ -3842,17 +3842,40 @@ ${hebanRelation === "relations.twin" ? `
 
             {decisionStatus === 'input' && (
               <>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 12, marginBottom: 8 }}>
-                  {t('decision.inputHint', { defaultValue: '用是非題或選擇題格式，例如：我該不該接受這個 offer？／A 公司 vs B 公司 vs C 公司？／3/15 下午 2 點開會適不適合？' })}
-                </div>
                 <textarea
                   className="wizard-auth-input"
-                  style={{ minHeight: 90, resize: 'vertical', fontFamily: 'inherit' }}
-                  placeholder={t('decision.placeholder', { defaultValue: '輸入你要做的決定...' })}
+                  style={{ minHeight: 90, marginTop: 12, resize: 'vertical', fontFamily: 'inherit' }}
+                  placeholder={t('decision.placeholder', { defaultValue: '列出你在考慮的選項 —— 可以是二選一，也可以多個方案' })}
                   value={decisionQuestion}
                   onChange={e => setDecisionQuestion(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runDecision(); }}
                 />
+                {(() => {
+                  // `returnObjects` makes i18next return the JS array; if the
+                  // user's current locale doesn't define examples we silently
+                  // skip the chip row rather than rendering literal key text.
+                  const examples = t('decision.examples', { returnObjects: true, defaultValue: [] });
+                  if (!Array.isArray(examples) || examples.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+                        {t('decision.examplesLabel', { defaultValue: '試試這些例子' })}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {examples.map((ex, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setDecisionQuestion(ex)}
+                            style={{ padding: '6px 12px', fontSize: 12, background: 'rgba(160,140,255,0.12)', border: '1px solid rgba(160,140,255,0.25)', borderRadius: 14, color: 'rgba(255,255,255,0.85)', cursor: 'pointer', textAlign: 'left', lineHeight: 1.4 }}
+                          >
+                            {ex}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <button
                   className="wizard-cta"
                   style={{ marginTop: 12 }}
