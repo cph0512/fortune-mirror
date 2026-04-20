@@ -862,6 +862,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // Monthly overview expansion + paywall
   const [expandedMonth, setExpandedMonth] = useState(null);  // 1..12
   const [showUnlockMonthly, setShowUnlockMonthly] = useState(false);
+  // Chat-only view: when user enters via "問事" on a chart card they want to
+  // dive straight into the Q&A UI without re-reading the full report.
+  const [chatOnlyMode, setChatOnlyMode] = useState(false);
+  // 歷史詢問 panel is collapsed by default so the user lands in an empty,
+  // clean input box instead of a long scroll of past Q&A.
+  const [showChatHistoryPanel, setShowChatHistoryPanel] = useState(false);
   const [showAddChart, setShowAddChart] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
   const [expandedChartId, setExpandedChartId] = useState(null);
@@ -895,6 +901,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         && String(bd.day) === String(cbd.day);
     });
     readings.sort((a, b) => new Date(b.time || b.date || 0) - new Date(a.time || a.date || 0));
+    setChatOnlyMode(true);
+    setShowChatHistoryPanel(false);
     if (readings.length > 0) {
       restoreReading(readings[0]);
     } else {
@@ -1098,6 +1106,15 @@ export default function WizardApp({ auth, onBack, onLogout }) {
 
   // Always land on Welcome page on mount; prior readings are reachable via history panel.
   // (previous behavior auto-jumped to the result page when a saved finalResult existed)
+
+  // Reset chat-only mode whenever the user is not on the result screen, so the
+  // next time they land on the result page they see the full report by default.
+  useEffect(() => {
+    if (step !== TOTAL_STEPS + 1) {
+      setChatOnlyMode(false);
+      setShowChatHistoryPanel(false);
+    }
+  }, [step]);
 
   const translateHoroscope = async (horoscope, targetLang) => {
     if (!horoscope || targetLang === 'zh-TW') return horoscope;
@@ -2882,8 +2899,23 @@ ${hebanRelation === "relations.twin" ? `
               </div>
             </div>
           )}
-          <div className="wizard-question" style={{ marginBottom: 12 }}>{t('result.title')}</div>
+          <div className="wizard-question" style={{ marginBottom: 12 }}>
+            {chatOnlyMode
+              ? t('result.askMode', { defaultValue: '問事 — 直接提問，系統依命盤資料回答' })
+              : t('result.title')}
+          </div>
 
+          {chatOnlyMode && finalResult && (
+            <button
+              className="wizard-quick-q-toggle"
+              style={{ width: '100%', marginBottom: 8, padding: '8px 12px', background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', borderRadius: 8, color: 'rgba(255,255,255,0.6)', fontSize: 13 }}
+              onClick={() => setChatOnlyMode(false)}
+            >
+              ▸ {t('result.showFullReport', { defaultValue: '查看完整分析報告' })}
+            </button>
+          )}
+
+          {!chatOnlyMode && (<>
           <div className="wizard-translate-bar">
             {Object.entries(LANG_NAMES).map(([lng, label]) => {
               const isOriginal = lng === currentLang && !displayLang;
@@ -3185,6 +3217,7 @@ ${hebanRelation === "relations.twin" ? `
               {t('family.buildChart')}
             </button>
           </div>
+          </>)}
 
           {/* Chat follow-up */}
           <div style={{ height: 32 }} />
@@ -3244,16 +3277,30 @@ ${hebanRelation === "relations.twin" ? `
             )}
 
             {chatHistory.length > 0 && (
-              <div className="wizard-chat-messages">
-                {chatHistory.map((msg, i) => (
-                  <div key={i} className={`wizard-chat-msg ${msg.role}`}>{
-                    msg.role === "assistant"
-                      ? msg.text.replace(/\[?\s*SECTION\s*\]?\s*[:：\-—]?\s*/gi, '').replace(/【\s*SECTION\s*】\s*/gi, '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#{1,6}\s*/gm, '')
-                      : msg.text
-                  }</div>
-                ))}
-                {chatLoading && <div className="wizard-chat-msg assistant" style={{ opacity: 0.5 }}>{t('result.chatLoading')}</div>}
-                <div ref={chatEndRef} />
+              <div style={{ marginTop: 8, marginBottom: 8 }}>
+                <button
+                  className="wizard-quick-q-toggle"
+                  style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
+                  onClick={() => setShowChatHistoryPanel(v => !v)}
+                >
+                  <span>{showChatHistoryPanel ? '▾' : '▸'} {t('result.chatHistory', { defaultValue: '歷史詢問', count: chatHistory.length / 2 | 0 })} ({chatHistory.length / 2 | 0})</span>
+                </button>
+                {showChatHistoryPanel && (
+                  <div className="wizard-chat-messages" style={{ marginTop: 4 }}>
+                    {chatHistory.map((msg, i) => (
+                      <div key={i} className={`wizard-chat-msg ${msg.role}`}>{
+                        msg.role === "assistant"
+                          ? msg.text.replace(/\[?\s*SECTION\s*\]?\s*[:：\-—]?\s*/gi, '').replace(/【\s*SECTION\s*】\s*/gi, '').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/^#{1,6}\s*/gm, '')
+                          : msg.text
+                      }</div>
+                    ))}
+                    {chatLoading && <div className="wizard-chat-msg assistant" style={{ opacity: 0.5 }}>{t('result.chatLoading')}</div>}
+                    <div ref={chatEndRef} />
+                  </div>
+                )}
+                {!showChatHistoryPanel && chatLoading && (
+                  <div className="wizard-chat-msg assistant" style={{ opacity: 0.5, marginTop: 4 }}>{t('result.chatLoading')}</div>
+                )}
               </div>
             )}
             <div className="wizard-chat-input">

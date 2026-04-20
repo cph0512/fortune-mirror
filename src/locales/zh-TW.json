@@ -143,6 +143,9 @@
     "hebanLoadingMsgs": ["正在解讀兩人的緣分密碼...", "分析兩人的能量互動...", "比對命運交會點...", "推算關係走向...", "描繪你們的緣分藍圖..."],
     "newReading": "重新算一次",
     "backHome": "回到主頁",
+    "chatHistory": "歷史詢問",
+    "askMode": "問事 — 直接提問，系統依命盤資料回答",
+    "showFullReport": "查看完整分析報告",
     "chatTitle": "你的命盤還藏著這些沒說完",
     "chatSubtitle": "點選下方問題，或輸入你想問的"
   },
@@ -297,7 +300,7 @@
       "engine": "解盤引擎", "engineDesc": "由伺服器端引擎驅動，無需設定。",
       "connected": "已連線",
       "model": "分析模型", "modelDesc": "伺服器端自動選擇最佳模型進行分析。",
-      "sonnet": "GPT-5 mini (推薦)", "opus": "GPT-5", "haiku": "GPT-5 nano",
+      "sonnet": "Claude Sonnet 4 (推薦)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
       "guide": "使用說明",
       "guideContent": "1. 在「設定」頁面填入 Anthropic API Key\n2. 在「知識庫」頁面新增命理知識（可選）\n3. 在「解盤」頁面上傳命盤截圖\n4. 系統會結合你的知識庫 + 內建知識進行分析\n5. 知識庫越豐富，分析越精準！"
     },

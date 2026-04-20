@@ -143,6 +143,9 @@
     "hebanLoadingMsgs": ["Charting...", "Analyzing both charts...", "Reading your connection..."],
     "newReading": "New Reading",
     "backHome": "Back Home",
+    "chatHistory": "Past Questions",
+    "askMode": "Ask a Question — answers reference this chart's data",
+    "showFullReport": "View full analysis report",
     "chatTitle": "Want to dig deeper?",
     "chatSubtitle": "Pick a question or ask your own"
   },
@@ -296,7 +299,7 @@
       "engine": "Analysis Engine", "engineDesc": "Server-side engine, no setup needed.",
       "connected": "Connected",
       "model": "Model", "modelDesc": "Server auto-selects the best model.",
-      "sonnet": "GPT-5 mini (Recommended)", "opus": "GPT-5", "haiku": "GPT-5 nano",
+      "sonnet": "Claude Sonnet 4 (Recommended)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
       "guide": "Guide",
       "guideContent": "1. Enter your Anthropic API Key in Settings\n2. Add knowledge entries (optional)\n3. Upload chart images\n4. The system combines your KB + built-in knowledge\n5. Richer KB = more accurate analysis!"
     },

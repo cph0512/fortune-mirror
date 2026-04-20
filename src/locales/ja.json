@@ -143,6 +143,9 @@
     "hebanLoadingMsgs": ["命盤を作成中...", "二人の命盤を分析中...", "縁を読み解いています..."],
     "newReading": "もう一度鑑定",
     "backHome": "ホームに戻る",
+    "chatHistory": "過去の質問",
+    "askMode": "質問モード — 命盤データに基づいて回答します",
+    "showFullReport": "完全な鑑定レポートを見る",
     "chatTitle": "もっと深く知りたいですか？",
     "chatSubtitle": "質問を選ぶか、自由に質問してください"
   },
@@ -296,7 +299,7 @@
       "engine": "鑑定エンジン", "engineDesc": "サーバー側エンジン、設定不要。",
       "connected": "接続済み",
       "model": "分析モデル", "modelDesc": "サーバーが最適なモデルを自動選択。",
-      "sonnet": "GPT-5 mini (推奨)", "opus": "GPT-5", "haiku": "GPT-5 nano",
+      "sonnet": "Claude Sonnet 4 (推奨)", "opus": "Claude Opus 4", "haiku": "Claude Haiku 4",
       "guide": "使い方",
       "guideContent": "1. 設定でAPI Keyを入力\n2. 知識庫に知識を追加（任意）\n3. 命盤画像をアップロード\n4. 知識庫+内蔵知識で分析\n5. 知識庫が豊富なほど精度UP！"
     },
