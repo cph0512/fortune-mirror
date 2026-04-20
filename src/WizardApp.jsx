@@ -3399,12 +3399,52 @@ ${hebanRelation === "relations.twin" ? `
               picked a non-monthly goal. A cell with real data expands inline;
               an empty cell opens the unlock modal. */}
           {(() => {
-            const highlights = parseMonthHighlights(displayResult);
-            const hasAnyData = highlights.length > 0;
+            // Deterministic tone per month — derived from programmatic 流月四化
+            // (calculateTransitOverlay.monthly), not parsed from LLM prose.
+            // Same chart + same year → same colors every time.
+            const llmHighlights = parseMonthHighlights(displayResult);
             const year = new Date().getFullYear();
+            const KEY_PALACES = ["命宮", "財帛宮", "官祿宮", "疾厄宮", "夫妻宮", "福德宮", "遷移宮"];
+            const scoreMonth = (effects) => {
+              // +1 per 化祿/化權/化科 landing in a key palace; -1 per 化忌
+              // there. Palace comes through as "本命X/流年Y" so startsWith match.
+              let s = 0;
+              for (const e of effects || []) {
+                const landed = e.gongName || "";
+                const inKey = KEY_PALACES.some(p => landed.includes(p));
+                if (!inKey) continue;
+                if (e.hua === "化忌") s -= 1;
+                else if (e.hua === "化祿" || e.hua === "化權" || e.hua === "化科") s += 1;
+              }
+              return s;
+            };
+            let deterministicTones = null;
+            try {
+              // Rebuild the ziwei chart from current birth state if we have it
+              // so the tones work on restored readings too, not only fresh runs.
+              if (birthYear && birthMonth && birthDay) {
+                const rawChart = calculateChart(
+                  parseInt(birthYear), parseInt(birthMonth), parseInt(birthDay),
+                  parseInt(birthHour || 0), parseInt(birthMinute || 0),
+                  gender || "男"
+                );
+                const overlay = calculateTransitOverlay(rawChart, year);
+                if (overlay?.monthly) {
+                  deterministicTones = {};
+                  for (let m = 1; m <= 12; m++) {
+                    const mo = overlay.monthly[m];
+                    const s = mo ? scoreMonth(mo.effects) : 0;
+                    deterministicTones[m] = s >= 2 ? "positive" : s <= -1 ? "caution" : (mo?.effects?.length ? "neutral" : "default");
+                  }
+                }
+              }
+            } catch (e) { /* fall back to LLM-parsed tones */ }
+            const hasAnyData = deterministicTones || llmHighlights.length > 0;
             const allMonths = Array.from({ length: 12 }, (_, i) => {
-              const found = highlights.find(h => h.month === i + 1);
-              return { month: i + 1, tone: found?.tone || "default", description: found?.description || "" };
+              const n = i + 1;
+              const found = llmHighlights.find(h => h.month === n);
+              const tone = deterministicTones ? deterministicTones[n] : (found?.tone || "default");
+              return { month: n, tone, description: found?.description || "" };
             });
             const toneColors = { positive: "#4caf50", caution: "#ff9800", neutral: "#90caf9", default: "rgba(255,255,255,0.1)" };
             const toneLabels = { positive: t('calendar.good'), caution: "!", neutral: "", default: "" };
