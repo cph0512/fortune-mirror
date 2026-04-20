@@ -996,20 +996,77 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // Supported forms: "3/15", "3-15", "3月15日", optional "下午2 / 14:00 / 2pm".
   const parseQuestionDateTime = (question) => {
     if (!question) return null;
-    const mdMatch = question.match(/(\d{1,2})\s*[\/月\-]\s*(\d{1,2})\s*日?/);
-    if (!mdMatch) return null;
-    const m = parseInt(mdMatch[1], 10);
-    const d = parseInt(mdMatch[2], 10);
-    if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return null;
     const now = new Date();
-    let y = now.getFullYear();
-    // If the parsed date is already in the past by more than a day, assume
-    // the user means next year (common for scheduling questions).
-    const candidate = new Date(y, m - 1, d);
-    if (candidate.getTime() < now.getTime() - 24 * 3600 * 1000) y++;
+    const todayY = now.getFullYear(), todayM = now.getMonth() + 1, todayD = now.getDate();
+    let y = null, m = null, d = null;
 
+    // 1. 相對日期 (zh/en/ja)
+    const relMap = [
+      [/(大大後天|大後天)/, 3],
+      [/(後天|後日|the day after tomorrow)/i, 2],
+      [/(明天|明日|tomorrow)/i, 1],
+      [/(今天|今日|today)/i, 0],
+      [/(昨天|昨日|yesterday)/i, -1],
+    ];
+    for (const [rx, delta] of relMap) {
+      if (rx.test(question)) {
+        const target = new Date(todayY, todayM - 1, todayD + delta);
+        y = target.getFullYear(); m = target.getMonth() + 1; d = target.getDate();
+        break;
+      }
+    }
+
+    // 2. 週 X / 下週 X / 下星期 X / next <weekday>
+    if (!y) {
+      const weekMap = { "日": 0, "天": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+        "sun": 0, "mon": 1, "tue": 2, "wed": 3, "thu": 4, "fri": 5, "sat": 6,
+        "日曜": 0, "月曜": 1, "火曜": 2, "水曜": 3, "木曜": 4, "金曜": 5, "土曜": 6 };
+      const wx = question.match(/(下|下個|next)?\s*(週|禮拜|星期|week)\s*([日天一二三四五六])/) ||
+                 question.match(/next\s+(sun|mon|tue|wed|thu|fri|sat)/i) ||
+                 question.match(/(下|下個)?\s*(日|月|火|水|木|金|土)曜日?/);
+      if (wx) {
+        const dayKey = (wx[3] || wx[1] || wx[2] || "").toLowerCase();
+        const targetDow = weekMap[dayKey];
+        if (targetDow !== undefined) {
+          const curDow = now.getDay();
+          let delta = (targetDow - curDow + 7) % 7;
+          if (delta === 0) delta = 7; // 同一天的「下週X」= 下週
+          const wantNext = /下|next/.test(question);
+          if (wantNext && delta < 7) delta += 7;
+          const target = new Date(todayY, todayM - 1, todayD + delta);
+          y = target.getFullYear(); m = target.getMonth() + 1; d = target.getDate();
+        }
+      }
+    }
+
+    // 3. 下個月 X 號
+    if (!y) {
+      const nm = question.match(/下個?月\s*(\d{1,2})\s*[號日]?/);
+      if (nm) {
+        const target = new Date(todayY, todayM, parseInt(nm[1], 10));
+        y = target.getFullYear(); m = target.getMonth() + 1; d = target.getDate();
+      }
+    }
+
+    // 4. 具體日期 N/M, N月M日 (fallback — 原本邏輯)
+    if (!y) {
+      const mdMatch = question.match(/(\d{1,2})\s*[\/月\-]\s*(\d{1,2})\s*日?/);
+      if (mdMatch) {
+        const mm = parseInt(mdMatch[1], 10);
+        const dd = parseInt(mdMatch[2], 10);
+        if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+          y = todayY; m = mm; d = dd;
+          const candidate = new Date(y, m - 1, d);
+          if (candidate.getTime() < now.getTime() - 24 * 3600 * 1000) y++;
+        }
+      }
+    }
+
+    if (!y) return null;
+
+    // 5. 時間解析 (optional — 流時)
     let hour = null, minute = null;
-    const timeMatch = question.match(/(下午|下午|晚上|晚|上午|早上|afternoon|evening|morning|pm|am)?\s*(\d{1,2})\s*[點:時]\s*(\d{1,2})?/i);
+    const timeMatch = question.match(/(下午|晚上|晚|上午|早上|afternoon|evening|morning|pm|am)?\s*(\d{1,2})\s*[點:時]\s*(\d{1,2})?/i);
     if (timeMatch) {
       hour = parseInt(timeMatch[2], 10);
       minute = parseInt(timeMatch[3] || "0", 10) || 0;
@@ -1061,6 +1118,19 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       return;
     }
 
+    // Decision 必須有流日: 先嘗試 parse, 若沒抓到日期 → 要求使用者補
+    const preDt = parseQuestionDateTime(question);
+    if (!preDt) {
+      setDecisionError(
+        t('decision.needDate', {
+          defaultValue: '請在問題中註明具體日期，才能精算到「流日」層級。例如：\n• 「明天」「後天」「下週一」\n• 「5/10」「5月10日」\n• 「下個月 15 號」\n若可能，也加上時間（如「下午 3 點」）可精算到「流時」。'
+        })
+      );
+      setDecisionStatus("input");
+      trackEvent("decision_blocked", { reason: "missing_date" });
+      return;
+    }
+
     setDecisionStatus("analyzing");
     try {
       const chart = decisionChart;
@@ -1073,11 +1143,9 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         : "- 無出生資料（訪客模式）";
       const today = new Date();
 
-      // Pre-compute 流日/流時 overlay if the question contains a date/time.
-      // We rebuild the ziwei chart from the chart's birthData so the overlay
-      // works even on charts that never ran the main analysis.
+      // Pre-compute 流日/流時 overlay — required for decision advisor.
       let dayHourBlock = "";
-      const dt = parseQuestionDateTime(question);
+      const dt = preDt;
       if (dt && chart?.birthData?.year) {
         try {
           const pb = chart.birthData;
@@ -1097,8 +1165,10 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         }
       }
 
+      const timeAnchorLine = `使用者決策日期：${dt.year}/${dt.month}/${dt.day}${dt.hour !== null ? ` ${String(dt.hour).padStart(2,'0')}:${String(dt.minute||0).padStart(2,'0')}` : '（未指定具體時間，僅算到流日）'}`;
       const userPrompt = `## 時間基準
 今天是 ${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}。
+${timeAnchorLine}
 
 ## 排盤資料
 ${chartsText}
@@ -1108,6 +1178,14 @@ ${bdLine}
 
 ## 使用者問題
 ${question}
+
+## 分析規則（決策層級強制）
+你做的是「決策建議」, 不是泛泛運勢. 你必須:
+1. 主要依據「流日疊宮」判斷該日吉凶與建議（若有流時更具體到時辰）
+2. 流月提供背景氛圍、流年提供更大格局、大限提供長期脈絡 — 這些是背景, 不是主判據
+3. 本命盤提供個性傾向 — 影響如何詮釋流日訊號
+4. 必須明確指出「${dt.year}/${dt.month}/${dt.day}」當天的流日四化落在哪些宮位, 並據此給出選項評分
+5. 禁止只講流年/流月就下結論 — 如果流日疊宮資料不足，要在 gap 欄位明說「流日資料不足，建議依流月氛圍參考」
 
 請依系統指令分類並輸出 JSON。`;
 
