@@ -1980,6 +1980,19 @@ ${hebanRelation === "relations.twin" ? `
       return <div className="wizard-section"><div className="wizard-section-body">{cleaned}</div></div>;
     }
 
+    // Goal → section title keywords (matches GOAL_FRAMEWORK titles in prompt)
+    const GOAL_SECTION_KEYWORDS = {
+      "goal.health": ["健康", "Health", "Wellness", "健康養生"],
+      "goal.wealth": ["財富", "財運", "Wealth", "Money", "Finance"],
+      "goal.love": ["感情", "關係", "Love", "Relationship"],
+      "goal.career": ["事業", "工作", "Career", "Work"],
+      "goal.general": ["整體運勢", "今年", "General", "Overall", "Year"],
+    };
+    const goalKeywords = GOAL_SECTION_KEYWORDS[goal] || [];
+    const isGoalSection = (title) => title && goalKeywords.some(k => title.includes(k));
+    const isMonthSection = (title) => title && /12\s*個月|月份|Month|Monthly|月別|月運/.test(title);
+    const isReminderSection = (title) => title && /近期提醒|提醒|Reminder|Alert/.test(title);
+
     return sections.map((sec, i) => {
       let mainBody = sec.body || "";
       let summary = "";
@@ -1997,8 +2010,17 @@ ${hebanRelation === "relations.twin" ? `
           }
         }
       }
+      // Default-open policy: goal section (用戶選的主題) + 12個月走勢 + 近期提醒
+      // Re-analysis 會帶新 activeReadingId → key 改變 → 強制 remount → 舊 state 清掉
+      const shouldOpen = isGoalSection(sec.title) || isMonthSection(sec.title) || isReminderSection(sec.title);
       return (
-        <CollapsibleSection key={i} title={sec.title} body={mainBody} summary={summary} defaultOpen={i < 2} />
+        <CollapsibleSection
+          key={`${activeReadingId || 'fresh'}-${i}`}
+          title={sec.title}
+          body={mainBody}
+          summary={summary}
+          defaultOpen={shouldOpen}
+        />
       );
     });
   };
