@@ -773,6 +773,208 @@ export function calculateTransitOverlay(chart, targetYear = null, targetMonths =
     palaceEffects,
     highlights,
     summary,
+    // Expose the natal-palace lookup so calculateDayHourOverlay can reuse it
+    // without recomputing — keeps day/hour overlays consistent with the base.
+    _lookup: { zhiToGong, findStarZhi, dualName, SI_HUA_TABLE, HUA_NAMES },
+  };
+}
+
+
+// ============================================================
+// 流日 / 流時 疊宮計算
+// ============================================================
+// Shared tables are scoped to the module so calculateDayHourOverlay doesn't
+// depend on internal refs of calculateTransitOverlay's return value. This lets
+// callers use day/hour overlay standalone (e.g., the Decision Advisor on a
+// chart that hasn't run a full analysis yet).
+const _SI_HUA_TABLE = {
+  "甲":["廉貞","破軍","武曲","太陽"],
+  "乙":["天機","天梁","紫微","太陰"],
+  "丙":["天同","天機","文昌","廉貞"],
+  "丁":["太陰","天同","天機","巨門"],
+  "戊":["貪狼","太陰","右弼","天機"],
+  "己":["武曲","貪狼","天梁","文曲"],
+  "庚":["太陽","武曲","天同","天相"],
+  "辛":["巨門","太陽","文曲","文昌"],
+  "壬":["天梁","紫微","左輔","武曲"],
+  "癸":["破軍","巨門","太陰","貪狼"],
+};
+const _HUA_NAMES = ["化祿","化權","化科","化忌"];
+
+// 五鼠遁 — day gan → hour gan at 子時
+const _HOUR_START_GAN = {
+  "甲":"甲","己":"甲",
+  "乙":"丙","庚":"丙",
+  "丙":"戊","辛":"戊",
+  "丁":"庚","壬":"庚",
+  "戊":"壬","癸":"壬",
+};
+
+// Julian Day Number for a Gregorian date at noon.
+function _julianDay(y, m, d) {
+  if (m <= 2) { y -= 1; m += 12; }
+  const a = Math.floor(y / 100);
+  const b = 2 - a + Math.floor(a / 4);
+  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + b - 1524;
+}
+
+// Day stem/branch via the 60-day sexagenary cycle.
+// Reference anchor: 1900-01-01 (JDN 2415021) is 甲戌 (gan=0, zhi=10).
+function _dayGanZhi(y, m, d) {
+  const offset = _julianDay(y, m, d) - 2415021;
+  const ganIdx = ((0 + offset) % 10 + 10) % 10;
+  const zhiIdx = ((10 + offset) % 12 + 12) % 12;
+  return { gan: TIAN_GAN[ganIdx], zhi: DI_ZHI[zhiIdx], ganIdx, zhiIdx };
+}
+
+// Hour stem from day stem + shichen index (0=子 ... 11=亥).
+function _hourGan(dayGan, shichenIdx) {
+  const startGan = _HOUR_START_GAN[dayGan];
+  if (!startGan) return null;
+  const idx = (TIAN_GAN.indexOf(startGan) + shichenIdx) % 10;
+  return TIAN_GAN[idx];
+}
+
+/**
+ * 計算流日（+ 可選流時）的精確疊宮效果。
+ * 回傳 { daily, hourly, summary } — summary 可直接串進 AI prompt。
+ *
+ * @param {object} chart    calculateChart() 回傳的本命盤
+ * @param {number} year     西元年（西曆）
+ * @param {number} month    西曆月 1-12
+ * @param {number} day      西曆日
+ * @param {number|null} hour   可選 0-23；給值才算流時
+ * @param {number|null} minute 流時用不到，保留給將來擴充
+ */
+export function calculateDayHourOverlay(chart, year, month, day, hour = null, minute = null) {
+  if (!chart || !chart.gongs) return null;
+
+  // Natal-palace lookup — rebuild on the fly so this function works on any
+  // chart, not just one that already ran calculateTransitOverlay.
+  const zhiToGong = {};
+  for (const zhi of DI_ZHI) {
+    if (chart.gongs[zhi]) zhiToGong[zhi] = chart.gongs[zhi].name;
+  }
+  function findStarZhi(starName) {
+    for (const zhi of DI_ZHI) {
+      const g = chart.gongs[zhi];
+      if (!g) continue;
+      if (g.stars.includes(starName) || g.minor.includes(starName)) return zhi;
+      if (g.sihua.some(s => s.startsWith(starName))) return zhi;
+    }
+    return null;
+  }
+  const gongOrPlain = (zhi) => zhiToGong[zhi] || `${zhi}宮`;
+
+  // ── 流日 ──
+  const { gan: dayGan, zhi: dayZhi } = _dayGanZhi(year, month, day);
+  const dailySihua = _SI_HUA_TABLE[dayGan]
+    ? _SI_HUA_TABLE[dayGan].map((star, i) => {
+        const landedZhi = findStarZhi(star);
+        return {
+          star,
+          hua: _HUA_NAMES[i],
+          zhi: landedZhi,
+          gongName: landedZhi ? gongOrPlain(landedZhi) : "（本命無此星）",
+        };
+      })
+    : [];
+
+  // ── 流時 (optional) ──
+  let hourly = null;
+  if (hour !== null && hour !== undefined) {
+    const shichenIdx = hourToShiChenIdx(hour);
+    const hGan = _hourGan(dayGan, shichenIdx);
+    const hZhi = DI_ZHI[shichenIdx];
+    const hourlySihua = hGan && _SI_HUA_TABLE[hGan]
+      ? _SI_HUA_TABLE[hGan].map((star, i) => {
+          const landedZhi = findStarZhi(star);
+          return {
+            star,
+            hua: _HUA_NAMES[i],
+            zhi: landedZhi,
+            gongName: landedZhi ? gongOrPlain(landedZhi) : "（本命無此星）",
+          };
+        })
+      : [];
+    hourly = {
+      gan: hGan,
+      zhi: hZhi,
+      shichenIdx,
+      ganZhi: hGan ? `${hGan}${hZhi}` : null,
+      sihua: hourlySihua,
+    };
+  }
+
+  // ── 疊宮重點：哪些宮位被多層疊加了化祿/化忌 ──
+  // Collect natal sihua into a map (to surface triple-overlaps of 祿 or 忌)
+  const palaceHits = {};
+  for (const zhi of DI_ZHI) palaceHits[zhi] = { lu: [], ji: [] };
+
+  for (const [star, hua] of Object.entries(chart.siHua || {})) {
+    const z = findStarZhi(star);
+    if (!z) continue;
+    if (hua === "化祿") palaceHits[z].lu.push(`本命${star}化祿`);
+    if (hua === "化忌") palaceHits[z].ji.push(`本命${star}化忌`);
+  }
+  for (const s of dailySihua) {
+    if (!s.zhi) continue;
+    if (s.hua === "化祿") palaceHits[s.zhi].lu.push(`流日${s.star}化祿`);
+    if (s.hua === "化忌") palaceHits[s.zhi].ji.push(`流日${s.star}化忌`);
+  }
+  if (hourly?.sihua) {
+    for (const s of hourly.sihua) {
+      if (!s.zhi) continue;
+      if (s.hua === "化祿") palaceHits[s.zhi].lu.push(`流時${s.star}化祿`);
+      if (s.hua === "化忌") palaceHits[s.zhi].ji.push(`流時${s.star}化忌`);
+    }
+  }
+  const highlights = [];
+  for (const zhi of DI_ZHI) {
+    const hit = palaceHits[zhi];
+    if (hit.lu.length >= 2) highlights.push({ type: "多祿疊", gongName: gongOrPlain(zhi), detail: hit.lu.join(" + "), impact: "該宮位當下能量旺，此事有利" });
+    if (hit.ji.length >= 2) highlights.push({ type: "多忌疊", gongName: gongOrPlain(zhi), detail: hit.ji.join(" + "), impact: "該宮位壓力集中，此事需避" });
+    if (hit.lu.length >= 1 && hit.ji.length >= 1) highlights.push({ type: "祿忌同宮", gongName: gongOrPlain(zhi), detail: `${hit.lu.join(",")} 與 ${hit.ji.join(",")}`, impact: "吉凶交錯，成敗一線之隔" });
+  }
+
+  // ── 摘要文字 ──
+  let summary = `\n===== 流日${hourly ? "/流時" : ""}疊宮（程式精算，非 AI 推測）=====\n`;
+  summary += `日期：${year}/${month}/${day}${hourly ? ` ${String(hour).padStart(2, "0")}:${String(minute || 0).padStart(2, "0")}` : ""}\n`;
+  summary += `\n【流日】${dayGan}${dayZhi}日\n`;
+  if (dailySihua.length) {
+    summary += `流日四化：${dailySihua.map(s => `${s.star}${s.hua}`).join("、")}\n`;
+    for (const s of dailySihua) {
+      summary += `  → ${s.star}${s.hua} 飛入 ${s.gongName}\n`;
+    }
+  } else {
+    summary += "（無可用流日四化資料）\n";
+  }
+  if (hourly) {
+    summary += `\n【流時】${hourly.ganZhi || "(未知)"} 時（地支 ${hourly.zhi}）\n`;
+    if (hourly.sihua?.length) {
+      summary += `流時四化：${hourly.sihua.map(s => `${s.star}${s.hua}`).join("、")}\n`;
+      for (const s of hourly.sihua) {
+        summary += `  → ${s.star}${s.hua} 飛入 ${s.gongName}\n`;
+      }
+    }
+  }
+  if (highlights.length) {
+    summary += `\n【疊宮重點】\n`;
+    for (const h of highlights) {
+      summary += `- ${h.type} 於 ${h.gongName}：${h.detail}（${h.impact}）\n`;
+    }
+  }
+
+  return {
+    daily: {
+      gan: dayGan,
+      zhi: dayZhi,
+      ganZhi: `${dayGan}${dayZhi}`,
+      sihua: dailySihua,
+    },
+    hourly,
+    highlights,
+    summary,
   };
 }
 

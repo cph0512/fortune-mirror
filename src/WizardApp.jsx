@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import './i18n.js';
 import './WizardApp.css';
-import { calculateChart, formatChart, formatChartCompact, formatChartByTianGan, calculateTransitOverlay } from "./ziwei-calc.js";
+import { calculateChart, formatChart, formatChartCompact, formatChartByTianGan, calculateTransitOverlay, calculateDayHourOverlay } from "./ziwei-calc.js";
 import { calculateBazi, formatBazi, formatBaziCompact } from "./bazi-calc.js";
 import { calculateAstro, formatAstro, formatAstroCompact } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
@@ -261,8 +261,7 @@ function parseMonthHighlights(resultText) {
   if (!resultText) return [];
   const months = [];
   // Find the section about key months
-  // Bug fix: also match "個月" (e.g. "12 個月健康走勢") and "月走勢" / "月運" patterns
-  const monthSectionMatch = resultText.match(/\[SECTION\]\s*.*(?:重點月份|Key Months|月份|Month|月別運勢|月別|個月|月走勢|月運勢|月運)[\s\S]*?(?=\[SECTION\]|$)/i);
+  const monthSectionMatch = resultText.match(/\[SECTION\]\s*.*(?:重點月份|Key Months|月份|Month|月別運勢|月別)[\s\S]*?(?=\[SECTION\]|$)/i);
   if (!monthSectionMatch) return months;
   const section = monthSectionMatch[0];
 
@@ -591,11 +590,11 @@ function getGoalFramework(y) {
 5. 最需要特別留意的健康面向：依排盤格局，未來 1-3 年哪個系統/部位是主要課題？
 6. 跨系統交叉訊號：若多個系統同時指向某個健康面向（例如消化、情緒、睡眠），點出來並解釋意義。）`,
       section5Title: `${y} 年 12 個月健康走勢`,
-      section5Body: `（**必須嚴格按 1 月 → 2 月 → 3 月 → ... → 12 月 順序逐月列出全部 12 個月**，不可跳月、不可只挑幾個月、不可亂序。每個月至少 3-4 句具體說明：
+      section5Body: `（必須逐月分析 12 個月，從 1 月到 12 月全部列出，不可跳月也不可只挑幾個月。每個月用 2-4 句具體說明：
 - 該月身心狀態主調（體力充沛／容易疲倦／情緒敏感／壓力大／適合休養／免疫偏弱...）
 - 該月最容易出現的身體訊號（睡眠、消化、呼吸、情緒、免疫、頭痛、筋骨...挑最可能的 1-2 項）
 - 該月適合做什麼保養（健康檢查時機、運動強度、飲食重點、作息調整、情緒紓壓）
-格式：每月獨立一段, 用「${y}年 1 月：」「${y}年 2 月：」...「${y}年 12 月：」嚴格照序開頭。12 段全部都要寫, 禁止用「其他月份大致類似」帶過, 禁止跳號亂序。）`
+格式：每月獨立一段，用「${y}年 X 月」開頭。12 段全部都要寫，禁止用「其他月份大致類似」帶過。）`
     },
     "goal.wealth": {
       section4Title: "財富與投資——你的現況與趨勢",
@@ -607,29 +606,29 @@ function getGoalFramework(y) {
 5. 投資 vs 風險：目前格局適合承擔多大風險？哪些類型投資符合你？
 6. 跨系統共鳴：若多系統都指向特定財務主題（如合作、不動產、創業），點出並說明。）`,
       section5Title: `${y} 年 12 個月財運走勢`,
-      section5Body: `（**必須嚴格按 1 月→12 月順序** 列完全部 12 個月, 每月至少 3-4 句：
+      section5Body: `（必須逐月分析 12 個月全部都要寫。每月 2-4 句：
 - 該月財運主調（進財月／守財月／破財風險月／投資窗口／合作機會／簽約吉時...）
 - 該月最可能發生的財務事件
 - 該月具體建議（簽約時機、投資動作、開銷控制、收帳催款）
-格式：用「${y}年 1 月：」... 到「${y}年 12 月：」嚴格照序, 每月獨立一段, 禁止跳號亂序。）`
+格式：「${y}年 X 月」開頭，每月獨立一段。）`
     },
     "goal.love": {
       section4Title: "感情與關係——你的現況與趨勢",
       section4Body: `（必須寫 5-6 段飽滿內容：感情基底特質／目前關係狀態（若有伴，談伴侶互動；若單身，談會遇到什麼樣的人）／桃花與穩定的拉扯／對方輪廓或理想對象特質／近期關係主題／跨系統共鳴訊號。）`,
       section5Title: `${y} 年 12 個月感情走勢`,
-      section5Body: `（**必須按 1 月→12 月順序**列完 12 個月, 每月至少 3-4 句：桃花活躍度／穩定或動盪／吸引力高低／衝突或分合可能／具體建議（表白、溝通、獨處、經營）。格式：「${y}年 1 月：」...「${y}年 12 月：」嚴格照序, 禁止跳號亂序。）`
+      section5Body: `（12 個月全部逐月分析。每月 2-4 句：桃花活躍度／穩定或動盪／吸引力高低／衝突或分合可能／具體建議（表白、溝通、獨處、經營）。「${y}年 X 月」格式。）`
     },
     "goal.career": {
       section4Title: "事業與工作——你的現況與趨勢",
       section4Body: `（必須寫 5-6 段飽滿內容：天賦與適合的工作方向／目前事業階段（開創、擴張、穩定、轉型）／升遷或轉職訊號／貴人與阻力的來源／近期最關鍵的事業主題／跨系統共鳴訊號。）`,
       section5Title: `${y} 年 12 個月事業走勢`,
-      section5Body: `（**必須按 1 月→12 月順序**列完 12 個月, 每月至少 3-4 句：升遷／轉職／合作／衝突／出差／考試／創業窗口 + 具體建議。格式：「${y}年 1 月：」...「${y}年 12 月：」嚴格照序, 禁止跳號亂序。）`
+      section5Body: `（12 個月全部逐月分析。每月 2-4 句：升遷／轉職／合作／衝突／出差／考試／創業窗口 + 具體建議。「${y}年 X 月」格式。）`
     },
     "goal.general": {
       section4Title: "今年整體運勢——你的現況與趨勢",
       section4Body: `（必須寫 5-6 段飽滿內容：今年主題／事業財運面／感情人際面／健康養生面／最需要注意的事／跨系統共鳴訊號。）`,
       section5Title: `${y} 年 12 個月運勢走勢`,
-      section5Body: `（**必須按 1 月→12 月順序**列完 12 個月, 每月至少 3-4 句：該月整體能量 + 事業/財運/感情/健康挑 1-2 個亮點 + 建議。格式：「${y}年 1 月：」...「${y}年 12 月：」嚴格照序, 禁止跳號亂序。）`
+      section5Body: `（12 個月全部逐月分析。每月 2-4 句：該月整體能量 + 事業/財運/感情/健康挑 1-2 個亮點 + 建議。「${y}年 X 月」格式。）`
     },
   };
 }
@@ -970,9 +969,6 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [showAddChart, setShowAddChart] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
   const [expandedChartId, setExpandedChartId] = useState(null);
-  const [deleteDialog, setDeleteDialog] = useState(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const [newChartName, setNewChartName] = useState("");
   const [newChartGender, setNewChartGender] = useState("");
   const [newChartYear, setNewChartYear] = useState("");
@@ -988,6 +984,42 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [horoscopeLoading, setHoroscopeLoading] = useState(false);
   const [selectedZodiac, setSelectedZodiac] = useState("");
   const [showHoroscopeDetail, setShowHoroscopeDetail] = useState(false);
+
+  // #8 — Extract an explicit date (optional time) out of the user's question
+  // so we can pre-compute the 流日/流時 overlay before sending to the LLM.
+  // The LLM no longer needs to guess day stems; the prompt gets exact sihua.
+  // Supported forms: "3/15", "3-15", "3月15日", optional "下午2 / 14:00 / 2pm".
+  const parseQuestionDateTime = (question) => {
+    if (!question) return null;
+    const mdMatch = question.match(/(\d{1,2})\s*[\/月\-]\s*(\d{1,2})\s*日?/);
+    if (!mdMatch) return null;
+    const m = parseInt(mdMatch[1], 10);
+    const d = parseInt(mdMatch[2], 10);
+    if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31)) return null;
+    const now = new Date();
+    let y = now.getFullYear();
+    // If the parsed date is already in the past by more than a day, assume
+    // the user means next year (common for scheduling questions).
+    const candidate = new Date(y, m - 1, d);
+    if (candidate.getTime() < now.getTime() - 24 * 3600 * 1000) y++;
+
+    let hour = null, minute = null;
+    const timeMatch = question.match(/(下午|下午|晚上|晚|上午|早上|afternoon|evening|morning|pm|am)?\s*(\d{1,2})\s*[點:時]\s*(\d{1,2})?/i);
+    if (timeMatch) {
+      hour = parseInt(timeMatch[2], 10);
+      minute = parseInt(timeMatch[3] || "0", 10) || 0;
+      const period = (timeMatch[1] || "").toLowerCase();
+      if ((period.includes("下午") || period.includes("晚") || period.includes("afternoon") || period.includes("evening") || period === "pm") && hour < 12) hour += 12;
+    }
+    if (hour === null) {
+      const clockMatch = question.match(/(\d{1,2}):(\d{2})/);
+      if (clockMatch) {
+        hour = parseInt(clockMatch[1], 10);
+        minute = parseInt(clockMatch[2], 10);
+      }
+    }
+    return { year: y, month: m, day: d, hour, minute };
+  };
 
   // #8 — Open the decision advisor modal anchored to a chart (null → guest).
   const openDecision = (chart, entrySource) => {
@@ -1035,12 +1067,37 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         ? `- 出生：${bd.year}/${bd.month}/${bd.day} ${bd.hour || 0}:${bd.minute || 0}\n- 性別：${chart?.gender || "未指定"}\n- 出生地：${bd.place || "未指定"}`
         : "- 無出生資料（訪客模式）";
       const today = new Date();
+
+      // Pre-compute 流日/流時 overlay if the question contains a date/time.
+      // We rebuild the ziwei chart from the chart's birthData so the overlay
+      // works even on charts that never ran the main analysis.
+      let dayHourBlock = "";
+      const dt = parseQuestionDateTime(question);
+      if (dt && chart?.birthData?.year) {
+        try {
+          const pb = chart.birthData;
+          const rawChart = calculateChart(
+            parseInt(pb.year), parseInt(pb.month), parseInt(pb.day),
+            parseInt(pb.hour || 0), parseInt(pb.minute || 0),
+            chart.gender || "男"
+          );
+          const overlay = calculateDayHourOverlay(
+            rawChart, dt.year, dt.month, dt.day, dt.hour, dt.minute
+          );
+          if (overlay?.summary) {
+            dayHourBlock = `\n## 精算流日/流時疊宮（請直接引用，勿自推）\n${overlay.summary}\n`;
+          }
+        } catch (e) {
+          console.warn("[decision] day/hour overlay failed:", e);
+        }
+      }
+
       const userPrompt = `## 時間基準
 今天是 ${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}。
 
 ## 排盤資料
 ${chartsText}
-
+${dayHourBlock}
 ## 用戶資料
 ${bdLine}
 
@@ -1286,72 +1343,6 @@ ${question}
       }
     }
     loadCharts(wizardUser).then(c => setUserCharts(c));
-  };
-
-  const openDeleteDialog = (config) => {
-    setDeleteError("");
-    setDeleteDialog(config);
-  };
-
-  const closeDeleteDialog = () => {
-    if (deleteBusy) return;
-    setDeleteError("");
-    setDeleteDialog(null);
-  };
-
-  const confirmDeleteDialog = async () => {
-    if (!deleteDialog || deleteBusy || !wizardUser?.email) return;
-    setDeleteBusy(true);
-    setDeleteError("");
-
-    try {
-      if (deleteDialog.kind === "reading") {
-        const reading = deleteDialog.reading;
-        const readingTime = reading?.time || reading?.date;
-        const ok = readingTime ? await deleteReading(wizardUser, readingTime) : false;
-        if (!ok) throw new Error("reading-delete-failed");
-        setServerReadings(prev => prev.filter(s => (s.time || s.date) !== readingTime));
-      } else if (deleteDialog.kind === "chart") {
-        const targetChart = deleteDialog.chart;
-        const duplicateChartIds = userCharts
-          .filter(c => birthMatch(c.birthData, targetChart?.birthData))
-          .map(c => c.id)
-          .filter(Boolean);
-        if (duplicateChartIds.length === 0 && targetChart?.id) duplicateChartIds.push(targetChart.id);
-
-        const deletedIds = [];
-        for (const chartId of duplicateChartIds) {
-          const ok = await deleteChart(wizardUser, chartId);
-          if (ok) deletedIds.push(chartId);
-        }
-        if (deletedIds.length === 0) throw new Error("chart-delete-failed");
-        setUserCharts(prev => prev.filter(c => !deletedIds.includes(c.id)));
-        if (deletedIds.includes(expandedChartId)) setExpandedChartId(null);
-      } else if (deleteDialog.kind === "family") {
-        const saves = deleteDialog.saves || [];
-        const familyName = deleteDialog.familyName || "";
-        const deletedTimes = [];
-        for (const save of saves) {
-          const readingTime = save?.time;
-          if (!readingTime) continue;
-          const ok = await deleteReading(wizardUser, readingTime);
-          if (ok) deletedTimes.push(readingTime);
-        }
-        if (saves.length > 0 && deletedTimes.length === 0) throw new Error("family-delete-failed");
-        setServerReadings(prev => prev.filter(s => !deletedTimes.includes(s.time || s.date)));
-        try {
-          const local = JSON.parse(localStorage.getItem("fortune-family-data") || "{}");
-          if (local.familyName === familyName) localStorage.removeItem("fortune-family-data");
-        } catch {}
-      }
-
-      setDeleteDialog(null);
-    } catch (err) {
-      console.error("[deleteDialog] failed:", err);
-      setDeleteError(t('charts.deleteFailed', { defaultValue: '刪除失敗，請再試一次。' }));
-    } finally {
-      setDeleteBusy(false);
-    }
   };
 
   // Load readings from server when user changes
@@ -1868,7 +1859,7 @@ ${transitOverlay?.summary || ''}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, analysis_type: "deep", visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", notify_email: wizardUser?.email || "", goal, job_type: "analysis", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace } }),
+        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", notify_email: wizardUser?.email || "", goal, job_type: "analysis", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace } }),
       });
       if (!submitRes.ok) throw new Error(t('result.analysisError'));
       const { job_id } = await submitRes.json();
@@ -2269,19 +2260,6 @@ ${hebanRelation === "relations.twin" ? `
       return <div className="wizard-section"><div className="wizard-section-body">{cleaned}</div></div>;
     }
 
-    // Goal → section title keywords (matches GOAL_FRAMEWORK titles in prompt)
-    const GOAL_SECTION_KEYWORDS = {
-      "goal.health": ["健康", "Health", "Wellness", "健康養生"],
-      "goal.wealth": ["財富", "財運", "Wealth", "Money", "Finance"],
-      "goal.love": ["感情", "關係", "Love", "Relationship"],
-      "goal.career": ["事業", "工作", "Career", "Work"],
-      "goal.general": ["整體運勢", "今年", "General", "Overall", "Year"],
-    };
-    const goalKeywords = GOAL_SECTION_KEYWORDS[goal] || [];
-    const isGoalSection = (title) => title && goalKeywords.some(k => title.includes(k));
-    const isMonthSection = (title) => title && /12\s*個月|月份|Month|Monthly|月別|月運/.test(title);
-    const isReminderSection = (title) => title && /近期提醒|提醒|Reminder|Alert/.test(title);
-
     return sections.map((sec, i) => {
       let mainBody = sec.body || "";
       let summary = "";
@@ -2299,17 +2277,8 @@ ${hebanRelation === "relations.twin" ? `
           }
         }
       }
-      // Default-open policy: goal section (用戶選的主題) + 12個月走勢 + 近期提醒
-      // Re-analysis 會帶新 activeReadingId → key 改變 → 強制 remount → 舊 state 清掉
-      const shouldOpen = isGoalSection(sec.title) || isMonthSection(sec.title) || isReminderSection(sec.title);
       return (
-        <CollapsibleSection
-          key={`${activeReadingId || 'fresh'}-${i}`}
-          title={sec.title}
-          body={mainBody}
-          summary={summary}
-          defaultOpen={shouldOpen}
-        />
+        <CollapsibleSection key={i} title={sec.title} body={mainBody} summary={summary} defaultOpen={i < 2} />
       );
     });
   };
@@ -2565,7 +2534,7 @@ ${hebanRelation === "relations.twin" ? `
                               {isExpanded ? '▾' : '▸'} {chart.name} {chart.is_primary ? '⭐' : ''}
                             </div>
                             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-                              {chartReadings.length > 0 ? t('charts.analyses', { count: chartReadings.length, defaultValue: '{{count}} 筆分析' }) : ''}
+                              {chartReadings.length > 0 ? `${chartReadings.length} ${t('charts.analyses', { defaultValue: '筆分析' })}` : ''}
                             </div>
                           </div>
                           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
@@ -2648,14 +2617,11 @@ ${hebanRelation === "relations.twin" ? `
                                     </span>
                                     <button
                                       style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.5)', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}
-                                      onClick={(e) => {
+                                      onClick={async (e) => {
                                         e.stopPropagation();
-                                        openDeleteDialog({
-                                          kind: "reading",
-                                          title: t('charts.deleteReading', { defaultValue: '刪除分析紀錄' }),
-                                          message: t('charts.confirmDeleteReading'),
-                                          reading: r,
-                                        });
+                                        if (!confirm(t('charts.confirmDeleteReading'))) return;
+                                        const ok = await deleteReading(wizardUser, r.time || r.date);
+                                        if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
                                       }}
                                     >✕</button>
                                   </div>
@@ -2673,14 +2639,11 @@ ${hebanRelation === "relations.twin" ? `
                                 : t('charts.setAsPrimary')}</button>
                               <button
                                 style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', color: 'rgba(255,100,100,0.6)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
-                                  openDeleteDialog({
-                                    kind: "chart",
-                                    title: t('charts.delete', { defaultValue: '刪除命盤' }),
-                                    message: t('charts.confirmDelete', { name: chart.name }),
-                                    chart,
-                                  });
+                                  if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
+                                  const ok = await deleteChart(wizardUser, chart.id);
+                                  if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
                                 }}
                               >{t('charts.delete')}</button>
                             </div>
@@ -2724,14 +2687,11 @@ ${hebanRelation === "relations.twin" ? `
                         </div>
                         <button
                           style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.5)', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            openDeleteDialog({
-                              kind: "reading",
-                              title: t('charts.deleteReading', { defaultValue: '刪除分析紀錄' }),
-                              message: t('charts.confirmDeleteReading'),
-                              reading: r,
-                            });
+                            if (!confirm(t('charts.confirmDeleteReading'))) return;
+                            const ok = await deleteReading(wizardUser, r.time || r.date);
+                            if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
                           }}
                         >✕</button>
                       </div>
@@ -2784,25 +2744,32 @@ ${hebanRelation === "relations.twin" ? `
                             <div style={{ flex: 1, cursor: 'pointer', textAlign: 'center' }} onClick={() => setShowFamily(true)}>
                               <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{fname}</div>
                               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-                                {memberCount > 0 ? t('family.members', { count: memberCount, defaultValue: '{{count}} 位成員' }) : ''}
+                                {memberCount > 0 ? `${memberCount} ${t('family.members', { defaultValue: '位成員' })}` : ''}
                                 {protoName ? ` · ${t('family.protagonist', { defaultValue: '主角' })}：${protoName}` : ''}
                               </div>
                               {saves.length > 1 && (
-                                <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{t('family.analyses', { count: saves.length, defaultValue: '{{count}} 次分析' })}</div>
+                                <div style={{ fontSize: 12, color: 'rgba(160,140,255,0.6)', marginTop: 4 }}>{saves.length} {t('family.analyses', { defaultValue: '次分析' })}</div>
                               )}
                             </div>
                             {wizardUser && (
                               <button
                                 style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.6)', fontSize: 16, cursor: 'pointer', padding: '4px 8px' }}
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
-                                  openDeleteDialog({
-                                    kind: "family",
-                                    title: t('charts.deleteFamily', { defaultValue: '刪除家族命盤' }),
-                                    message: t('charts.confirmDeleteFamily', { name: fname }),
-                                    familyName: fname,
-                                    saves,
-                                  });
+                                  if (!confirm(t('charts.confirmDeleteFamily', { name: fname }))) return;
+                                  // Delete all saves for this family
+                                  for (const s of saves) {
+                                    if (s.time) await deleteReading(wizardUser, s.time);
+                                  }
+                                  setServerReadings(prev => prev.filter(s => {
+                                    const n = s.familyData?.familyName || s.goalPrompt?.replace(/^家族命盤 — /, '');
+                                    return n !== fname;
+                                  }));
+                                  // Also clear localStorage family data if matching
+                                  try {
+                                    const local = JSON.parse(localStorage.getItem("fortune-family-data") || "{}");
+                                    if (local.familyName === fname) localStorage.removeItem("fortune-family-data");
+                                  } catch {}
                                 }}
                                 title={t('charts.delete')}
                               >✕</button>
@@ -3711,40 +3678,6 @@ ${hebanRelation === "relations.twin" ? `
         : renderLoading()}
 
       <div className="wizard-footer">{t('app.footer')}</div>
-
-      {deleteDialog && (
-        <div className="wizard-auth-overlay" onClick={closeDeleteDialog}>
-          <div className="wizard-auth-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <div className="wizard-auth-title">
-              {deleteDialog.title || t('charts.delete', { defaultValue: '刪除' })}
-            </div>
-            <div className="wizard-auth-subtitle">
-              {deleteDialog.message || t('charts.confirmDeleteReading', { defaultValue: '確定要刪除嗎？' })}
-            </div>
-            {deleteError && <div className="wizard-auth-error">{deleteError}</div>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button
-                className="wizard-cta"
-                style={{ flex: 1, background: 'rgba(255,90,90,0.92)' }}
-                disabled={deleteBusy}
-                onClick={confirmDeleteDialog}
-              >
-                {deleteBusy
-                  ? t('common.deleting', { defaultValue: '刪除中...' })
-                  : t('charts.delete', { defaultValue: '刪除' })}
-              </button>
-              <button
-                className="wizard-cta"
-                style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)' }}
-                disabled={deleteBusy}
-                onClick={closeDeleteDialog}
-              >
-                {t('common.cancel', { defaultValue: '取消' })}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Add Chart Modal */}
       {showAddChart && (
