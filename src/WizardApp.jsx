@@ -415,6 +415,7 @@ const RELATIONS = [
   { key: "relations.family" },
   { key: "relations.friend" },
   { key: "relations.colleague" },
+  { key: "relations.boss" },
   { key: "relations.twin" },
 ];
 
@@ -434,6 +435,7 @@ const HEBAN_DEFAULT_TOPICS = {
   "relations.family": ["love", "core"],
   "relations.friend": ["career", "core"],
   "relations.colleague": ["career", "wealth", "core"],
+  "relations.boss": ["career", "wealth", "timing", "core"], // 權力動態 + 職涯時機
   "relations.twin": null, // 全送
 };
 
@@ -943,6 +945,8 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [hebanMode, setHebanMode] = useState(saved?.hebanMode ?? "basic");
   const [hebanTargetMonth, setHebanTargetMonth] = useState(saved?.hebanTargetMonth ?? String(new Date().getMonth() + 1));
   const [hebanTargetDay, setHebanTargetDay] = useState(saved?.hebanTargetDay ?? String(new Date().getDate()));
+  // 使用者問題 — 驅動合盤分析聚焦 + 作為 KB topic 分類輔助訊號
+  const [hebanQuestion, setHebanQuestion] = useState(saved?.hebanQuestion ?? "");
 
   const [activeReadingId, setActiveReadingId] = useState(saved?.activeReadingId ?? null);
   const [chatHistory, setChatHistory] = useState(saved?.chatHistory ?? []);
@@ -1628,7 +1632,7 @@ ${question}
       hebanResult, hebanRelation, hebanName, hebanGender,
       hebanYear, hebanMonth, hebanDay, hebanHour, hebanMinute,
       showHeban,
-      hebanMode, hebanTargetMonth, hebanTargetDay,
+      hebanMode, hebanTargetMonth, hebanTargetDay, hebanQuestion,
       // 追問
       chatHistory,
       activeReadingId,
@@ -1738,6 +1742,7 @@ ${question}
     if (s.hebanMode) setHebanMode(s.hebanMode);
     if (s.hebanTargetMonth) setHebanTargetMonth(s.hebanTargetMonth);
     if (s.hebanTargetDay) setHebanTargetDay(s.hebanTargetDay);
+    if (s.hebanQuestion) setHebanQuestion(s.hebanQuestion);
     // 追問
     if (s.chatHistory) setChatHistory(s.chatHistory);
   };
@@ -2406,9 +2411,12 @@ ${myCharts}
 ${hasPartnerTime ? "（有完整出生時間，可做完整飛化交叉分析）" : "（無出生時間，以生年天干四化和主星分佈推算宮位影響，命宮位置不確定）"}
 
 ${partnerCharts}
-${crossSihuaBlock}
+${crossSihuaBlock}${hebanQuestion?.trim() ? `
+## 使用者關心的問題 (請把分析聚焦在這上面)
+${hebanQuestion.trim()}
+` : ""}
 ## 任務
-請根據兩人的紫微斗數命盤分析這兩人作為「${hebanRelationZh}」的關係。
+請根據兩人的紫微斗數命盤分析這兩人作為「${hebanRelationZh}」的關係。${hebanQuestion?.trim() ? `整份報告必須環繞使用者的這個問題回答, 給出實際可用的判斷或建議, 不要泛泛而談。` : ""}
 ${crossSihuaBlock ? "上方「交叉飛化分析」是程式精算的結果, 直接引用其中的四化飛入關係做推論, 不要自己重推飛化; 你的工作是把這些飛入點轉為自然語言的關係描述。" : ""}${modeDirective}
 ${hasPartnerTime
   ? "重點分析：雙方命盤的宮位飛化互動、四化交叉影響、主星搭配的互補或衝突。"
@@ -3757,6 +3765,16 @@ ${hebanRelation === "relations.twin" ? `
                           </button>
                         ))}
                       </div>
+                      <div className="wizard-heban-label" style={{ marginTop: 12 }}>
+                        {t('result.hebanQuestion', { defaultValue: '你最想問的問題（選填）' })}
+                      </div>
+                      <textarea className="wizard-input" value={hebanQuestion}
+                        onChange={e => setHebanQuestion(e.target.value)}
+                        placeholder={t('result.hebanQuestionPlaceholder', {
+                          defaultValue: '例如：我們今年會不會走到下一步？他是不是真的適合長期合作？',
+                        })}
+                        rows={2}
+                        style={{ width: '100%', maxWidth: 560, marginBottom: 16, padding: 10, minHeight: 64, resize: 'vertical' }} />
                     </>
                   )}
 

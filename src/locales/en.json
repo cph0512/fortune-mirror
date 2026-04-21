@@ -154,7 +154,8 @@
     "spouse": "Spouse / Life partner",
     "family": "Family",
     "friend": "Friend",
-    "colleague": "Colleague / Boss",
+    "colleague": "Colleague (peer)",
+    "boss": "Manager / Direct report",
     "twin": "Twin sibling"
   },
   "heban": {

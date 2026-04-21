@@ -154,7 +154,8 @@
     "spouse": "配偶者・パートナー",
     "family": "家族",
     "friend": "友人",
-    "colleague": "同僚・上司",
+    "colleague": "同僚",
+    "boss": "上司・部下",
     "twin": "双子の兄弟姉妹"
   },
   "heban": {
