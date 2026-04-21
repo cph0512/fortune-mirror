@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { calculateChart, formatChart } from "./ziwei-calc.js";
+import { calculateChart, formatChart, getDecadalSihuaStarsAtOffset } from "./ziwei-calc.js";
 import { calculateCrossSihua } from "./crosssihua.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
@@ -359,28 +359,41 @@ ${m.charts.astro}
 
       let crossSihuaBlock = "";
       try {
-        const protoChart = proto.charts?.rawZiwei;
-        if (protoChart) {
-          const pieces = [];
-          for (const m of otherMembers) {
-            if (!m.charts?.rawZiwei) continue;
-            const cross = calculateCrossSihua(protoChart, m.charts.rawZiwei, {
+        // All-pairs cross-sihua: every distinct pair of members with charts,
+        // not just protagonist vs each. For a 5-person family that's 10 pairs,
+        // but it lets the AI reason about e.g. mother↔elder_brother dynamics
+        // rather than only seeing through the protagonist's lens. Each pair
+        // also carries L3b past-decadal (回看 10-20 年) when computable so the
+        // report can ground "過去怎樣 / 現在怎樣" in精算 not vibes.
+        const allForCross = membersToAnalyze.filter(m => m?.charts?.rawZiwei);
+        const pieces = [];
+        for (let i = 0; i < allForCross.length; i++) {
+          for (let j = i + 1; j < allForCross.length; j++) {
+            const a = allForCross[i], b = allForCross[j];
+            const aPrevDec = getDecadalSihuaStarsAtOffset(a.charts.rawZiwei, -1)?.stars;
+            const bPrevDec = getDecadalSihuaStarsAtOffset(b.charts.rawZiwei, -1)?.stars;
+            const opts = {
               levels: ["natal", "palace", "decadal", "yearly"],
-              nameA: proto.name,
-              nameB: m.name,
-            });
-            const roleLbl = getRoleLabel(m.role, 'zh-TW');
-            pieces.push(`### ${proto.name} ↔ ${m.name} (${roleLbl})\n${cross.summary}`);
-          }
-          if (pieces.length) {
-            crossSihuaBlock = `\n\n===== 家族成員交叉飛化（程式精算，非 AI 推測）=====\n\n${pieces.join("\n\n")}\n`;
+              nameA: a.name,
+              nameB: b.name,
+            };
+            if (aPrevDec && bPrevDec) {
+              opts.levels = [...opts.levels, "pastDecadal"];
+              opts.pastDecadalSihua = { a: aPrevDec, b: bPrevDec };
+              opts.pastDecadalLabel = "上一大限 (回看 10-20 年)";
+            }
+            const cross = calculateCrossSihua(a.charts.rawZiwei, b.charts.rawZiwei, opts);
+            const aRole = getRoleLabel(a.role, 'zh-TW');
+            const bRole = getRoleLabel(b.role, 'zh-TW');
+            pieces.push(`### ${a.name} (${aRole}) ↔ ${b.name} (${bRole})\n${cross.summary}`);
           }
         }
-        if (!crossSihuaBlock) {
+        if (pieces.length) {
+          crossSihuaBlock = `\n\n===== 家族成員交叉飛化（程式精算，非 AI 推測）=====\n\n${pieces.join("\n\n")}\n`;
+        } else {
           console.warn("[family] crosssihua block empty", {
-            hasProtoChart: !!proto.charts?.rawZiwei,
-            otherCount: otherMembers.length,
-            membersWithChart: otherMembers.filter(m => m.charts?.rawZiwei).length,
+            membersTotal: membersToAnalyze.length,
+            membersWithChart: allForCross.length,
           });
         }
       } catch (e) {

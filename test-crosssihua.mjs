@@ -6,7 +6,7 @@
  * Two hardcoded birth inputs to avoid any test framework; verifies shape +
  * a couple of invariants on L1-L4 flights.
  */
-import { calculateChart, getMonthlySihuaStars, getDailySihuaStars } from "./src/ziwei-calc.js";
+import { calculateChart, getMonthlySihuaStars, getDailySihuaStars, getDecadalSihuaStarsAtOffset } from "./src/ziwei-calc.js";
 import { calculateCrossSihua, __internals } from "./src/crosssihua.js";
 
 const { DI_ZHI, HUA_ORDER } = __internals;
@@ -124,6 +124,26 @@ const realL6 = calculateCrossSihua(chartA, chartB, {
 assert(realL6.summary.includes("2026/5/15"), "real L6 helper summary has date label");
 const l6flights = [...realL6.flights.aToB, ...realL6.flights.bToA].filter(f => f.layer === "L6");
 assert(l6flights.length > 0, `real L6 produced flights (got ${l6flights.length})`);
+
+// --- Past decadal (L3b) ---
+const curDec = getDecadalSihuaStarsAtOffset(chartA, 0);
+const prevDec = getDecadalSihuaStarsAtOffset(chartA, -1);
+assert(curDec && Array.isArray(curDec.stars) && curDec.stars.length === 4, `getDecadalSihuaStarsAtOffset offset=0 returns 4 stars`);
+assert(prevDec && Array.isArray(prevDec.stars) && prevDec.stars.length === 4, `getDecadalSihuaStarsAtOffset offset=-1 returns 4 stars (got ${prevDec?.stars?.length})`);
+assert(curDec.gan !== prevDec.gan || curDec.zhi !== prevDec.zhi, `current vs previous decadal differ by gan/zhi`);
+
+const realL3b = calculateCrossSihua(chartA, chartB, {
+  levels: ["natal", "palace", "decadal", "pastDecadal", "yearly"],
+  pastDecadalSihua: {
+    a: getDecadalSihuaStarsAtOffset(chartA, -1)?.stars,
+    b: getDecadalSihuaStarsAtOffset(chartB, -1)?.stars,
+  },
+  pastDecadalLabel: `上一大限`,
+  nameA: "阿明", nameB: "小美",
+});
+const realL3bFlights = [...realL3b.flights.aToB, ...realL3b.flights.bToA].filter(f => f.layer === "L3b");
+assert(realL3bFlights.length > 0, `L3b past decadal produced flights (got ${realL3bFlights.length})`);
+assert(realL3b.summary.includes("上一大限"), "L3b summary has past-decadal heading");
 
 console.log("\n--- Summary sample (L1-L4) ---");
 console.log(res.summary.slice(0, 800));

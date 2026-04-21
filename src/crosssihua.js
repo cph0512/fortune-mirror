@@ -23,12 +23,13 @@ const HUA_ORDER = ["化祿", "化權", "化科", "化忌"];
 const DEFAULT_LEVELS = ["natal", "palace", "decadal", "yearly"];
 
 const LAYER_META = {
-  L1: { key: "natal",   label: "本命四化 (生年干)" },
-  L2: { key: "palace",  label: "宮干飛化" },
-  L3: { key: "decadal", label: "當前大限四化" },
-  L4: { key: "yearly",  label: "流年四化" },
-  L5: { key: "monthly", label: "流月四化" },
-  L6: { key: "daily",   label: "流日四化" },
+  L1:  { key: "natal",       label: "本命四化 (生年干)" },
+  L2:  { key: "palace",      label: "宮干飛化" },
+  L3:  { key: "decadal",     label: "當前大限四化" },
+  L3b: { key: "pastDecadal", label: "上一大限四化" },
+  L4:  { key: "yearly",      label: "流年四化" },
+  L5:  { key: "monthly",     label: "流月四化" },
+  L6:  { key: "daily",       label: "流日四化" },
 };
 
 // 在 chart 中找出某顆星所在的宮位 (先找 major, 再找 minor)
@@ -155,6 +156,14 @@ function runDirection(srcChart, dstChart, srcName, levels, extras = {}) {
   if (want.has("palace"))  flights.push(...layerPalace(srcChart, dstChart, srcName));
   if (want.has("decadal")) flights.push(...layerDecadal(srcChart, dstChart, srcName));
   if (want.has("yearly"))  flights.push(...layerYearly(srcChart, dstChart, srcName));
+  if (want.has("pastDecadal") && Array.isArray(extras.pastDecadalSihua?.[srcName === extras.nameA ? "a" : "b"])) {
+    flights.push(...layerFromSihuaArray(
+      srcChart, dstChart, srcName,
+      extras.pastDecadalSihua[srcName === extras.nameA ? "a" : "b"],
+      "L3b",
+      extras.pastDecadalLabel || "上一大限",
+    ));
+  }
   if (want.has("monthly") && Array.isArray(extras.monthlySihua?.[srcName === extras.nameA ? "a" : "b"])) {
     flights.push(...layerFromSihuaArray(
       srcChart, dstChart, srcName,
@@ -175,7 +184,7 @@ function runDirection(srcChart, dstChart, srcName, levels, extras = {}) {
 }
 
 function buildSummary(flights, { nameA, nameB, levels }) {
-  const layerOrder = ["L1", "L2", "L3", "L4", "L5", "L6"];
+  const layerOrder = ["L1", "L2", "L3", "L3b", "L4", "L5", "L6"];
   let s = `===== 交叉飛化分析（程式精算，非 AI 推測）=====\n`;
   s += `涵蓋層級：${levels.map(l => {
     for (const [k, v] of Object.entries(LAYER_META)) if (v.key === l) return `${k}(${v.label})`;
@@ -198,7 +207,7 @@ function buildSummary(flights, { nameA, nameB, levels }) {
       const temporalTag = list[0].sourceLabel
         ? list[0].sourceLabel.replace(`${srcName} `, "").trim()
         : "";
-      const heading = ["L3", "L4", "L5", "L6"].includes(layer) && temporalTag
+      const heading = ["L3", "L3b", "L4", "L5", "L6"].includes(layer) && temporalTag
         ? `${LAYER_META[layer].label}（${temporalTag}）`
         : LAYER_META[layer].label;
       s += `\n### ${heading}\n`;
@@ -238,6 +247,8 @@ export function calculateCrossSihua(chartA, chartB, opts = {}) {
   const extras = {
     nameA,
     nameB,
+    pastDecadalSihua: opts.pastDecadalSihua,
+    pastDecadalLabel: opts.pastDecadalLabel,
     monthlySihua: opts.monthlySihua,
     dailySihua: opts.dailySihua,
     monthlyLabel: opts.monthlyLabel,

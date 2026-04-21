@@ -1014,3 +1014,34 @@ export function getDailySihuaStars(chart, year, month, day) {
   if (!overlay?.daily?.sihua?.length) return null;
   return overlay.daily.sihua.map(s => s.star);
 }
+
+/**
+ * 取某個大限的四化 4 顆星 (祿/權/科/忌 順序)
+ * offset=0 = 當前大限, -1 = 上一大限, 1 = 下一大限
+ * 大限干 = 大限命宮所在宮的宮干, 查 _SI_HUA_TABLE 即得四化
+ * @param {object} chart
+ * @param {number} offset  相對當前大限的位移 (int)
+ * @returns {{ stars: string[]|null, gan: string|null, zhi: string|null, startAge: number|null, endAge: number|null }|null}
+ */
+export function getDecadalSihuaStarsAtOffset(chart, offset = 0) {
+  const daXian = chart?.daXian || [];
+  const age = chart?.horoscope?.age?.nominalAge;
+  if (!daXian.length || !age) return null;
+  // Find current decadal by age-in-range. daXian is ordered by ascending age.
+  const curIdx = daXian.findIndex(dx => age >= dx.startAge && age <= dx.endAge);
+  if (curIdx < 0) return null;
+  const targetIdx = curIdx + offset;
+  if (targetIdx < 0 || targetIdx >= daXian.length) return null;
+  const target = daXian[targetIdx];
+  const gan = chart.gongGan?.[target.zhi];
+  if (!gan || !_SI_HUA_TABLE[gan]) {
+    return { stars: null, gan, zhi: target.zhi, startAge: target.startAge, endAge: target.endAge };
+  }
+  return {
+    stars: [..._SI_HUA_TABLE[gan]],
+    gan,
+    zhi: target.zhi,
+    startAge: target.startAge,
+    endAge: target.endAge,
+  };
+}
