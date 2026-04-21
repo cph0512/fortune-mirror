@@ -580,6 +580,43 @@ function hitsDecisionBlockList(text) {
   return DECISION_BLOCK_KEYWORDS.some(kw => lower.includes(kw.toLowerCase()));
 }
 
+const DECISION_TYPES = ["yesno", "multi", "timed", "open", "blocked"];
+
+// Validate the JSON the model returns for decision analysis. We can't trust the
+// LLM to always stick to the schema, so checks are cheap guards before we render
+// anything — missing fields here have surfaced as blank screens in the past.
+function validateDecisionResponse(parsed) {
+  if (!parsed || typeof parsed !== "object") {
+    return { ok: false, reason: "not_object" };
+  }
+  if (!DECISION_TYPES.includes(parsed.type)) {
+    return { ok: false, reason: `bad_type:${parsed.type}` };
+  }
+  if (parsed.type === "blocked" || parsed.type === "open") {
+    if (typeof parsed.question_summary !== "string" || !parsed.question_summary.trim()) {
+      return { ok: false, reason: "missing_question_summary" };
+    }
+    return { ok: true };
+  }
+  if (parsed.type === "yesno" || parsed.type === "multi" || parsed.type === "timed") {
+    if (!Array.isArray(parsed.options) || parsed.options.length === 0) {
+      return { ok: false, reason: "missing_options" };
+    }
+    for (const [i, opt] of parsed.options.entries()) {
+      if (!opt || typeof opt !== "object") return { ok: false, reason: `option_${i}_not_object` };
+      if (typeof opt.label !== "string" || !opt.label.trim()) return { ok: false, reason: `option_${i}_missing_label` };
+      if (typeof opt.score !== "number" || opt.score < 0 || opt.score > 100) {
+        return { ok: false, reason: `option_${i}_bad_score` };
+      }
+    }
+    if (parsed.type === "timed" && !parsed.time_anchor) {
+      return { ok: false, reason: "timed_missing_anchor" };
+    }
+    return { ok: true };
+  }
+  return { ok: false, reason: "unreachable" };
+}
+
 // Goal-specific framework for section 4 (topic deep-dive) and section 5
 // (12-month breakdown). Kept as a function (not a const) so the current year
 // interpolates at call time instead of at module load.
@@ -725,8 +762,13 @@ function filterKBByGoal(kbEntries, goalKey) {
     if (t.includes("core")) return true;
     return needTopics.some(topic => t.includes(topic));
   });
-  // Safety: if filtering removed too much, send all (quality first)
-  if (filtered.length < 20) return kbEntries;
+  // Safety: if filtering removed too much, send all (quality first). Log so we
+  // can audit how often fallback fires and tune thresholds / topic maps.
+  if (filtered.length < 20) {
+    console.warn(`[KB_FALLBACK] goal=${goalKey} filtered=${filtered.length}/${kbEntries.length} below threshold=20, sending full KB`);
+    try { trackEvent("kb_fallback", { goal: goalKey, filtered: filtered.length, total: kbEntries.length }); } catch {}
+    return kbEntries;
+  }
   return filtered;
 }
 
@@ -1281,8 +1323,28 @@ ${question}
       } catch (e) {
         // Last-ditch: find the first { and last } and try again.
         const m = cleaned.match(/\{[\s\S]*\}/);
-        if (m) parsed = JSON.parse(m[0]);
-        else throw e;
+        if (m) {
+          try { parsed = JSON.parse(m[0]); } catch { parsed = null; }
+        }
+      }
+      if (!parsed) {
+        console.error("[decision] unparseable AI response:", cleaned.slice(0, 500));
+        trackEvent("decision_error", { reason: "json_parse_failed" });
+        setDecisionError(t('decision.badResponse', {
+          defaultValue: 'AI 回應格式錯誤（無法解析 JSON）。請重試，或換個問題方式。'
+        }));
+        setDecisionStatus("input");
+        return;
+      }
+      const schemaCheck = validateDecisionResponse(parsed);
+      if (!schemaCheck.ok) {
+        console.error("[decision] schema validation failed:", schemaCheck.reason, parsed);
+        trackEvent("decision_error", { reason: `schema_${schemaCheck.reason}` });
+        setDecisionError(t('decision.badResponse', {
+          defaultValue: 'AI 回應格式錯誤（欄位不完整）。請重試，或換個問題方式。'
+        }));
+        setDecisionStatus("input");
+        return;
       }
 
       setDecisionResult(parsed);
