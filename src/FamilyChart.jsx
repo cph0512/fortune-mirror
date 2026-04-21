@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { calculateChart, formatChart } from "./ziwei-calc.js";
+import { calculateCrossSihua } from "./crosssihua.js";
 import { calculateBazi, formatBazi } from "./bazi-calc.js";
 import { calculateAstro, formatAstro } from "./astro-calc.js";
 import { calculateTrueSolarTime } from "./true-solar-time.js";
@@ -88,9 +89,10 @@ async function saveFamilyToServer(apiBackend, user, data, getVisitorId) {
   } catch (e) { console.error("[FamilyChart] save error:", e); }
 }
 
-// Rebuild charts for members loaded from server (server saves don't include chart strings)
+// Rebuild charts for members loaded from server (server saves don't include chart strings).
+// Also regenerates when rawZiwei is missing so legacy saves still get cross-sihua capability.
 function rebuildCharts(members) {
-  return members.map(m => m.charts?.ziwei ? m : { ...m, charts: generateCharts(m) });
+  return members.map(m => (m.charts?.ziwei && m.charts?.rawZiwei) ? m : { ...m, charts: generateCharts(m) });
 }
 
 // Load family data from server saves (find ALL family saves for history)
@@ -128,10 +130,14 @@ function generateCharts(member) {
   const tst = calculateTrueSolarTime(y, m, d, h, min, cityLng, cityTz);
   const tstY = tst.adjustedYear, tstM = tst.adjustedMonth, tstD = tst.adjustedDay;
   const tstH = tst.trueSolarHour, tstMin = tst.trueSolarMinute;
-  const ziwei = formatChart(calculateChart(tstY, tstM, tstD, tstH, tstMin, member.gender));
+  // Keep the raw ziwei chart object alongside the rendered text so downstream
+  // cross-sihua computation can read chart.siHua / feiHua / horoscope without
+  // re-parsing the formatted markdown.
+  const rawZiwei = calculateChart(tstY, tstM, tstD, tstH, tstMin, member.gender);
+  const ziwei = formatChart(rawZiwei);
   const bazi = formatBazi(calculateBazi(tstY, tstM, tstD, tstH, member.gender, tstMin));
   const astro = formatAstro(calculateAstro(y, m, d, h, min, cityLat, cityLng));
-  return { ziwei, bazi, astro, tst };
+  return { ziwei, bazi, astro, tst, rawZiwei };
 }
 
 export default function FamilyChart({ apiBackend, wizardUser, getVisitorId, onClose }) {
@@ -333,6 +339,39 @@ ${m.charts.astro}
       const protoRole = getRoleLabel(proto.role, 'zh-TW');
       const otherMembers = membersToAnalyze.filter(m => m.id !== proto.id);
 
+      // Cross-sihua L1-L4: protagonist vs each other member, bidirectional.
+      // Upstream audit found Family analysis asked the LLM to infer 飛化 from
+      // raw chart text — now we pre-compute the flights deterministically.
+      let crossSihuaBlock = "";
+      try {
+        // Protagonist may arrive without rawZiwei if restored from server (server
+        // saves strip the chart object). Regenerate on the fly so cross-sihua
+        // has something to work with.
+        let protoChart = proto.charts?.rawZiwei;
+        if (!protoChart && proto.year && proto.month && proto.day) {
+          proto.charts = generateCharts(proto);
+          protoChart = proto.charts.rawZiwei;
+        }
+        if (protoChart) {
+          const pieces = [];
+          for (const m of otherMembers) {
+            if (!m.charts?.rawZiwei) continue;
+            const cross = calculateCrossSihua(protoChart, m.charts.rawZiwei, {
+              levels: ["natal", "palace", "decadal", "yearly"],
+              nameA: proto.name,
+              nameB: m.name,
+            });
+            const roleLbl = getRoleLabel(m.role, 'zh-TW');
+            pieces.push(`### ${proto.name} ↔ ${m.name} (${roleLbl})\n${cross.summary}`);
+          }
+          if (pieces.length) {
+            crossSihuaBlock = `\n\n===== 家族成員交叉飛化（程式精算，非 AI 推測）=====\n\n${pieces.join("\n\n")}\n`;
+          }
+        }
+      } catch (e) {
+        console.warn("[family] crosssihua failed:", e);
+      }
+
       // Build relationship context
       const parentMembers = otherMembers.filter(m => m.role === "father" || m.role === "mother");
       const siblingMembers = otherMembers.filter(m => m.role === "elder_sib" || m.role === "younger_sib");
@@ -370,7 +409,7 @@ ${m.charts.astro}
 
 以下是一個家庭的所有成員命盤資料（內部資料，不可對外揭露來源系統）：
 ${chartsBlock}
-
+${crossSihuaBlock}
 ## 分析任務
 
 以「${proto.name}」（${protoRole}）為主角，進行家族命盤交叉分析。
@@ -379,11 +418,9 @@ ${verifyBlock}
 
 ## 飛化交叉分析方法
 
-對於每位家庭成員，進行以下三層飛化交叉：
-
-A. 主角自身的對應宮位飛化（從主角的宮位飛化表中找到對應宮位行）
-B. 家人的生年四化 → 找這些星在主角命盤十二宮排盤中的位置
-C. 家人命宮天干飛化 → 找這些星在主角命盤中的位置
+${crossSihuaBlock
+  ? "上方「家族成員交叉飛化」已把主角和每位家人的 L1 生年 / L2 宮干 / L3 大限 / L4 流年飛化關係全部算好。你的工作是把這些飛入點轉為自然語言描述，例如「父親命盤的某能量透過某領域影響主角的某生活面向」。不要自己重推飛化。"
+  : "對於每位家庭成員，進行以下三層飛化交叉：\nA. 主角自身的對應宮位飛化（從主角的宮位飛化表中找到對應宮位行）\nB. 家人的生年四化 → 找這些星在主角命盤十二宮排盤中的位置\nC. 家人命宮天干飛化 → 找這些星在主角命盤中的位置"}
 
 ## 輸出結構
 
