@@ -5,14 +5,13 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 ---
 
 ## 🎯 Current State
-- **Status**: in-progress — **資安修復剛 deploy, 待驗證**
-- **Branch**: `lab` 和 `main` 已 merged 同步
-- **Lab provider**: Gemini 3.1 (Flash-Lite / Pro-Preview)
-- **Test provider**: Claude 4 (Opus)
-- **OAI provider**: OpenAI GPT-5
-- **Working on**: 等 sandbox deploy 完成後驗證資安修復 6 項測試 (見 Session Log)
-- **Next step**: 使用者 rotate keys + 跑測試清單 + 看是否要把 goal-aware prompt/疊宮強制推上 prod (main)
-- **Blockers**: 使用者需手動 rotate 5 把 API key / admin pw (外洩風險)
+- **Status**: Phase 1 of pre-revenue audit **landed**. Frontend pushed (lab), 3 backends committed locally (需手動 deploy).
+- **Branch**: `lab`
+- **Lab / Test / OAI providers**: unchanged (Gemini 3.1 / Claude Opus 4 / GPT-5)
+- **Working on**: 等 test 站 deploy 驗證 KB_MODE=filtered 行為; 下一步進 Phase 2 (合盤 + Family 疊宮/交叉飛化)
+- **Next step**: (1) 手動 deploy fortune-sandbox & fortune-lab 到 Cloud Run, 重啟 fortune-oai on m4pro:8788; (2) 實作 `calculateCrossSihua` + `calculateDecadalOverlay`; (3) 接合盤/Family
+- **Blockers**: 舊 session 遺留 — 需手動 rotate 5 把 key + admin pw (外洩風險)
+- **Rollback tag**: `pre-source-map-fix-20260421` (四個 repo 都有)
 
 ## 🔥 Recent Change (2026-04-19)
 - `src/WizardApp.jsx`: `getWizardSystemPromptZh(goalKey)` 改 goal-aware
@@ -74,6 +73,28 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 - **i18n**: 繁中 / English / 日本語 三語支援
 
 ## 📜 Session Log
+### 2026-04-21 21:50 (m4pro, claude) — Phase 1 of pre-revenue audit
+
+**收費前審計 → 產出 `docs/SOURCE_MAP.md`** (target state + gap + 4-phase 修正計畫)
+- 三站 6 個算命功能 + 疊宮 coverage matrix (current vs target)
+- target 加上用戶指定: 合盤雙方大限/流年/流月 + 交叉飛化 / Family 近 20 年大限 + all members 兩兩交叉 / 追問流日 / 切主角重算
+
+**Phase 1 landed (4 repos):**
+- `fortune-mirror`: `validateDecisionResponse` (決策 JSON schema 守門, 不再 blank screen); `filterKBByGoal` 退回全量時打 `[KB_FALLBACK]` warning + trackEvent
+- `fortune-sandbox`: 新增 `KB_MODE` env (default `filtered`, rollback `unified`), 對齊 lab/oai 的 per-request KB 過濾; 舊 `_UNIFIED_SP` 保留可一鍵回推; `_fortune_run` / `handle_fortune` 吃進 goal
+- `fortune-lab` / `fortune-oai`: `[KB_FALLBACK]` logger.warning (可在 Cloud Run log 審計)
+- fortune-oai 另一個 commit (`0f9192e`) 是舊 session 未提交的 OpenAI provider + Token monitoring work (author 保留 cph)
+
+**部署狀態:**
+- fortune-mirror `lab` 已 push → m4pro auto-deploy 2 分內生效 (lab.destinytelling.life)
+- fortune-sandbox / fortune-lab / fortune-oai 只 commit 沒 push (無 remote) **需要手動 deploy**
+  - sandbox & lab: `./deploy.sh` → Cloud Run
+  - oai: 重啟 m4pro:8788 python service
+
+**⚠️ KB_MODE=filtered 副作用**: test 站每個 goal 的 system prompt 不同 → Anthropic prompt cache hit rate 會掉。若成本跳升, `KB_MODE=unified` 一鍵回推。
+
+**Tag**: `pre-source-map-fix-20260421` (四個 repo, 全 reset 回推點)
+
 ### 2026-04-21 06:15 (m4pro, claude) — 重大 session, 做了很多事
 
 **三站架構確認**
