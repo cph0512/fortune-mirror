@@ -979,3 +979,38 @@ export function calculateDayHourOverlay(chart, year, month, day, hour = null, mi
 }
 
 export { SHI_CHEN_RANGE, DI_ZHI, TIAN_GAN };
+
+// 五虎遁月干表 — 年干 → 正月天干，然後順推每月
+const _TIGER_MAP = {
+  "甲": "丙", "乙": "戊", "丙": "庚", "丁": "壬", "戊": "甲",
+  "己": "丙", "庚": "戊", "辛": "庚", "壬": "壬", "癸": "甲",
+};
+
+/**
+ * 取某年某月的流月四化 4 顆星 (祿/權/科/忌 順序)
+ * 目前用 chart.horoscope 的流年干 (current year only)。跨年月後續 iteration 補。
+ * @param {object} chart  calculateChart 輸出
+ * @param {number} month  1-12
+ * @returns {string[]|null}  [祿星, 權星, 科星, 忌星] 或 null
+ */
+export function getMonthlySihuaStars(chart, month) {
+  const yearGan = chart?.horoscope?.yearly?.ganZhi?.[0];
+  if (!yearGan || month < 1 || month > 12) return null;
+  const startGan = _TIGER_MAP[yearGan];
+  if (!startGan) return null;
+  const monthGan = TIAN_GAN[(TIAN_GAN.indexOf(startGan) + (month - 1)) % 10];
+  return _SI_HUA_TABLE[monthGan] ? [..._SI_HUA_TABLE[monthGan]] : null;
+}
+
+/**
+ * 取某日的流日四化 4 顆星 (祿/權/科/忌 順序)
+ * 複用 calculateDayHourOverlay 的計算, 抽出 sihua 的 star name array
+ * @param {object} chart  calculateChart 輸出
+ * @param {number} year, month, day
+ * @returns {string[]|null}  [祿星, 權星, 科星, 忌星] 或 null
+ */
+export function getDailySihuaStars(chart, year, month, day) {
+  const overlay = calculateDayHourOverlay(chart, year, month, day);
+  if (!overlay?.daily?.sihua?.length) return null;
+  return overlay.daily.sihua.map(s => s.star);
+}

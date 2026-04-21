@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import './i18n.js';
 import './WizardApp.css';
-import { calculateChart, formatChart, formatChartCompact, formatChartByTianGan, calculateTransitOverlay, calculateDayHourOverlay } from "./ziwei-calc.js";
+import { calculateChart, formatChart, formatChartCompact, formatChartByTianGan, calculateTransitOverlay, calculateDayHourOverlay, getMonthlySihuaStars, getDailySihuaStars } from "./ziwei-calc.js";
 import { calculateCrossSihua } from "./crosssihua.js";
 import { calculateBazi, formatBazi, formatBaziCompact } from "./bazi-calc.js";
 import { calculateAstro, formatAstro, formatAstroCompact } from "./astro-calc.js";
@@ -939,6 +939,10 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [twinType, setTwinType] = useState(saved?.twinType ?? "");
   const [hebanAnalyzing, setHebanAnalyzing] = useState(false);
   const [hebanResult, setHebanResult] = useState(saved?.hebanResult ?? "");
+  // 合盤子模式: basic / monthly / timed (L5 / L6). 月度/擇吉需對方時辰 + 目標月或日
+  const [hebanMode, setHebanMode] = useState(saved?.hebanMode ?? "basic");
+  const [hebanTargetMonth, setHebanTargetMonth] = useState(saved?.hebanTargetMonth ?? String(new Date().getMonth() + 1));
+  const [hebanTargetDay, setHebanTargetDay] = useState(saved?.hebanTargetDay ?? String(new Date().getDate()));
 
   const [activeReadingId, setActiveReadingId] = useState(saved?.activeReadingId ?? null);
   const [chatHistory, setChatHistory] = useState(saved?.chatHistory ?? []);
@@ -1624,6 +1628,7 @@ ${question}
       hebanResult, hebanRelation, hebanName, hebanGender,
       hebanYear, hebanMonth, hebanDay, hebanHour, hebanMinute,
       showHeban,
+      hebanMode, hebanTargetMonth, hebanTargetDay,
       // 追問
       chatHistory,
       activeReadingId,
@@ -1730,6 +1735,9 @@ ${question}
     if (s.hebanHour) setHebanHour(s.hebanHour);
     if (s.hebanMinute) setHebanMinute(s.hebanMinute);
     if (s.showHeban) setShowHeban(s.showHeban);
+    if (s.hebanMode) setHebanMode(s.hebanMode);
+    if (s.hebanTargetMonth) setHebanTargetMonth(s.hebanTargetMonth);
+    if (s.hebanTargetDay) setHebanTargetDay(s.hebanTargetDay);
     // 追問
     if (s.chatHistory) setChatHistory(s.chatHistory);
   };
@@ -2335,21 +2343,48 @@ ${transitOverlay?.summary || ''}
       );
 
       let crossSihuaBlock = "";
+      let modeDirective = "";
       try {
-        const crossLevels = hasPartnerTime
+        const baseLevels = hasPartnerTime
           ? ["natal", "palace", "decadal", "yearly"]
           : ["natal"];
         const me = wizardUser?.name || "本人";
         const them = hebanName || "對方";
-        const cross = calculateCrossSihua(myChartObj, partnerChartObj, {
-          levels: crossLevels,
-          nameA: me,
-          nameB: them,
-        });
+        const crossOpts = { levels: baseLevels, nameA: me, nameB: them };
+        const currentYear = new Date().getFullYear();
+
+        if (hebanMode === "monthly" && hasPartnerTime) {
+          const m = parseInt(hebanTargetMonth);
+          if (m >= 1 && m <= 12) {
+            const aSt = getMonthlySihuaStars(myChartObj, m);
+            const bSt = getMonthlySihuaStars(partnerChartObj, m);
+            if (aSt && bSt) {
+              crossOpts.levels = [...baseLevels, "monthly"];
+              crossOpts.monthlySihua = { a: aSt, b: bSt };
+              crossOpts.monthlyLabel = `${currentYear}年${m}月`;
+              modeDirective = `\n本次分析聚焦於 ${currentYear} 年 ${m} 月的關係動態, 請以該月流月飛化為重點時間軸 (其他層為背景)。`;
+            }
+          }
+        } else if (hebanMode === "timed" && hasPartnerTime) {
+          const m = parseInt(hebanTargetMonth);
+          const d = parseInt(hebanTargetDay);
+          if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+            const aSt = getDailySihuaStars(myChartObj, currentYear, m, d);
+            const bSt = getDailySihuaStars(partnerChartObj, currentYear, m, d);
+            if (aSt && bSt) {
+              crossOpts.levels = [...baseLevels, "daily"];
+              crossOpts.dailySihua = { a: aSt, b: bSt };
+              crossOpts.dailyLabel = `${currentYear}/${m}/${d}`;
+              modeDirective = `\n本次為擇吉合盤, 鎖定 ${currentYear}/${m}/${d} 這天. 請以流日飛化為主判據 (回答「這天見面/決定/約會」等具體情境適不適合, 有哪些加持或阻力)。`;
+            }
+          }
+        }
+
+        const cross = calculateCrossSihua(myChartObj, partnerChartObj, crossOpts);
         crossSihuaBlock = `\n\n${cross.summary}\n`;
       } catch (e) {
         console.warn("[heban] crosssihua failed:", e);
-        trackEvent("heban_crosssihua_failed", { error: e.message });
+        trackEvent("heban_crosssihua_failed", { error: e.message, mode: hebanMode });
       }
 
       // Resolve relation display text (always Chinese for AI prompt)
@@ -2374,7 +2409,7 @@ ${partnerCharts}
 ${crossSihuaBlock}
 ## 任務
 請根據兩人的紫微斗數命盤分析這兩人作為「${hebanRelationZh}」的關係。
-${crossSihuaBlock ? "上方「交叉飛化分析」是程式精算的結果, 直接引用其中的四化飛入關係做推論, 不要自己重推飛化; 你的工作是把這些飛入點轉為自然語言的關係描述。" : ""}
+${crossSihuaBlock ? "上方「交叉飛化分析」是程式精算的結果, 直接引用其中的四化飛入關係做推論, 不要自己重推飛化; 你的工作是把這些飛入點轉為自然語言的關係描述。" : ""}${modeDirective}
 ${hasPartnerTime
   ? "重點分析：雙方命盤的宮位飛化互動、四化交叉影響、主星搭配的互補或衝突。"
   : "對方無出生時間，請以對方的生年天干四化為核心，分析其四化星落入哪些宮位的主星、這些能量如何與本人的命盤產生互動。重點看生年四化的祿忌落宮與本人的對應宮位關係。"}
@@ -3644,6 +3679,61 @@ ${hebanRelation === "relations.twin" ? `
                 </button>
               ) : (
                 <div className="wizard-heban-form">
+                  <div className="wizard-heban-label">{t('result.hebanMode', { defaultValue: '合盤模式' })}</div>
+                  <div className="wizard-heban-relations">
+                    <button className={`wizard-heban-rel-btn ${hebanMode === "basic" ? "selected" : ""}`}
+                      onClick={() => setHebanMode("basic")}>
+                      {t('result.hebanModeBasic', { defaultValue: '基礎合盤' })}
+                    </button>
+                    <button className={`wizard-heban-rel-btn ${hebanMode === "monthly" ? "selected" : ""}`}
+                      onClick={() => setHebanMode("monthly")}>
+                      {t('result.hebanModeMonthly', { defaultValue: '合盤月度' })}
+                    </button>
+                    <button className={`wizard-heban-rel-btn ${hebanMode === "timed" ? "selected" : ""}`}
+                      onClick={() => setHebanMode("timed")}>
+                      {t('result.hebanModeTimed', { defaultValue: '合盤擇吉' })}
+                    </button>
+                  </div>
+
+                  {hebanMode === "monthly" && (
+                    <>
+                      <div className="wizard-heban-label">{t('result.hebanTargetMonth', { defaultValue: '聚焦月份 (今年)' })}</div>
+                      <select className="wizard-select" value={hebanTargetMonth}
+                        onChange={e => setHebanTargetMonth(e.target.value)}
+                        style={{ maxWidth: 140, marginBottom: 16 }}>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                          <option key={m} value={m}>{m} 月</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+
+                  {hebanMode === "timed" && (
+                    <>
+                      <div className="wizard-heban-label">{t('result.hebanTargetDate', { defaultValue: '擇吉日期 (今年)' })}</div>
+                      <div className="wizard-date-row" style={{ marginBottom: 16, maxWidth: 260 }}>
+                        <div className="wizard-select-wrap">
+                          <label>{t('birth.month')}</label>
+                          <select className="wizard-select" value={hebanTargetMonth}
+                            onChange={e => setHebanTargetMonth(e.target.value)}>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="wizard-select-wrap">
+                          <label>{t('birth.day')}</label>
+                          <select className="wizard-select" value={hebanTargetDay}
+                            onChange={e => setHebanTargetDay(e.target.value)}>
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   <div className="wizard-heban-label">{t('result.hebanRelation')}</div>
                   <div className="wizard-heban-relations">
                     {RELATIONS.map(r => (

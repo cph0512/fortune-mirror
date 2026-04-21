@@ -6,7 +6,7 @@
  * Two hardcoded birth inputs to avoid any test framework; verifies shape +
  * a couple of invariants on L1-L4 flights.
  */
-import { calculateChart } from "./src/ziwei-calc.js";
+import { calculateChart, getMonthlySihuaStars, getDailySihuaStars } from "./src/ziwei-calc.js";
 import { calculateCrossSihua, __internals } from "./src/crosssihua.js";
 
 const { DI_ZHI, HUA_ORDER } = __internals;
@@ -89,7 +89,45 @@ const l5flights = withMonthly.flights.aToB.filter(f => f.layer === "L5");
 assert(l5flights.length <= 4, `L5 A→B ≤ 4 (got ${l5flights.length})`);
 assert(withMonthly.summary.includes("2026年5月"), "L5 summary includes label");
 
+// --- Real L5/L6 via helpers (integration with ziwei-calc) ---
+const mayStars = getMonthlySihuaStars(chartA, 5);
+assert(Array.isArray(mayStars) && mayStars.length === 4, `getMonthlySihuaStars returns 4 stars (got ${mayStars?.length})`);
+const junStars = getMonthlySihuaStars(chartA, 6);
+assert(Array.isArray(junStars) && junStars.length === 4, `getMonthlySihuaStars month=6 returns 4 stars`);
+assert(JSON.stringify(mayStars) !== JSON.stringify(junStars), `May vs June stars differ (五虎遁 works)`);
+
+const dayStars = getDailySihuaStars(chartA, 2026, 5, 15);
+assert(Array.isArray(dayStars) && dayStars.length === 4, `getDailySihuaStars returns 4 stars (got ${dayStars?.length})`);
+
+const realL5 = calculateCrossSihua(chartA, chartB, {
+  levels: ["natal", "palace", "decadal", "yearly", "monthly"],
+  monthlySihua: {
+    a: getMonthlySihuaStars(chartA, 6),
+    b: getMonthlySihuaStars(chartB, 6),
+  },
+  monthlyLabel: "2026年6月",
+  nameA: "阿明", nameB: "小美",
+});
+assert(realL5.summary.includes("2026年6月"), "real L5 helper summary has month label");
+const realL5flights = [...realL5.flights.aToB, ...realL5.flights.bToA].filter(f => f.layer === "L5");
+assert(realL5flights.length > 0, `real L5 produced flights (got ${realL5flights.length})`);
+
+const realL6 = calculateCrossSihua(chartA, chartB, {
+  levels: ["natal", "palace", "decadal", "yearly", "daily"],
+  dailySihua: {
+    a: getDailySihuaStars(chartA, 2026, 5, 15),
+    b: getDailySihuaStars(chartB, 2026, 5, 15),
+  },
+  dailyLabel: "2026/5/15",
+  nameA: "阿明", nameB: "小美",
+});
+assert(realL6.summary.includes("2026/5/15"), "real L6 helper summary has date label");
+const l6flights = [...realL6.flights.aToB, ...realL6.flights.bToA].filter(f => f.layer === "L6");
+assert(l6flights.length > 0, `real L6 produced flights (got ${l6flights.length})`);
+
 console.log("\n--- Summary sample (L1-L4) ---");
 console.log(res.summary.slice(0, 800));
 console.log("\n...(truncated)\n");
 console.log(`Total flights: A→B=${res.flights.aToB.length}, B→A=${res.flights.bToA.length}`);
+console.log(`L5 flights (both dir): ${realL5flights.length}`);
+console.log(`L6 flights (both dir): ${l6flights.length}`);
