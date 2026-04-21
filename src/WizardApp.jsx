@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import './i18n.js';
 import './WizardApp.css';
 import { calculateChart, formatChart, formatChartCompact, formatChartByTianGan, calculateTransitOverlay, calculateDayHourOverlay } from "./ziwei-calc.js";
+import { calculateCrossSihua } from "./crosssihua.js";
 import { calculateBazi, formatBazi, formatBaziCompact } from "./bazi-calc.js";
 import { calculateAstro, formatAstro, formatAstroCompact } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
@@ -2310,13 +2311,45 @@ ${transitOverlay?.summary || ''}
 
       const partnerGender = hebanGender || (gender === "男" ? "女" : "男");
       let partnerCharts = "";
+      let partnerChartObj = null;
 
       if (hasPartnerTime) {
-        const pZiwei = formatChartCompact(calculateChart(y2, m2, d2, h2, 0, partnerGender));
-        partnerCharts = `【紫微斗數】\n${pZiwei}`;
+        const pChart = calculateChart(y2, m2, d2, h2, 0, partnerGender);
+        partnerChartObj = pChart;
+        partnerCharts = `【紫微斗數】\n${formatChartCompact(pChart)}`;
       } else {
         const tianGanChart = formatChartByTianGan(y2, m2, d2, partnerGender);
         partnerCharts = tianGanChart;
+        // No precise hour → partner palace layout unreliable. Still compute a chart
+        // at noon so we can surface natal 四化 交叉, but skip L2/L3/L4 cross-sihua
+        // since those depend on accurate palace placement.
+        partnerChartObj = calculateChart(y2, m2, d2, 12, 0, partnerGender);
+      }
+
+      // Compute user chart fresh for cross-sihua. Uses raw birth time (not TST
+      // corrected) to match the partner side — relationship structure is far less
+      // time-sensitive than main-analysis 疊宮, so this is acceptable.
+      const myChartObj = calculateChart(
+        parseInt(birthYear), parseInt(birthMonth), parseInt(birthDay),
+        parseInt(birthHour) || 12, parseInt(birthMinute) || 0, gender,
+      );
+
+      let crossSihuaBlock = "";
+      try {
+        const crossLevels = hasPartnerTime
+          ? ["natal", "palace", "decadal", "yearly"]
+          : ["natal"];
+        const me = wizardUser?.name || "本人";
+        const them = hebanName || "對方";
+        const cross = calculateCrossSihua(myChartObj, partnerChartObj, {
+          levels: crossLevels,
+          nameA: me,
+          nameB: them,
+        });
+        crossSihuaBlock = `\n\n${cross.summary}\n`;
+      } catch (e) {
+        console.warn("[heban] crosssihua failed:", e);
+        trackEvent("heban_crosssihua_failed", { error: e.message });
       }
 
       // Resolve relation display text (always Chinese for AI prompt)
@@ -2338,9 +2371,10 @@ ${myCharts}
 ${hasPartnerTime ? "（有完整出生時間，可做完整飛化交叉分析）" : "（無出生時間，以生年天干四化和主星分佈推算宮位影響，命宮位置不確定）"}
 
 ${partnerCharts}
-
+${crossSihuaBlock}
 ## 任務
 請根據兩人的紫微斗數命盤分析這兩人作為「${hebanRelationZh}」的關係。
+${crossSihuaBlock ? "上方「交叉飛化分析」是程式精算的結果, 直接引用其中的四化飛入關係做推論, 不要自己重推飛化; 你的工作是把這些飛入點轉為自然語言的關係描述。" : ""}
 ${hasPartnerTime
   ? "重點分析：雙方命盤的宮位飛化互動、四化交叉影響、主星搭配的互補或衝突。"
   : "對方無出生時間，請以對方的生年天干四化為核心，分析其四化星落入哪些宮位的主星、這些能量如何與本人的命盤產生互動。重點看生年四化的祿忌落宮與本人的對應宮位關係。"}
