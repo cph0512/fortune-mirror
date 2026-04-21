@@ -151,6 +151,98 @@ function saveKB(entries) {
 const API_BACKEND = IS_OAI
   ? `${ORIGIN}/api/fortune`
   : "https://fortune-api-64kdjyxhpq-de.a.run.app/api/fortune";
+
+// ============================================================
+// Admin-facing activity labels (Pro admin is zh-TW only)
+// Raw event keys (select_gender, chat_question, decision_started, ...) come
+// from trackEvent() calls across the app. The admin panel is hard to read if
+// we dump the raw keys, so translate here. Unknown keys fall back to raw so
+// new events still show up — just without a pretty label.
+// ============================================================
+const ADMIN_ACTION_LABELS = {
+  register: "註冊",
+  login: "登入",
+  start_analysis: "開始分析",
+  analysis_complete: "分析完成",
+  select_gender: "選擇性別",
+  select_goal: "選擇目標",
+  chat_question: "追問問題",
+  "追問": "追問問題",
+  ask_question_clicked: "點「問事」",
+  chart_saved: "儲存命盤",
+  chart_discarded: "不儲存命盤",
+  start_heban: "開始合盤",
+  unlock_monthly_clicked: "點月份解鎖",
+  unlock_monthly_confirmed: "確認解鎖",
+  unlock_monthly_dismissed: "取消解鎖",
+  decision_started: "開始決策建議",
+  decision_type_detected: "決策分類",
+  decision_blocked: "決策攔截",
+  decision_completed: "決策完成",
+  decision_need_date: "補日期",
+  decision_need_chart: "補選命盤",
+};
+
+const ADMIN_GOAL_LABELS = {
+  "goal.love": "感情與姻緣",
+  "goal.career": "事業與升遷",
+  "goal.wealth": "財富與投資",
+  "goal.health": "健康與養生",
+  "goal.general": "全面綜合",
+  "goal.loveSingle": "感情（單身）",
+  "goal.loveMarried": "感情（已婚）",
+  "decision": "決策建議",
+  "heban": "合盤解讀",
+  "family": "家族命盤",
+};
+
+const ADMIN_DETAIL_KEY_LABELS = {
+  gender: "性別",
+  goal: "目標",
+  sub: "細項",
+  question: "問題",
+  type: "類型",
+  email: "Email",
+  name: "姓名",
+  options: "選項數",
+  resultLength: "結果長度",
+  reason: "原因",
+  month: "月份",
+  source: "來源",
+  chart_id: "命盤ID",
+  has_chart: "已選命盤",
+  has_prior_reading: "有歷史",
+  is_primary: "本命盤",
+  entry: "入口",
+  available: "可選命盤數",
+  error: "錯誤",
+};
+
+function adminFormatAction(key) {
+  return ADMIN_ACTION_LABELS[key] || key || "";
+}
+
+function adminFormatDetailValue(key, value) {
+  if (value === null || value === undefined) return "";
+  if (key === "goal" && typeof value === "string" && ADMIN_GOAL_LABELS[value]) return ADMIN_GOAL_LABELS[value];
+  if (typeof value === "boolean") return value ? "是" : "否";
+  if (typeof value === "object") {
+    try { return JSON.stringify(value); } catch { return String(value); }
+  }
+  const s = String(value);
+  return s.length > 120 ? s.slice(0, 120) + "…" : s;
+}
+
+function adminFormatDetail(detail) {
+  if (!detail) return "";
+  if (typeof detail === "string") return detail.length > 140 ? detail.slice(0, 140) + "…" : detail;
+  if (typeof detail !== "object") return String(detail);
+  const entries = Object.entries(detail);
+  if (!entries.length) return "";
+  return entries
+    .map(([k, v]) => `${ADMIN_DETAIL_KEY_LABELS[k] || k}：${adminFormatDetailValue(k, v)}`)
+    .join(" · ");
+}
 const API_ACTIVITY = API_BACKEND.replace("/fortune", "/fortune-activity");
 
 function logActivity(user, action, detail) {
@@ -1976,9 +2068,9 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                         <div key={i} className="activity-item">
                           <div className="activity-time">{a.time ? new Date(a.time).toLocaleString("zh-TW") : ""}</div>
                           <div className="activity-main">
-                            <span className="activity-action">{a.action}</span>
+                            <span className="activity-action">{adminFormatAction(a.action)}</span>
                           </div>
-                          {a.detail && <div className="activity-detail">{a.detail}</div>}
+                          {a.detail && <div className="activity-detail">{adminFormatDetail(a.detail)}</div>}
                         </div>
                       ))}
                     </div>
@@ -2059,7 +2151,7 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                       {v.event_count} 個事件 · 首次：{v.first_seen ? new Date(v.first_seen).toLocaleString("zh-TW") : "?"} · 最後：{v.last_seen ? new Date(v.last_seen).toLocaleString("zh-TW") : "?"}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>
-                      {v.actions?.slice(-5).join(" → ")}
+                      {v.actions?.slice(-5).map(adminFormatAction).join(" → ")}
                     </div>
                   </div>
                 ))}
@@ -2080,12 +2172,12 @@ ${question || "請分析兩人的整體緣分和互動模式"}
                   {(selectedVisitor.events || []).map((evt, i) => (
                     <div key={i} className="save-card" style={{ padding: "8px 12px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>{evt.action}</span>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{adminFormatAction(evt.action)}</span>
                         <span style={{ fontSize: 11, color: "var(--text-dim)" }}>{evt.ts ? new Date(evt.ts).toLocaleString("zh-TW") : ""}</span>
                       </div>
-                      {evt.detail && Object.keys(evt.detail).length > 0 && (
+                      {evt.detail && (typeof evt.detail === "string" ? evt.detail : Object.keys(evt.detail).length > 0) && (
                         <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>
-                          {Object.entries(evt.detail).map(([k, v]) => `${k}: ${typeof v === "string" ? v.slice(0, 100) : JSON.stringify(v)}`).join(" · ")}
+                          {adminFormatDetail(evt.detail)}
                         </div>
                       )}
                     </div>
