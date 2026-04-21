@@ -342,16 +342,24 @@ ${m.charts.astro}
       // Cross-sihua L1-L4: protagonist vs each other member, bidirectional.
       // Upstream audit found Family analysis asked the LLM to infer 飛化 from
       // raw chart text — now we pre-compute the flights deterministically.
+      // Ensure every member (incl. protagonist) has rawZiwei before cross-sihua.
+      // Members loaded from pre-Phase-2d localStorage / server saves only carry
+      // the formatted text, so we regenerate on the fly whenever the raw chart
+      // object is missing. Without this step the loop silently skips every
+      // member and the block is empty → prompt falls back to the A/B/C
+      // self-compute instruction, defeating the whole point.
+      function ensureRawZiwei(m) {
+        if (m?.charts?.rawZiwei) return m;
+        if (!m?.year || !m?.month || !m?.day) return m;
+        m.charts = generateCharts(m);
+        return m;
+      }
+      ensureRawZiwei(proto);
+      for (const m of otherMembers) ensureRawZiwei(m);
+
       let crossSihuaBlock = "";
       try {
-        // Protagonist may arrive without rawZiwei if restored from server (server
-        // saves strip the chart object). Regenerate on the fly so cross-sihua
-        // has something to work with.
-        let protoChart = proto.charts?.rawZiwei;
-        if (!protoChart && proto.year && proto.month && proto.day) {
-          proto.charts = generateCharts(proto);
-          protoChart = proto.charts.rawZiwei;
-        }
+        const protoChart = proto.charts?.rawZiwei;
         if (protoChart) {
           const pieces = [];
           for (const m of otherMembers) {
@@ -367,6 +375,13 @@ ${m.charts.astro}
           if (pieces.length) {
             crossSihuaBlock = `\n\n===== 家族成員交叉飛化（程式精算，非 AI 推測）=====\n\n${pieces.join("\n\n")}\n`;
           }
+        }
+        if (!crossSihuaBlock) {
+          console.warn("[family] crosssihua block empty", {
+            hasProtoChart: !!proto.charts?.rawZiwei,
+            otherCount: otherMembers.length,
+            membersWithChart: otherMembers.filter(m => m.charts?.rawZiwei).length,
+          });
         }
       } catch (e) {
         console.warn("[family] crosssihua failed:", e);
