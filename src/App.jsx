@@ -735,18 +735,48 @@ function MainApp({ auth, isAdmin, onLogout }) {
     } catch {}
   };
   const loadVisitorList = async () => {
+    // Backend /api/fortune-track returns a flat event stream; the UI wants
+    // per-visitor cards with event_count / first_seen / last_seen / actions,
+    // so group client-side. Avoids adding a new backend endpoint just for
+    // this admin view.
     try {
-      const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-track")}`);
-      const data = await res.json();
-      setVisitorList(Array.isArray(data) ? data : []);
-    } catch {}
+      const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-track")}?limit=2000`);
+      const events = await res.json();
+      if (!Array.isArray(events)) { setVisitorList([]); return; }
+      const byVisitor = new Map();
+      for (const e of events) {
+        const vid = e.visitor_id || "(unknown)";
+        let v = byVisitor.get(vid);
+        if (!v) {
+          v = {
+            visitor_id: vid,
+            user: e.user || null,
+            user_name: e.user_name || null,
+            event_count: 0,
+            first_seen: e.ts,
+            last_seen: e.ts,
+            actions: [],
+            events: [],
+          };
+          byVisitor.set(vid, v);
+        }
+        v.event_count++;
+        if (e.ts && (!v.first_seen || e.ts < v.first_seen)) v.first_seen = e.ts;
+        if (e.ts && (!v.last_seen  || e.ts > v.last_seen))  v.last_seen  = e.ts;
+        v.actions.push(e.action);
+        v.events.push(e);
+        if (e.user && !v.user) v.user = e.user;
+        if (e.user_name && !v.user_name) v.user_name = e.user_name;
+      }
+      const list = Array.from(byVisitor.values()).sort((a, b) => (b.last_seen || "").localeCompare(a.last_seen || ""));
+      setVisitorList(list);
+    } catch (e) { console.warn("[admin] loadVisitorList failed:", e); setVisitorList([]); }
   };
   const loadVisitorDetail = async (vid) => {
-    try {
-      const res = await fetch(`${API_BACKEND.replace("/api/fortune", "/api/fortune-track/" + vid)}`);
-      const data = await res.json();
-      setSelectedVisitor(data);
-    } catch {}
+    // Reuse the grouped buffer — each visitor object already carries its
+    // events[] from loadVisitorList.
+    const v = visitorList.find(x => x.visitor_id === vid);
+    setSelectedVisitor(v || null);
   };
   const fileInputRef = useRef(null);
 
