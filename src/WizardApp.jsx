@@ -2879,11 +2879,17 @@ ${hebanRelation === "relations.twin" ? `
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
                                     {(() => {
-                                      let raw = r.goal || r.goalPrompt || '';
-                                      const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
-                                      if (baseKey.startsWith('goal.')) return t(baseKey);
-                                      if (raw.startsWith('合盤')) return raw;
-                                      return raw || t('history.analysis');
+                                      let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim();
+                                      if (k === 'heban') return t('account.featureHeban');
+                                      if (k === 'decision') {
+                                        const q = r.goalPrompt || '';
+                                        const short = q.length > 24 ? q.slice(0, 24) + '…' : q;
+                                        return `🎯 ${t('decision.cta', { defaultValue: '決策建議' })}${short ? '：' + short : ''}`;
+                                      }
+                                      if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length);
+                                      if (k.startsWith('goal.')) return t(k);
+                                      if (k.startsWith('合盤')) return k;
+                                      return k || t('history.analysis');
                                     })()}
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2954,10 +2960,16 @@ ${hebanRelation === "relations.twin" ? `
                         <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openHistoryCard(r)}>
                           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
                             {(() => {
-                              let raw = r.goal || r.goalPrompt || '';
-                              const baseKey = raw.replace(/\s*\(chat\)\s*/g, '').trim();
-                              if (baseKey.startsWith('goal.')) return t(baseKey);
-                              return raw || t('history.analysis');
+                              let k = (r.goal || r.goalPrompt || '').replace(/\s*\(chat\)\s*/g, '').trim();
+                              if (k === 'heban') return t('account.featureHeban');
+                              if (k === 'decision') {
+                                const q = r.goalPrompt || '';
+                                const short = q.length > 24 ? q.slice(0, 24) + '…' : q;
+                                return `🎯 ${t('decision.cta', { defaultValue: '決策建議' })}${short ? '：' + short : ''}`;
+                              }
+                              if (k.startsWith('goal.') && k.endsWith('Prompt')) k = k.slice(0, -'Prompt'.length);
+                              if (k.startsWith('goal.')) return t(k);
+                              return k || t('history.analysis');
                             })()}
                             {r.birthData?.year ? ` — ${r.birthData.year}/${r.birthData.month}/${r.birthData.day}` : ''}
                           </div>
