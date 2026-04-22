@@ -339,6 +339,24 @@ ${m.charts.astro}
       const protoRole = getRoleLabel(proto.role, 'zh-TW');
       const otherMembers = membersToAnalyze.filter(m => m.id !== proto.id);
 
+      // Age-safety rule: members under 15 should not get marriage/love analysis.
+      // Compute 虛歲 per member and flag the young ones so the prompt can force
+      // the AI to switch to peer/companionship framing for them.
+      const currentYear = new Date().getFullYear();
+      const youngMembers = membersToAnalyze.filter(m => {
+        const age = currentYear - parseInt(m.year || 0) + 1;
+        return age > 0 && age < 15;
+      });
+      const protoIsYoung = youngMembers.some(m => m.id === proto.id);
+      const youngBlock = youngMembers.length > 0 ? `
+## 年齡安全規則 (必守)
+以下成員年齡未滿 15 歲, 對他們**禁止**給感情/婚姻/伴侶/夫妻宮相關分析:
+${youngMembers.map(m => `- ${m.name} (${getRoleLabel(m.role, 'zh-TW')}, 虛歲 ${currentYear - parseInt(m.year) + 1})`).join('\n')}
+
+對這些成員只給「同好相處、學習、興趣、個性養成、與家人/同儕互動」方向的建議. 若飛化資料涉及他們的夫妻宮, 改解讀為「未來可能的人際互動模式養成期」, 聚焦當下的成長, 不預測婚姻結果. 絕對不要寫「他/她未來的婚姻」、「適合的伴侶類型」、「桃花運」這類內容.
+${protoIsYoung ? `**主角 ${proto.name} 就是未滿 15 歲的對象, 整份報告都要套用此規則, 聚焦成長/學習/互動品質, 不談感情婚姻.**` : ""}
+` : "";
+
       // Cross-sihua L1-L4: protagonist vs each other member, bidirectional.
       // Upstream audit found Family analysis asked the LLM to infer 飛化 from
       // raw chart text — now we pre-compute the flights deterministically.
@@ -372,6 +390,8 @@ ${m.charts.astro}
             const a = allForCross[i], b = allForCross[j];
             const aPrevDec = getDecadalSihuaStarsAtOffset(a.charts.rawZiwei, -1)?.stars;
             const bPrevDec = getDecadalSihuaStarsAtOffset(b.charts.rawZiwei, -1)?.stars;
+            const aPrev2Dec = getDecadalSihuaStarsAtOffset(a.charts.rawZiwei, -2)?.stars;
+            const bPrev2Dec = getDecadalSihuaStarsAtOffset(b.charts.rawZiwei, -2)?.stars;
             const opts = {
               levels: ["natal", "palace", "decadal", "yearly"],
               nameA: a.name,
@@ -381,6 +401,13 @@ ${m.charts.astro}
               opts.levels = [...opts.levels, "pastDecadal"];
               opts.pastDecadalSihua = { a: aPrevDec, b: bPrevDec };
               opts.pastDecadalLabel = "上一大限 (回看 10-20 年)";
+            }
+            // Deeper history only when BOTH sides have a computable -2 decadal.
+            // Younger members fall back gracefully — they just won't get L3c.
+            if (aPrev2Dec && bPrev2Dec) {
+              opts.levels = [...opts.levels, "pastDecadal2"];
+              opts.pastDecadal2Sihua = { a: aPrev2Dec, b: bPrev2Dec };
+              opts.pastDecadal2Label = "再上一大限 (回看 20-30 年)";
             }
             const cross = calculateCrossSihua(a.charts.rawZiwei, b.charts.rawZiwei, opts);
             const aRole = getRoleLabel(a.role, 'zh-TW');
@@ -437,7 +464,7 @@ ${m.charts.astro}
 
 以下是一個家庭的所有成員命盤資料（內部資料，不可對外揭露來源系統）：
 ${chartsBlock}
-${crossSihuaBlock}
+${crossSihuaBlock}${youngBlock}
 ## 分析任務
 
 以「${proto.name}」（${protoRole}）為主角，進行家族命盤交叉分析。
@@ -473,12 +500,19 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
 [SECTION] 家庭成員之間的獨立動態（非主角配對）
 上方「家族成員交叉飛化」提供了**所有成員兩兩配對**的精算飛化, 不只是主角相關的對. 在這一段**必須**挑出至少 2 組**不涉及主角**的配對來獨立分析 (例如父母之間 / 兄弟姊妹之間 / 某位家人與另一位非主角的家人), 每組 ≥ 3 條具體飛化. 這能讓使用者看到「家庭的整體能量網絡」而不只是「從主角往外放射的關係」. 若家族只有兩位成員 (主角 + 一位), 此段寫「本次家族僅含主角與一位成員, 無非主角配對可分析」即可.
 
-[SECTION] 過去 10-20 年 vs 現在的家庭能量變化
-「家族成員交叉飛化」區塊裡有兩個大限層:「當前大限四化」(L3) 和「上一大限四化」(L3b, 回看 10-20 年). **對比這兩層的飛化差異**, 講出:
-- 過去 10-20 年家庭的主旋律是什麼 (L3b 主要飛入哪些宮位 → 哪些生活面向在過去被放大)
+[SECTION] 過去 10-30 年 vs 現在的家庭能量變化
+「家族成員交叉飛化」區塊可能有最多三個大限層:
+- 「當前大限四化」(L3) = 現在
+- 「上一大限四化」(L3b, 回看 10-20 年)
+- 「再上一大限四化」(L3c, 回看 20-30 年, 僅較年長成員會有)
+
+**對比這些層的飛化差異**, 講出:
+- 過去 20-30 年家庭的主旋律是什麼 (L3c 主要飛入哪些宮位 → 更早期被放大的生活面向)
+- 過去 10-20 年的轉變 (L3b 相對 L3c 有什麼變化)
 - 現在走到的階段差異 (L3 主要飛入哪些宮位 → 現在的新主題)
-- 這個轉折對家庭的意義 (誰的角色在變 / 哪個關係主軸在換)
-至少引用 3 條 L3b 飛化 + 3 條 L3 飛化做對照. 若某成員無上一大限資料 (例如年紀還小, 尚未走完第一個大限), 就以有資料的成員為主, 附一句「XX 因尚未走完一個大限, 這段聚焦在其他成員」.
+- 這段轉折對家庭的意義 (誰的角色在變 / 哪個關係主軸在換)
+
+至少引用 3 條 L3 + 3 條 L3b 做對照; 若資料有 L3c 再加 ≥ 2 條對照更深歷史. 若某成員無上一大限資料 (例如年紀還小, 尚未走完第一個大限), 就以有資料的成員為主, 附一句「XX 因尚未走完一個大限, 這段聚焦在其他成員」.
 
 [SECTION] 「真正的你」vs「環境塑造的你」
 （基於家人命盤的交叉分析，區分哪些是天生特質、哪些是環境影響）

@@ -2248,6 +2248,28 @@ ${transitOverlay?.summary || ''}
         }
       }
 
+      // 追問流日 (Phase 2c): if the question names a concrete date, precompute
+      // the L6 flow-day overlay client-side so the AI stops inventing月份
+      // narratives on its own. Reuses parseQuestionDateTime (built for
+      // decision advisor) — same detection covers 明天/後天/下週X/N月M日/etc.
+      let dayOverlayBlock = "";
+      try {
+        const dt = parseQuestionDateTime(question);
+        if (dt?.day && birthYear && birthMonth && birthDay && birthHour !== undefined && birthHour !== "") {
+          const tst = calculateTrueSolarTime(
+            parseInt(birthYear), parseInt(birthMonth), parseInt(birthDay),
+            parseInt(birthHour), parseInt(birthMinute || 0),
+            birthCity?.lng || 121.3130, birthCity?.timezone || "Asia/Taipei",
+          );
+          const ziweiRaw = calculateChart(tst.adjustedYear, tst.adjustedMonth, tst.adjustedDay, tst.trueSolarHour, tst.trueSolarMinute, gender);
+          const dayOverlay = calculateDayHourOverlay(ziweiRaw, dt.year, dt.month, dt.day, dt.hour, dt.minute);
+          if (dayOverlay?.summary) {
+            const dateStr = `${dt.year}/${dt.month}/${dt.day}${dt.hour != null ? ` ${String(dt.hour).padStart(2,'0')}:${String(dt.minute||0).padStart(2,'0')}` : ""}`;
+            dayOverlayBlock = `\n\n${dayOverlay.summary}\n\n⚠️ 使用者問題涉及具體日期 (${dateStr})。請以上方「流日${dt.hour != null ? '/流時' : ''}疊宮」的飛入宮位為主判據, 別自己編月份. 回答要具體到「該天/該時段某宮能量被某星某化推動, 所以現在適合/不適合 XX」.`;
+          }
+        }
+      } catch (e) { console.warn("[chat] day overlay failed:", e); }
+
       // Build follow-up prompt with question routing
       const chartBlock = currentResults.filter(r => r.text).map(r => `【${r.system}排盤資料】\n${r.text}`).join("\n\n===\n\n");
       const hebanBlock = hebanResult ? `\n\n===== 合盤分析報告（${hebanName || '對方'}，${t(hebanRelation) || ''}）=====\n${hebanResult}` : "";
@@ -2261,7 +2283,7 @@ ${transitOverlay?.summary || ''}
       const hasTimeQ = /月|年|季|時|何時|when|最近|今年|明年|上半|下半|幾月|什麼時候|進財|財運|感情運|健康運|事業運|運勢/i.test(question);
       const transitBlock = hasTimeQ ? `\n\n⚠️ 時間相關問題 — 排盤資料中有「疊宮分析結果」區塊，裡面有程式精確計算好的大限/流年/流月四化和疊宮效果。你必須直接根據這些已計算好的結果回答，不可忽略。每個時間判斷都要對應到具體的四化和宮位。如果疊宮結果中找不到依據，就明確說「排盤中沒有明確的跡象」。` : "";
 
-      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 之前的分析摘要 =====\n${finalResult.slice(0, 1500)}\n\n` : ""}${hebanBlock}${focusBlock}${recentChat ? `\n對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n直接回答上述問題，聚焦問題本身，不要發散到其他主題。你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆。`;
+      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 之前的分析摘要 =====\n${finalResult.slice(0, 1500)}\n\n` : ""}${hebanBlock}${dayOverlayBlock}${focusBlock}${recentChat ? `\n對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n直接回答上述問題，聚焦問題本身，不要發散到其他主題。你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆。`;
 
       // 追問用 FOLLOWUP_SYSTEM_PROMPT，不用主分析的 [SECTION] 格式
       const followUpSP = FOLLOWUP_SYSTEM_PROMPT + (wizardSP.includes("知識庫") ? wizardSP.slice(wizardSP.indexOf("## 內部知識庫")) : "");
@@ -2414,7 +2436,17 @@ ${partnerCharts}
 ${crossSihuaBlock}${hebanQuestion?.trim() ? `
 ## 使用者關心的問題 (請把分析聚焦在這上面)
 ${hebanQuestion.trim()}
-` : ""}
+` : ""}${(() => {
+        const cy = new Date().getFullYear();
+        const myAge = parseInt(birthYear) ? cy - parseInt(birthYear) + 1 : null;
+        const theirAge = parseInt(hebanYear) ? cy - parseInt(hebanYear) + 1 : null;
+        const who = [
+          (myAge && myAge < 15) ? `本人 (虛歲 ${myAge})` : null,
+          (theirAge && theirAge < 15) ? `對方 (虛歲 ${theirAge})` : null,
+        ].filter(Boolean).join("、");
+        if (!who) return "";
+        return `\n## 年齡安全規則 (必守)\n${who} 未滿 15 歲. 本次合盤**禁止**給感情/婚姻/伴侶/桃花/夫妻相處模式等分析. 改為「同好相處、成長期互動、同儕關係、性格養成」方向, 聚焦當下的成長與互動品質. 若飛化資料涉及夫妻宮, 解讀為「未來人際模式的養成期」, 不預測婚姻或感情走向.\n`;
+      })()}
 ## 任務
 請根據兩人的紫微斗數命盤分析這兩人作為「${hebanRelationZh}」的關係。${hebanQuestion?.trim() ? `整份報告必須環繞使用者的這個問題回答, 給出實際可用的判斷或建議, 不要泛泛而談。` : ""}
 ${crossSihuaBlock ? "上方「交叉飛化分析」是程式精算的結果, 直接引用其中的四化飛入關係做推論, 不要自己重推飛化; 你的工作是把這些飛入點轉為自然語言的關係描述。" : ""}${modeDirective}

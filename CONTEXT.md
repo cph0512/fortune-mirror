@@ -5,11 +5,11 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 ---
 
 ## 🎯 Current State
-- **Status**: Phase 1 of pre-revenue audit **landed**. Frontend pushed (lab), 3 backends committed locally (需手動 deploy).
-- **Branch**: `lab`
-- **Lab / Test / OAI providers**: unchanged (Gemini 3.1 / Claude Opus 4 / GPT-5)
-- **Working on**: 等 test 站 deploy 驗證 KB_MODE=filtered 行為; 下一步進 Phase 2 (合盤 + Family 疊宮/交叉飛化)
-- **Next step**: (1) 手動 deploy fortune-sandbox & fortune-lab 到 Cloud Run, 重啟 fortune-oai on m4pro:8788; (2) 實作 `calculateCrossSihua` + `calculateDecadalOverlay`; (3) 接合盤/Family
+- **Status**: Phase 1 + Phase 2 (a-f) 全部 landed + 三站部署一致。收費前主要 infrastructure 到位。
+- **Branch**: `lab` (和 `main` 皆同步)
+- **Family 分析模型對齊**: test=Claude Opus 4 / lab=Gemini 3.1 Pro / oai=GPT-5 full (都升級自 default 了, family 穩定引用飛化)
+- **Working on**: 煙測 + 收費前 checklist (可選) / Phase 2d.2 深層大限 / 追問流日 (2c) 剛 ship 待驗
+- **Next step**: 使用者跑 smoke 測 3 個功能 (合盤月度/擇吉 × 站 / Family 切主角 + 深層大限 / 追問帶日期觸發流日)
 - **Blockers**: 舊 session 遺留 — 需手動 rotate 5 把 key + admin pw (外洩風險)
 - **Rollback tag**: `pre-source-map-fix-20260421` (四個 repo 都有)
 
@@ -73,6 +73,55 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 - **i18n**: 繁中 / English / 日本語 三語支援
 
 ## 📜 Session Log
+### 2026-04-22 00:30 (m4pro, claude) — Phase 2 sweep + family polish
+
+**crosssihua.js 擴完整**:
+- L1-L4 主骨 + L3b (上一大限) + L3c (再上一大限, 20-30 年回看) + L5 流月 + L6 流日
+- buildSummary 輸出 structured + narrative, 溫度標籤自動顯示 (e.g. 「當前大限甲子」「流年丙午」「上一大限(回看 10-20 年)」)
+- `getMonthlySihuaStars` / `getDailySihuaStars` / `getDecadalSihuaStarsAtOffset` 三個 helper 從 ziwei-calc 匯出
+
+**合盤 (Heban) 三模式上線 (Phase 2e)**:
+- `hebanMode`: basic / monthly / timed 三顆按鈕
+- monthly: 加 L5, 鎖定今年某月
+- timed: 加 L6, 鎖定某日 (擇吉用)
+- `hebanQuestion` 使用者問題欄位, 驅動 AI 聚焦 (Phase 2f)
+- 新增 `relations.boss` (上下屬), 拆出 career+wealth+timing+core KB topics
+- i18n 補完 zh-TW / en / ja 全部新 key
+
+**Family (Phase 2d) 徹底重構**:
+- `generateCharts` 同時 return rawZiwei chart object (不只 text), 供 cross-sihua 讀 siHua/feiHua/horoscope
+- `ensureRawZiwei` 在分析前為所有成員 (含主角) 補 rawZiwei, fix 了 localStorage legacy 成員缺 chart obj 的 silent bug
+- 全成員兩兩交叉 (C(N,2)), 非只主角-vs-each. 5 人家族: 4 對 → 10 對
+- 每對自動加 L3b (上一大限) + L3c (再上一大限) 當成員有足夠歷史
+- 結果頁新增「一鍵切主角」chip bar, 點任何成員自動重跑 (Phase 2d.4)
+- Family prompt 新增兩段強制 section:
+  1. **家庭成員之間的獨立動態** (非主角配對, 至少 2 組)
+  2. **過去 10-30 年 vs 現在的家庭能量變化** (L3/L3b/L3c 對比)
+- System prompt 從「禁止術語」反轉為「必須引用星名+四化 tag」(背後精算是靈魂, 不是要 AI 翻成抽象語言)
+
+**追問流日 (Phase 2c) 剛 ship**:
+- `sendChat` 偵測問題裡的具體日期 (parseQuestionDateTime, 複用 decision advisor 的), 有日期就即時算 L6 流日/流時 overlay 附到 prompt
+- AI 被強制以流日飛入宮位為主判據回答
+
+**決策 validator** (Phase 1):
+- `validateDecisionResponse` schema 守門 JSON 解析失敗或欄位不齊時 graceful fallback, 不再 blank screen
+
+**模型對齊** (穩定性, 收費前必做):
+- fortune-oai: job_type=="family" → DEEP_MODEL (GPT-5 full 而非 GPT-5-mini)
+- fortune-lab: job_type=="family" → DEEP_MODEL (Gemini 3.1 Pro 而非 flash-lite)
+- fortune-sandbox: default=deep 都是 Opus 本來就穩
+- KB_FALLBACK logger.warning 三後端 + 前端
+
+**Tag**: `pre-source-map-fix-20260421` (四 repo 回推點)
+
+**⚠️ 三站部署流程** (auto-deploy 會同步 fortune-lab/test-frontend 但 Cloud Run 仍要手動 deploy.sh):
+```
+# 每次 lab branch push 後:
+cd ~/fortune-sandbox && ./deploy.sh   # test.destinytelling.life
+cd ~/fortune-lab && ./deploy.sh       # lab.destinytelling.life
+launchctl kickstart -k gui/501/com.cph.oai-fortune  # oai (m4pro:8788)
+```
+
 ### 2026-04-21 21:50 (m4pro, claude) — Phase 1 of pre-revenue audit
 
 **收費前審計 → 產出 `docs/SOURCE_MAP.md`** (target state + gap + 4-phase 修正計畫)
