@@ -902,10 +902,12 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const currentLang = i18n.language || 'zh-TW';
   const changeLang = (lng) => {
     i18n.changeLanguage(lng);
-    // Save language preference to server for future sessions
+    // Save language preference to server for future sessions.
+    // Must use authHeaders() — /api/fortune-session enforces owner-bearer auth,
+    // so plain Content-Type headers were silently 401'd (smoke 2026-04-22).
     if (wizardUser?.email) {
       fetch(`${API_BASE}/api/fortune-session`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: authHeaders(),
         body: JSON.stringify({ user: wizardUser.email, session: { _lang: lng } }),
       }).catch(() => {});
     }
@@ -1077,11 +1079,21 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // so we can pre-compute the 流日/流時 overlay before sending to the LLM.
   // The LLM no longer needs to guess day stems; the prompt gets exact sihua.
   // Supported forms: "3/15", "3-15", "3月15日", optional "下午2 / 14:00 / 2pm".
-  const parseQuestionDateTime = (question) => {
+  // parseQuestionDateTime extracts a date from a natural-language question.
+  // `opts.bumpPastToFuture` (default true for historical decision-advisor
+  //    callers) auto-shifts past dates to the next year. Pass `false` from
+  //    follow-up chat so "去年" or "5 月 (已過)" stays in the actual past.
+  // Returns `{ year, month, day, hour, minute, dayExplicit }` or null.
+  //    `dayExplicit` lets callers distinguish day-level questions (enable L6
+  //    流日 overlay) from month-only questions (skip L6, let transitOverlay
+  //    handle the 12-month summary instead).
+  const parseQuestionDateTime = (question, opts = {}) => {
+    const { bumpPastToFuture = true } = opts;
     if (!question) return null;
     const now = new Date();
     const todayY = now.getFullYear(), todayM = now.getMonth() + 1, todayD = now.getDate();
     let y = null, m = null, d = null;
+    let dayExplicit = false;
 
     // 1. 相對日期 (zh/en/ja)
     const relMap = [
@@ -1095,6 +1107,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       if (rx.test(question)) {
         const target = new Date(todayY, todayM - 1, todayD + delta);
         y = target.getFullYear(); m = target.getMonth() + 1; d = target.getDate();
+        dayExplicit = true;
         break;
       }
     }
@@ -1118,6 +1131,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
           if (wantNext && delta < 7) delta += 7;
           const target = new Date(todayY, todayM - 1, todayD + delta);
           y = target.getFullYear(); m = target.getMonth() + 1; d = target.getDate();
+          dayExplicit = true;
         }
       }
     }
@@ -1128,6 +1142,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       if (nm) {
         const target = new Date(todayY, todayM, parseInt(nm[1], 10));
         y = target.getFullYear(); m = target.getMonth() + 1; d = target.getDate();
+        dayExplicit = true;
       }
     }
 
@@ -1139,14 +1154,18 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         const dd = parseInt(mdMatch[2], 10);
         if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
           y = todayY; m = mm; d = dd;
-          const candidate = new Date(y, m - 1, d);
-          if (candidate.getTime() < now.getTime() - 24 * 3600 * 1000) y++;
+          dayExplicit = true;
+          if (bumpPastToFuture) {
+            const candidate = new Date(y, m - 1, d);
+            if (candidate.getTime() < now.getTime() - 24 * 3600 * 1000) y++;
+          }
         }
       }
     }
 
     // 5. 中文月份：「七月」「8 月份」「明年三月」；可選年份 "2027 年" / "明年"
-    // Treat month-only as the 1st of that month (or 15th for mid-month phrases).
+    // Month-only phrases get day=1 with dayExplicit=false so callers can
+    // decide whether to treat as specific 流日 (L6) or just a month context.
     if (!y) {
       const cnMonths = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
                         "七": 7, "八": 8, "九": 9, "十": 10, "十一": 11, "十二": 12 };
@@ -1163,8 +1182,9 @@ export default function WizardApp({ auth, onBack, onLogout }) {
           const dd = dayStr ? parseInt(dayStr, 10) : 1;  // default to 1st if day omitted
           if (dd >= 1 && dd <= 31) {
             y = year; m = mm; d = dd;
+            dayExplicit = !!dayStr;
             // If no year was supplied and the date is already past, assume next occurrence.
-            if (!yearStr && !relYear) {
+            if (!yearStr && !relYear && bumpPastToFuture) {
               const candidate = new Date(y, m - 1, d);
               if (candidate.getTime() < now.getTime() - 24 * 3600 * 1000) y++;
             }
@@ -1191,7 +1211,7 @@ export default function WizardApp({ auth, onBack, onLogout }) {
         minute = parseInt(clockMatch[2], 10);
       }
     }
-    return { year: y, month: m, day: d, hour, minute };
+    return { year: y, month: m, day: d, hour, minute, dayExplicit };
   };
 
   // #8 — Open the decision advisor modal anchored to a chart (null → guest).
@@ -2315,10 +2335,16 @@ ${transitOverlay?.summary || ''}
       // the L6 flow-day overlay client-side so the AI stops inventing月份
       // narratives on its own. Reuses parseQuestionDateTime (built for
       // decision advisor) — same detection covers 明天/後天/下週X/N月M日/etc.
+      // Key distinctions from the decision-advisor usage:
+      //   bumpPastToFuture=false → "上個月" / past bare dates stay in the past
+      //     instead of silently jumping to next year (smoke report 2026-04-22).
+      //   dayExplicit gate     → month-only phrases like "5 月怎樣" return
+      //     day=1 so L6 overlay would be misleading; skip L6 then and let
+      //     transitOverlay handle month-level context.
       let dayOverlayBlock = "";
       try {
-        const dt = parseQuestionDateTime(question);
-        if (dt?.day && birthYear && birthMonth && birthDay && birthHour !== undefined && birthHour !== "") {
+        const dt = parseQuestionDateTime(question, { bumpPastToFuture: false });
+        if (dt?.dayExplicit && dt?.day && birthYear && birthMonth && birthDay && birthHour !== undefined && birthHour !== "") {
           const tst = calculateTrueSolarTime(
             parseInt(birthYear), parseInt(birthMonth), parseInt(birthDay),
             parseInt(birthHour), parseInt(birthMinute || 0),
@@ -2358,7 +2384,14 @@ ${transitOverlay?.summary || ''}
       // 追問用 FOLLOWUP_SYSTEM_PROMPT，不用主分析的 [SECTION] 格式
       const followUpSP = FOLLOWUP_SYSTEM_PROMPT + (wizardSP.includes("知識庫") ? wizardSP.slice(wizardSP.indexOf("## 內部知識庫")) : "");
 
-      const isDeep = /大運|流年|逐月|十年|運勢走向|life phase|month.by.month/i.test(question);
+      // Route to DEEP model when the question is temporal and therefore
+      // benefits from the bigger context window / better instruction-following.
+      // Covers the cases smoke 2026-04-22 flagged (今年 5 月 / 4-6 月 / 下週三)
+      // by counting: (a) explicit parsed date, (b) month-only phrase, or
+      // (c) any classic deep-analysis keyword.
+      const isTemporalQ = !!parseQuestionDateTime(question, { bumpPastToFuture: false })
+        || /月|年|季|何時|when|上半|下半|下週|下个月|下個月|幾月|什麼時候|運勢走向|近期|大運|流年|逐月|十年|life phase|month.by.month/i.test(question);
+      const isDeep = isTemporalQ;
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
