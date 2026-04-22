@@ -72,6 +72,39 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 - **Prod storage**: m4pro fortune_saves/*.json (users, saves 上限 50/人)
 - **i18n**: 繁中 / English / 日本語 三語支援
 
+## 🔧 Ops (runtime reality, not just repo structure)
+
+### Site → runtime mapping
+| site | domain | runtime | repo |
+|---|---|---|---|
+| test | test.destinytelling.life | Cloud Run | `fortune-sandbox/main.py` (Python, Claude SDK direct) |
+| lab | lab.destinytelling.life | Cloud Run | `fortune-lab/main.py` (Python, Gemini / Anthropic fallback) |
+| oai | oai.destinytelling.life | m4pro launchctl `com.cph.oai-fortune` | **`~/Documents/New project/codex-fortune-api/server.mjs` (Node, not `fortune-oai/main.py`)** |
+| prod | destinytelling.life | m4pro scheduler.py | `telegram-claude-bot` |
+
+> ⚠️ `fortune-oai/main.py` exists but is **not live**. Edit server.mjs for oai behavior.
+
+### Proxy & auth contracts (post 2026-04-22 round 2)
+- lab & oai proxy most `/api/fortune-*` to `bot.velopulse.io` (scheduler), forwarding `Authorization` + preserving HTTP method (including DELETE body).
+- `/api/fortune-logout` has no upstream handler — lab (`_handle_logout_local`) and oai (server.mjs) intercept locally with `{ok:true}`.
+- Bearer token is required on `/api/fortune-session` writes (including `_lang` sync → `changeLang` uses `authHeaders()`).
+
+### Deploy order (after a `lab` branch push)
+1. m4pro `~/auto-deploy.sh` cron (every 2 min) rsyncs `fortune-mirror/dist/` → `fortune-lab/test-frontend/` + `codex-fortune-api/test-frontend/` + `fortune-sandbox/static/`.
+2. For Cloud Run sites (test, lab) run `cd ~/<repo> && ./deploy.sh` **manually** — auto-deploy only updates static files, not the container.
+3. For oai (m4pro Node): `launchctl kickstart -k gui/501/com.cph.oai-fortune` picks up both file and code changes.
+4. Always `git pull --rebase origin lab` before pushing if conflicts look likely.
+
+### Backup-before-deploy rule
+Create a tag before any multi-repo change: `git tag -f <label>-$(date +%Y%m%d)` across all 5 repos (fortune-mirror / fortune-sandbox / fortune-lab / fortune-oai / codex-fortune-api). Current green state: `smoke-green-20260422`.
+
+### Tests + smoke
+- `node test-crosssihua.mjs` — cross-sihua + helpers (PASS 37)
+- `node test-heban-modes.mjs` — heban basic/monthly/timed (PASS 7)
+- `node test-date-parser.mjs` — parseQuestionDateTime cases (PASS 23)
+- `./scripts/contract-test.sh` — logout / session / charts DELETE / save-delete contract across 3 sites (PASS 12)
+- `./scripts/check-kb-fallback.sh [hours]` — Cloud Run + oai log grep for `[KB_FALLBACK]`
+
 ## 📜 Session Log
 ### 2026-04-22 23:30 (m4pro, claude) — smoke audit round 2 + 3 fixes
 
