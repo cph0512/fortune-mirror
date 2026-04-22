@@ -73,6 +73,25 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 - **i18n**: 繁中 / English / 日本語 三語支援
 
 ## 📜 Session Log
+### 2026-04-22 23:30 (m4pro, claude) — smoke audit round 2 + 3 fixes
+
+**Smoke 2026-04-22 報告 4 件全修 (bundle main-BHWTpGrJ.js)**:
+
+1. **oai proxy 斷 auth + 少路由** (High). 先前 auditor 寫成 lab, 實測是 oai:
+   `fortune-oai/main.py:520` 的 `handle_proxy` 只支援 GET/POST + 完全沒轉 Authorization header, 且缺 `fortune-charts / fortune-save/delete / fortune-session / fortune-logout` 4 條路由. Copy lab 的 handle_proxy (保留 method + 轉 auth) + 補路由. 登入儲存 / 刪除 / lang 同步 等原本在 oai 靜默 401 的功能現在會走到 scheduler backend.
+
+2. **parseQuestionDateTime 月份 → 流日** (High). 月份 only 問題 (「今年 5 月」) 返回 `day=1`, sendChat 以為是具體日期 → 觸發 L6 流日 overlay 分析 5/1; 過去的 bare 日期 (5 月問「4/6」) 自動跳 +1 年. 加 `bumpPastToFuture` (default true for 決策相容, chat 傳 false) 和 `dayExplicit` 兩個 opts. sendChat 只在 dayExplicit 時才注入 L6.
+
+3. **_lang 同步沒帶 Bearer** (Med). `changeLang` 的 fetch 寫死 Content-Type, server 端 /api/fortune-session 要 owner-bearer, 所以 lang 偏好從不曾 persist. 改用 `authHeaders()`.
+
+4. **isDeep 太窄** (Med). 原本只 `大運|流年|逐月|十年`, 錯過「今年 5 月 / 4-6 月 / 下週三」這些典型時間問. 擴成「有解析到日期 OR 含時間關鍵字」, 這類問題會路由到 DEEP_MODEL.
+
+**Smoke 2026-04-22 pre-round2 修的 2 件**:
+- chat 時間基準: sendChat prompt 開頭注入 `今天是 YYYY/M/D` + 「bare month 一律解讀為本年」(job#43 曾飄到 2027)
+- dashboard 月份格 lock: 有 deterministic tone 的月份點擊展開 tone 摘要, 不再跳解鎖 modal; 解鎖只在**完全無資料**月份觸發
+- chart/reading/family 刪除改用自訂 `askConfirm` modal, 不再 native confirm() (mobile WebView 不穩)
+- `scripts/check-kb-fallback.sh` 支援 Cloud Run + 本地 oai log 查 24/72h window
+
 ### 2026-04-22 00:30 (m4pro, claude) — Phase 2 sweep + family polish
 
 **crosssihua.js 擴完整**:
