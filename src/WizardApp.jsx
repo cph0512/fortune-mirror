@@ -1141,6 +1141,34 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       }
     }
 
+    // 5. 中文月份：「七月」「8 月份」「明年三月」；可選年份 "2027 年" / "明年"
+    // Treat month-only as the 1st of that month (or 15th for mid-month phrases).
+    if (!y) {
+      const cnMonths = { "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+                        "七": 7, "八": 8, "九": 9, "十": 10, "十一": 11, "十二": 12 };
+      // Pattern: (year?) (cnNumber|digits) 月(份?) (N 號/日)?
+      const cnMatch = question.match(/(?:(\d{4})\s*年|(明|今|去)\s*年)?\s*(十一|十二|十|[一二三四五六七八九]|\d{1,2})\s*月\s*份?\s*(?:(\d{1,2})\s*[號日])?/);
+      if (cnMatch) {
+        const [, yearStr, relYear, monthStr, dayStr] = cnMatch;
+        const mm = cnMonths[monthStr] ?? parseInt(monthStr, 10);
+        if (mm >= 1 && mm <= 12) {
+          let year = todayY;
+          if (yearStr) year = parseInt(yearStr, 10);
+          else if (relYear === "明") year = todayY + 1;
+          else if (relYear === "去") year = todayY - 1;
+          const dd = dayStr ? parseInt(dayStr, 10) : 1;  // default to 1st if day omitted
+          if (dd >= 1 && dd <= 31) {
+            y = year; m = mm; d = dd;
+            // If no year was supplied and the date is already past, assume next occurrence.
+            if (!yearStr && !relYear) {
+              const candidate = new Date(y, m - 1, d);
+              if (candidate.getTime() < now.getTime() - 24 * 3600 * 1000) y++;
+            }
+          }
+        }
+      }
+    }
+
     if (!y) return null;
 
     // 5. 時間解析 (optional — 流時)
@@ -1232,64 +1260,68 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       return;
     }
 
-    // Step 2. 命盤 — 缺盤就切到 need_chart，列出可用盤給使用者挑；沒有盤
-    // 就顯示建立命盤的 CTA（真的沒盤能用時才是 block case）。
+    // Step 2. 命盤 — 有多張選一張、沒有盤則走訪客模式（不做精算疊宮，依
+    // 問題本身給一般性建議）。只有「已登入 + 有盤但沒選」這個 case 才切到
+    // need_chart 讓使用者挑。完全沒盤不 block — guest 想試決策流程也能試。
     let chart = decisionChart;
     if (!chart?.birthData?.year) {
-      if (userCharts?.length > 0) {
+      if (wizardUser?.email && userCharts?.length > 0) {
         setDecisionStatus("need_chart");
         trackEvent("decision_need_chart", { available: userCharts.length });
         return;
       }
-      setDecisionError(
-        t('decision.needChart', {
-          defaultValue: '決策建議必須基於完整命盤。請先登入並建立一張命盤，再使用決策建議。'
-        })
-      );
-      setDecisionStatus("input");
-      trackEvent("decision_blocked", { reason: "missing_chart" });
-      return;
+      // Fall through: guest mode or logged-in-but-no-charts. Use null chart;
+      // the prompt already has a guest branch in chartsText that tells the LLM
+      // there's no precise chart data so give common-sense advice.
+      chart = null;
+      trackEvent("decision_guest_mode");
     }
 
     setDecisionStatus("analyzing");
     try {
-      const chartsText = Object.entries(chart.charts || {}).map(([sys, text]) => `【${sys}】\n${text}`).join("\n\n===\n\n");
-      const bd = chart.birthData;
-      const bdLine = `- 出生：${bd.year}/${bd.month}/${bd.day} ${bd.hour || 0}:${bd.minute || 0}\n- 性別：${chart?.gender || "未指定"}\n- 出生地：${bd.place || "未指定"}`;
+      const chartsText = chart?.charts
+        ? Object.entries(chart.charts).map(([sys, text]) => `【${sys}】\n${text}`).join("\n\n===\n\n")
+        : "（訪客模式：無命盤資料。請依題目本身的實務面給建議，在 notes 欄註明「訪客模式 — 無精算支撐」。）";
+      const bd = chart?.birthData || {};
+      const bdLine = chart
+        ? `- 出生：${bd.year}/${bd.month}/${bd.day} ${bd.hour || 0}:${bd.minute || 0}\n- 性別：${chart?.gender || "未指定"}\n- 出生地：${bd.place || "未指定"}`
+        : "- 無出生資料（訪客模式）";
       const today = new Date();
       const dt = preDt;
 
-      // Step 3. 疊宮到極致 — 強制計算, 失敗即中止
+      // Step 3. 疊宮到極致 — 有命盤才跑；訪客模式直接跳過，讓 LLM 從常識回答
       let dayHourBlock = "";
-      try {
-        const rawChart = calculateChart(
-          parseInt(bd.year), parseInt(bd.month), parseInt(bd.day),
-          parseInt(bd.hour || 0), parseInt(bd.minute || 0),
-          chart.gender || "男"
-        );
-        if (!rawChart || !rawChart.gongs) throw new Error("本命盤計算失敗");
+      if (chart?.birthData?.year) {
+        try {
+          const rawChart = calculateChart(
+            parseInt(bd.year), parseInt(bd.month), parseInt(bd.day),
+            parseInt(bd.hour || 0), parseInt(bd.minute || 0),
+            chart.gender || "男"
+          );
+          if (!rawChart || !rawChart.gongs) throw new Error("本命盤計算失敗");
 
-        // 大限 / 流年 / 流月 overlay — 必須
-        const transitOverlay = calculateTransitOverlay(rawChart);
-        if (!transitOverlay) throw new Error("大限/流年/流月疊宮計算失敗");
+          // 大限 / 流年 / 流月 overlay — 必須
+          const transitOverlay = calculateTransitOverlay(rawChart);
+          if (!transitOverlay) throw new Error("大限/流年/流月疊宮計算失敗");
 
-        // 流日 (+ 流時) overlay — 必須
-        const dayHourOverlay = calculateDayHourOverlay(
-          rawChart, dt.year, dt.month, dt.day, dt.hour, dt.minute
-        );
-        if (!dayHourOverlay?.summary) throw new Error("流日疊宮計算失敗");
+          // 流日 (+ 流時) overlay — 必須
+          const dayHourOverlay = calculateDayHourOverlay(
+            rawChart, dt.year, dt.month, dt.day, dt.hour, dt.minute
+          );
+          if (!dayHourOverlay?.summary) throw new Error("流日疊宮計算失敗");
 
-        dayHourBlock = `\n## 精算流日${dt.hour !== null ? '/流時' : ''}疊宮（請直接引用，勿自推）\n${dayHourOverlay.summary}\n`;
-      } catch (e) {
-        console.error("[decision] overlay computation failed:", e);
-        setDecisionError(
-          t('decision.overlayFailed', {
-            defaultValue: '命理疊宮計算失敗：' + e.message + '。請重試，或聯繫管理員。'
-          })
-        );
-        setDecisionStatus("input");
-        trackEvent("decision_blocked", { reason: "overlay_failed", error: e.message });
-        return;
+          dayHourBlock = `\n## 精算流日${dt.hour !== null ? '/流時' : ''}疊宮（請直接引用，勿自推）\n${dayHourOverlay.summary}\n`;
+        } catch (e) {
+          console.error("[decision] overlay computation failed:", e);
+          setDecisionError(
+            t('decision.overlayFailed', {
+              defaultValue: '命理疊宮計算失敗：' + e.message + '。請重試，或聯繫管理員。'
+            })
+          );
+          setDecisionStatus("input");
+          trackEvent("decision_blocked", { reason: "overlay_failed", error: e.message });
+          return;
+        }
       }
 
       const timeAnchorLine = `使用者決策日期：${dt.year}/${dt.month}/${dt.day}${dt.hour !== null ? ` ${String(dt.hour).padStart(2,'0')}:${String(dt.minute||0).padStart(2,'0')}` : '（未指定具體時間，僅算到流日）'}`;
