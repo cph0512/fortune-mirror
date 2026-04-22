@@ -973,6 +973,20 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
 
   // ===== Phase: Result =====
   if (phase === "result") {
+    // Quick-switch: one-click protagonist change that keeps the rest of the
+    // family as selected analysis members and re-runs startFamilyAnalysis.
+    // Saves the "back to pick → pick new proto → confirm members → analyze"
+    // 3-click detour every time the user wants another angle.
+    const switchProtagonist = (newProto) => {
+      if (!newProto || newProto.id === protagonist?.id) return;
+      const nextSelected = new Set(selectedMembers);
+      nextSelected.delete(newProto.id);
+      if (protagonist?.id) nextSelected.add(protagonist.id);
+      setSelectedMembers(nextSelected);
+      const analysisMembers = members.filter(m => m.id === newProto.id || nextSelected.has(m.id));
+      startFamilyAnalysis(newProto, analysisMembers);
+    };
+    const membersWithCharts = members.filter(m => m?.charts?.ziwei);
     return (
       <div className="family-panel">
         <div className="family-header">
@@ -981,6 +995,33 @@ ${childMembers.length > 0 ? `[SECTION] 親子關係分析
             {familyName} — {protagonist?.name}
           </div>
         </div>
+        {membersWithCharts.length > 1 && (
+          <div style={{ margin: '12px 0 20px', padding: '10px 14px', background: 'rgba(124,58,237,0.08)', borderRadius: 12 }}>
+            <div style={{ fontSize: 12, color: '#c4b5fd', marginBottom: 8 }}>
+              {currentLang === 'en' ? 'Switch perspective (re-analyzes)'
+                : currentLang === 'ja' ? '視点を切り替え（再分析）'
+                : '改以這位成員為主角 (會重跑分析)'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {membersWithCharts.map(m => {
+                const isCurrent = m.id === protagonist?.id;
+                return (
+                  <button key={m.id}
+                    onClick={() => { if (!isCurrent) switchProtagonist(m); }}
+                    disabled={isCurrent}
+                    className="wizard-heban-rel-btn"
+                    style={{
+                      opacity: isCurrent ? 0.55 : 1,
+                      cursor: isCurrent ? 'default' : 'pointer',
+                      fontWeight: isCurrent ? 700 : 500,
+                    }}>
+                    {m.name}（{getRoleLabel(m.role, currentLang)}）{isCurrent ? ' ⭐' : ''}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="wizard-result-sections">
           {renderSections(result)}
         </div>
