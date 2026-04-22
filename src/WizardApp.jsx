@@ -1029,6 +1029,10 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   // Monthly overview expansion + paywall
   const [expandedMonth, setExpandedMonth] = useState(null);  // 1..12
   const [showUnlockMonthly, setShowUnlockMonthly] = useState(false);
+  // Custom confirm modal — native window.confirm() is unreliable in mobile
+  // WebViews (especially embedded flows) and was flagged by smoke audit.
+  const [confirmState, setConfirmState] = useState(null);
+  const askConfirm = (message, onYes) => setConfirmState({ message, onYes });
   // #8 Decision Advisor — modal state. decisionChart=null means "guest mode"
   // (home CTA with no chart selected); otherwise the chart the decision is
   // anchored to. `status` drives the modal view stack: input form →
@@ -3044,11 +3048,12 @@ ${hebanRelation === "relations.twin" ? `
                                     </span>
                                     <button
                                       style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.5)', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}
-                                      onClick={async (e) => {
+                                      onClick={(e) => {
                                         e.stopPropagation();
-                                        if (!confirm(t('charts.confirmDeleteReading'))) return;
-                                        const ok = await deleteReading(wizardUser, r.time || r.date);
-                                        if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
+                                        askConfirm(t('charts.confirmDeleteReading'), async () => {
+                                          const ok = await deleteReading(wizardUser, r.time || r.date);
+                                          if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
+                                        });
                                       }}
                                     >✕</button>
                                   </div>
@@ -3066,11 +3071,12 @@ ${hebanRelation === "relations.twin" ? `
                                 : t('charts.setAsPrimary')}</button>
                               <button
                                 style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', color: 'rgba(255,100,100,0.6)', fontSize: 11, cursor: 'pointer', padding: '3px 10px', borderRadius: 6 }}
-                                onClick={async (e) => {
+                                onClick={(e) => {
                                   e.stopPropagation();
-                                  if (!confirm(t('charts.confirmDelete', { name: chart.name }))) return;
-                                  const ok = await deleteChart(wizardUser, chart.id);
-                                  if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
+                                  askConfirm(t('charts.confirmDelete', { name: chart.name }), async () => {
+                                    const ok = await deleteChart(wizardUser, chart.id);
+                                    if (ok) setUserCharts(prev => prev.filter(c => c.id !== chart.id));
+                                  });
                                 }}
                               >{t('charts.delete')}</button>
                             </div>
@@ -3120,11 +3126,12 @@ ${hebanRelation === "relations.twin" ? `
                         </div>
                         <button
                           style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.5)', fontSize: 14, cursor: 'pointer', padding: '2px 4px' }}
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.stopPropagation();
-                            if (!confirm(t('charts.confirmDeleteReading'))) return;
-                            const ok = await deleteReading(wizardUser, r.time || r.date);
-                            if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
+                            askConfirm(t('charts.confirmDeleteReading'), async () => {
+                              const ok = await deleteReading(wizardUser, r.time || r.date);
+                              if (ok) setServerReadings(prev => prev.filter(s => (s.time || s.date) !== (r.time || r.date)));
+                            });
                           }}
                         >✕</button>
                       </div>
@@ -3187,22 +3194,23 @@ ${hebanRelation === "relations.twin" ? `
                             {wizardUser && (
                               <button
                                 style={{ background: 'none', border: 'none', color: 'rgba(255,100,100,0.6)', fontSize: 16, cursor: 'pointer', padding: '4px 8px' }}
-                                onClick={async (e) => {
+                                onClick={(e) => {
                                   e.stopPropagation();
-                                  if (!confirm(t('charts.confirmDeleteFamily', { name: fname }))) return;
-                                  // Delete all saves for this family
-                                  for (const s of saves) {
-                                    if (s.time) await deleteReading(wizardUser, s.time);
-                                  }
-                                  setServerReadings(prev => prev.filter(s => {
-                                    const n = s.familyData?.familyName || s.goalPrompt?.replace(/^家族命盤 — /, '');
-                                    return n !== fname;
-                                  }));
-                                  // Also clear localStorage family data if matching
-                                  try {
-                                    const local = JSON.parse(localStorage.getItem("fortune-family-data") || "{}");
-                                    if (local.familyName === fname) localStorage.removeItem("fortune-family-data");
-                                  } catch {}
+                                  askConfirm(t('charts.confirmDeleteFamily', { name: fname }), async () => {
+                                    // Delete all saves for this family
+                                    for (const s of saves) {
+                                      if (s.time) await deleteReading(wizardUser, s.time);
+                                    }
+                                    setServerReadings(prev => prev.filter(s => {
+                                      const n = s.familyData?.familyName || s.goalPrompt?.replace(/^家族命盤 — /, '');
+                                      return n !== fname;
+                                    }));
+                                    // Also clear localStorage family data if matching
+                                    try {
+                                      const local = JSON.parse(localStorage.getItem("fortune-family-data") || "{}");
+                                      if (local.familyName === fname) localStorage.removeItem("fortune-family-data");
+                                    } catch {}
+                                  });
                                 }}
                                 title={t('charts.delete')}
                               >✕</button>
@@ -4603,6 +4611,37 @@ ${hebanRelation === "relations.twin" ? `
                 >{t('decision.retry', { defaultValue: '重試' })}</button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {confirmState && (
+        <div className="wizard-auth-overlay" onClick={() => setConfirmState(null)}>
+          <div className="wizard-auth-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="wizard-auth-title">
+              {t('common.confirmDelete', { defaultValue: '確認刪除' })}
+            </div>
+            <div className="wizard-auth-subtitle" style={{ marginTop: 12 }}>
+              {confirmState.message}
+            </div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button
+                className="wizard-cta-secondary"
+                style={{ flex: 1 }}
+                onClick={() => setConfirmState(null)}>
+                {t('common.cancel', { defaultValue: '取消' })}
+              </button>
+              <button
+                className="wizard-cta"
+                style={{ flex: 1, background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}
+                onClick={() => {
+                  const fn = confirmState.onYes;
+                  setConfirmState(null);
+                  if (typeof fn === "function") fn();
+                }}>
+                {t('common.delete', { defaultValue: '刪除' })}
+              </button>
+            </div>
           </div>
         </div>
       )}
