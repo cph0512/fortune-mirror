@@ -2342,7 +2342,14 @@ ${transitOverlay?.summary || ''}
       const hasTimeQ = /月|年|季|時|何時|when|最近|今年|明年|上半|下半|幾月|什麼時候|進財|財運|感情運|健康運|事業運|運勢/i.test(question);
       const transitBlock = hasTimeQ ? `\n\n⚠️ 時間相關問題 — 排盤資料中有「疊宮分析結果」區塊，裡面有程式精確計算好的大限/流年/流月四化和疊宮效果。你必須直接根據這些已計算好的結果回答，不可忽略。每個時間判斷都要對應到具體的四化和宮位。如果疊宮結果中找不到依據，就明確說「排盤中沒有明確的跡象」。` : "";
 
-      const prompt = `${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 之前的分析摘要 =====\n${finalResult.slice(0, 1500)}\n\n` : ""}${hebanBlock}${dayOverlayBlock}${focusBlock}${recentChat ? `\n對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n直接回答上述問題，聚焦問題本身，不要發散到其他主題。你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆。`;
+      // Time anchor: smoke-test job#43 drifted "國曆 4-6 月" to 2027. Force
+      // the model to interpret bare months as the current year unless the
+      // user explicitly names a future year.
+      const _chatToday = new Date();
+      const _chatTodayStr = `${_chatToday.getFullYear()}/${_chatToday.getMonth()+1}/${_chatToday.getDate()}`;
+      const timeAnchor = `## 時間基準 (強制遵守)\n今天是 ${_chatTodayStr}. 使用者問「4-6 月」「X 月」「下個月」「近期」等一律解讀為 ${_chatToday.getFullYear()} 年該月份, 絕不可自行飄到 ${_chatToday.getFullYear()+1} 年或之後. 只有使用者明確寫「${_chatToday.getFullYear()+1} 年」「明年」才能用該年.\n\n`;
+
+      const prompt = `${timeAnchor}${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 之前的分析摘要 =====\n${finalResult.slice(0, 1500)}\n\n` : ""}${hebanBlock}${dayOverlayBlock}${focusBlock}${recentChat ? `\n對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n直接回答上述問題，聚焦問題本身，不要發散到其他主題。你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆。`;
 
       // 追問用 FOLLOWUP_SYSTEM_PROMPT，不用主分析的 [SECTION] 格式
       const followUpSP = FOLLOWUP_SYSTEM_PROMPT + (wizardSP.includes("知識庫") ? wizardSP.slice(wizardSP.indexOf("## 內部知識庫")) : "");
@@ -3716,11 +3723,21 @@ ${hebanRelation === "relations.twin" ? `
             const toneColors = { positive: "#4caf50", caution: "#ff9800", neutral: "#90caf9", default: "rgba(255,255,255,0.1)" };
             const toneLabels = { positive: t('calendar.good'), caution: "!", neutral: "", default: "" };
             const monthNames = t('calendar.months', { returnObjects: true });
+            const toneDescriptions = {
+              positive: t('calendar.tonePositiveSummary', { defaultValue: '本月程式精算偏向機會、動能或資源推動。若要更深的逐月文字解讀, 可點「解鎖完整逐月分析」。' }),
+              caution: t('calendar.toneCautionSummary', { defaultValue: '本月程式精算顯示壓力疊加或能量拉扯, 需要謹慎應對. 若要更深的逐月文字解讀, 可點「解鎖完整逐月分析」。' }),
+              neutral: t('calendar.toneNeutralSummary', { defaultValue: '本月程式精算顯示有四化活動但非強訊號, 屬平緩月份. 若要更深的逐月文字解讀, 可點「解鎖完整逐月分析」。' }),
+            };
+            const hasToneData = (m) => m.tone && m.tone !== "default";
             const onCellClick = (m) => {
-              if (m.description) {
+              // 分三種:
+              // 1. 有 LLM description → 展開該月詳細文字
+              // 2. 有 deterministic tone (程式精算) 但無 description → 展開 tone 摘要 (不再彈解鎖 modal)
+              // 3. 完全沒資料 → 彈解鎖 modal 引導重跑或付費
+              if (m.description || hasToneData(m)) {
                 setExpandedMonth(expandedMonth === m.month ? null : m.month);
               } else {
-                trackEvent("unlock_monthly_clicked", { month: m.month, source: hasAnyData ? "partial" : "locked" });
+                trackEvent("unlock_monthly_clicked", { month: m.month, source: "locked" });
                 setShowUnlockMonthly(true);
               }
             };
@@ -3728,24 +3745,30 @@ ${hebanRelation === "relations.twin" ? `
               <div className="wizard-month-overview">
                 <div className="wizard-month-overview-title">{t('calendar.title', { year })}</div>
                 <div className="wizard-month-grid">
-                  {allMonths.map(m => (
-                    <div key={m.month}
-                      className={`wizard-month-cell ${m.tone} ${expandedMonth === m.month ? 'expanded' : ''}`}
-                      title={m.description || t('calendar.locked', { defaultValue: '點擊解鎖' })}
-                      style={{ borderBottom: `3px solid ${toneColors[m.tone]}`, cursor: 'pointer', opacity: m.description ? 1 : 0.55 }}
-                      onClick={() => onCellClick(m)}>
-                      <span className="wizard-month-num">{monthNames[m.month - 1]}</span>
-                      {toneLabels[m.tone] && <span className="wizard-month-badge">{toneLabels[m.tone]}</span>}
-                      {!m.description && <span className="wizard-month-badge" style={{ opacity: 0.7 }}>🔒</span>}
-                    </div>
-                  ))}
+                  {allMonths.map(m => {
+                    const unlocked = m.description || hasToneData(m);
+                    return (
+                      <div key={m.month}
+                        className={`wizard-month-cell ${m.tone} ${expandedMonth === m.month ? 'expanded' : ''}`}
+                        title={m.description || (hasToneData(m) ? toneDescriptions[m.tone] : t('calendar.locked', { defaultValue: '點擊解鎖' }))}
+                        style={{ borderBottom: `3px solid ${toneColors[m.tone]}`, cursor: 'pointer', opacity: unlocked ? 1 : 0.55 }}
+                        onClick={() => onCellClick(m)}>
+                        <span className="wizard-month-num">{monthNames[m.month - 1]}</span>
+                        {toneLabels[m.tone] && <span className="wizard-month-badge">{toneLabels[m.tone]}</span>}
+                        {!unlocked && <span className="wizard-month-badge" style={{ opacity: 0.7 }}>🔒</span>}
+                      </div>
+                    );
+                  })}
                 </div>
                 {expandedMonth && (() => {
                   const m = allMonths.find(x => x.month === expandedMonth);
-                  if (!m?.description) return null;
+                  if (!m) return null;
+                  // 優先顯示 LLM description, 沒有就 fallback 顯示 tone 摘要
+                  const body = m.description || (hasToneData(m) ? toneDescriptions[m.tone] : null);
+                  if (!body) return null;
                   return (
                     <div style={{ marginTop: 8, padding: '10px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: 8, borderLeft: `3px solid ${toneColors[m.tone]}`, fontSize: 13, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)' }}>
-                      <strong>{monthNames[m.month - 1]}</strong>：{m.description}
+                      <strong>{monthNames[m.month - 1]}</strong>：{body}
                     </div>
                   );
                 })()}
