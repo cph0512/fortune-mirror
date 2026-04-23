@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Install: cp this file to ~/Library/LaunchAgents/ then:
+       launchctl load ~/Library/LaunchAgents/com.cph.fortune-monitor.plist
+     Uninstall:
+       launchctl unload ~/Library/LaunchAgents/com.cph.fortune-monitor.plist
+     Script runs every 15 min. Silent on success, TG alert on anomaly.
+     Logs to /tmp/fortune-monitor.log.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cph.fortune-monitor</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/cph/fortune-mirror/scripts/monitor-sites.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>900</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/fortune-monitor.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/fortune-monitor.log</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
