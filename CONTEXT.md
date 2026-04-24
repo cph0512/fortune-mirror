@@ -72,6 +72,36 @@ AI 接續協定: 收到 `resume` → 讀此檔 → 摘要 Current State + Next s
 - **Prod storage**: m4pro fortune_saves/*.json (users, saves 上限 50/人)
 - **i18n**: 繁中 / English / 日本語 三語支援
 
+## 📍 Canonical production line (決定收費那一條)
+
+**`destinytelling.life` (no subdomain, prod) = canonical.** 
+- Frontend: `fortune-mirror` main 分支 build → `fortune-sandbox/static/`
+- Backend: `scheduler.py` on m4pro (bot.velopulse.io)
+- Model: Claude 4 Opus via CLI (Max plan, 免費 quota)
+- KB: `public/default-kb.json` (137 條 union, 共用來源)
+
+**test / lab / oai 都是 staging / A-B test line, 不直接收費主力。**
+
+| site | role | 收費? | 用途 |
+|---|---|---|---|
+| destinytelling.life | **canonical prod** | ✅ 主收費 | 穩定走 Claude CLI, 吃 Max plan |
+| test.destinytelling.life | Claude SDK sandbox | ❌ 內測 | 驗新功能, 有 prompt caching |
+| lab.destinytelling.life | Gemini 3.1 Pro 實驗 | ❌ 內測 | 比對 Gemini 品質 |
+| oai.destinytelling.life | GPT-5 實驗 | ❌ 內測 | 比對 OpenAI 品質 |
+
+**KB 改動流程** (避免 drift):
+1. 改 `fortune-mirror/public/default-kb.json` (source of truth)
+2. `git push` 觸發 auto-deploy.sh 同步到:
+   - `fortune-sandbox/static/` (canonical prod)
+   - `fortune-lab/test-frontend/` (lab)
+   - `codex-fortune-api/test-frontend/` (oai)
+3. 驗證三站 bundle hash 一致 (via `monitor-sites.sh`)
+4. 每季回看 `scripts/check-kb-fallback.sh 720` 找 topic drift
+
+**Bug fix 流程**:
+1. 若 bug 只在 test/lab/oai: 可獨立修, 不動 canonical
+2. 若 bug 在 scheduler.py / shared backend: 修 + 重啟 `com.cph.telegram-claude-bot`, **直接影響 canonical prod**, 一律先 tag 再動
+
 ## 🔧 Ops (runtime reality, not just repo structure)
 
 ### Site → runtime mapping

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cph.oai-fortune</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/cph/bin/oai-fortune-run.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/cph/Documents/New project/codex-fortune-api</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>AUDIT_URL</key>
+        <string>https://audit.velopulse.io</string>
+        <key>AUDIT_WRITE_TOKEN</key>
+        <string>m4pro-audit-2026-a9f3</string>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- Only restart on abnormal exit; prevents infinite loops if we ever
+         intentionally stop the service. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+    <!-- Throttle crash-loop: wait 15s between respawns -->
+    <key>ThrottleInterval</key>
+    <integer>15</integer>
+    <key>ExitTimeOut</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/oai-fortune.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/oai-fortune-stderr.log</string>
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
