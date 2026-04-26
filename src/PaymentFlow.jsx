@@ -143,8 +143,30 @@ export default function PaymentFlow({ user, onClose }) {
         invoice,
       });
       setOrderId(res.order_id);
-      // For mock mode the URL is relative; for real providers it's external.
-      // Either way: send the browser there.
+
+      // Mock mode (no real OEN/Stripe configured): auto-complete and stay
+      // in-app on the receipt screen. Skips the redirect-out-and-back-in
+      // dance so dev/test users can validate the flow end-to-end without
+      // a real payment gateway.
+      if (res.mock || res.provider === "mock") {
+        try {
+          // Reuses the dev-only /api/payment/mock-complete endpoint.
+          const base = (typeof window !== "undefined" && window.location.hostname === "oai.destinytelling.life")
+            ? "https://oai.destinytelling.life"
+            : (typeof window !== "undefined" && window.location.hostname === "lab.destinytelling.life")
+            ? "https://lab.destinytelling.life"
+            : "";
+          await fetch(`${base}/api/payment/mock-complete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order_id: res.order_id }),
+          });
+        } catch {}
+        setMode("receipt");
+        return;
+      }
+
+      // Real providers (OEN / Stripe): redirect out to their checkout page.
       setMode("redirect");
       setTimeout(() => {
         window.location.href = res.checkout_url;
