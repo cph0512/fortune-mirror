@@ -5,6 +5,7 @@ import './WizardApp.css';
 import { calculateChart, formatChart, formatChartCompact, formatChartByTianGan, calculateTransitOverlay, calculateDayHourOverlay, getMonthlySihuaStars, getDailySihuaStars } from "./ziwei-calc.js";
 import { calculateCrossSihua } from "./crosssihua.js";
 import { parseQuestionDateTime } from "./date-parser.js";
+import PaymentFlow from "./PaymentFlow.jsx";
 import { calculateBazi, formatBazi, formatBaziCompact } from "./bazi-calc.js";
 import { calculateAstro, formatAstro, formatAstroCompact } from "./astro-calc.js";
 import CITY_COORDS, { findCity, getCityGroups } from "./city-coords.js";
@@ -998,28 +999,39 @@ export default function WizardApp({ auth, onBack, onLogout }) {
   const [showFamily, setShowFamily] = useState(false);
 
   const [showAccount, setShowAccount] = useState(false);
+  // Payment flow overlay — triggered from 帳號 panel's 購買 button or any other
+  // "upgrade" CTA. Holds optional plan_id so we can deep-link directly into
+  // the invoice step for that plan (rather than always landing on pricing).
+  const [showPayment, setShowPayment] = useState(false);
   const [userFeatures, setUserFeatures] = useState([]);
   const [userCredits, setUserCredits] = useState(0);
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentPlans, setPaymentPlans] = useState(null);
   const [paymentMsg, setPaymentMsg] = useState(null); // {type: "success"|"fail"|"cancel", order}
 
-  // Handle payment callback from OEN redirect
+  // Handle payment callback from OEN redirect.
+  // success → open PaymentFlow on its receipt step (it auto-detects the
+  //           ?payment=success&order=X query and lands on receipt mode).
+  // cancel/fail → drop the user back into 帳號 with a banner.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const paymentStatus = params.get("payment");
     const orderId = params.get("order");
-    if (paymentStatus) {
-      setPaymentMsg({ type: paymentStatus, order: orderId });
-      if (paymentStatus === "success" && wizardUser?.email) {
-        fetchUserStatus(wizardUser.email);
-      }
+    if (!paymentStatus) return;
+
+    setPaymentMsg({ type: paymentStatus, order: orderId });
+    if (paymentStatus === "success") {
+      if (wizardUser?.email) fetchUserStatus(wizardUser.email);
+      // Open the PaymentFlow modal — its own useEffect picks up the
+      // ?payment=success and shows the receipt with live status polling.
+      setShowPayment(true);
+    } else {
       setShowAccount(true);
-      // Clean URL
+      // Clean the URL only on cancel/fail; success leaves it for the
+      // PaymentFlow to read first, then we clean below.
       window.history.replaceState({}, "", window.location.pathname);
-      // Auto-dismiss after 8 seconds
-      setTimeout(() => setPaymentMsg(null), 8000);
     }
+    setTimeout(() => setPaymentMsg(null), 8000);
   }, []);
 
   // Charts (命盤庫) state
@@ -1216,36 +1228,14 @@ export default function WizardApp({ auth, onBack, onLogout }) {
       }
 
       const timeAnchorLine = `使用者決策日期：${dt.year}/${dt.month}/${dt.day}${dt.hour !== null ? ` ${String(dt.hour).padStart(2,'0')}:${String(dt.minute||0).padStart(2,'0')}` : '（未指定具體時間，僅算到流日）'}`;
-      const userPrompt = `## 時間基準
-今天是 ${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}。
-${timeAnchorLine}
+      const userPrompt = `今天是 ${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}\n${timeAnchorLine}\n\n排盤資料：\n${chartsText}\n${dayHourBlock}\n\n用戶資料：\n${bdLine}\n\n使用者問題：\n${question}\n\n請給出清楚可執行的決策建議，並盡量對應到已提供的日期與排盤資料。`;
 
-## 排盤資料
-${chartsText}
-${dayHourBlock}
-## 用戶資料
-${bdLine}
-
-## 使用者問題
-${question}
-
-## 分析規則（決策層級強制）
-你做的是「決策建議」, 不是泛泛運勢. 你必須:
-1. 主要依據「流日疊宮」判斷該日吉凶與建議（若有流時更具體到時辰）
-2. 流月提供背景氛圍、流年提供更大格局、大限提供長期脈絡 — 這些是背景, 不是主判據
-3. 本命盤提供個性傾向 — 影響如何詮釋流日訊號
-4. 必須明確指出「${dt.year}/${dt.month}/${dt.day}」當天的流日四化落在哪些宮位, 並據此給出選項評分
-5. 禁止只講流年/流月就下結論 — 如果流日疊宮資料不足，要在 gap 欄位明說「流日資料不足，建議依流月氛圍參考」
-
-請依系統指令分類並輸出 JSON。`;
-
-      const langLabel = LANG_AI[currentLang] || "繁體中文";
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           images: [],
-          system: decisionSystemPrompt(langLabel),
+          system_key: "decision",
           prompt: userPrompt,
           visitor_id: getVisitorId(),
           user: wizardUser?.email || null,
@@ -1846,7 +1836,7 @@ ${question}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: `你是專業翻譯。將命理報告翻譯成${langName}，保持[SECTION]格式標記不變，保持原文的語氣和風格。`, prompt, analysis_type: "general", visitor_id: getVisitorId(), user: wizardUser?.email || null }),
+        body: JSON.stringify({ images: [], system_key: "translation", prompt, analysis_type: "general", visitor_id: getVisitorId(), user: wizardUser?.email || null, job_type: "translation" }),
       });
       if (!submitRes.ok) throw new Error("Translation failed");
       const { job_id } = await submitRes.json();
@@ -1879,7 +1869,7 @@ ${question}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: systemPrompt, prompt, engine, analysis_type: "general" }),
+        body: JSON.stringify({ images: [], system_key: "analysis", prompt, engine, analysis_type: "general", job_type: "analysis" }),
       });
       if (!submitRes.ok) return null;
       const { job_id } = await submitRes.json();
@@ -1967,7 +1957,6 @@ ${question}
       }
       setRawResults(results);
 
-      const wizardSP = buildWizardPrompt(kbEntries, goal);
       const twinChartBlock = isTwin ? `
 
 ===
@@ -2017,59 +2006,30 @@ ${twinAstroChart}` : "";
       const _today = new Date();
       const _todayStr = `${_today.getFullYear()}/${_today.getMonth()+1}/${_today.getDate()}`;
 
-      const oneCallPrompt = `以下是一位用戶的三套命理排盤資料（內部資料，不可對外揭露來源系統）：
+      const oneCallPrompt = `排盤資料如下，請直接做完整分析：
 
-## 分析時間基準
-今天是 ${_todayStr}。所有關於「近期」「重點月份」「年運勢」的判斷都必須以此日期為基準，不可任意漂移到其他月份。
-
-【紫微斗數排盤】
+【紫微斗數】
 ${ziweiChart}
 
-===
-
-【八字排盤】
+【八字】
 ${baziChart}
 
-===
-
-【西洋占星排盤】
+【西洋占星】
 ${astroChart}${twinChartBlock}
 ${transitOverlay?.summary || ''}
-## 用戶資料
+
+用戶資料：
 - 性別：${gender}
 - 出生：${birthYear}年${birthMonth}月${birthDay}日 ${h}時${min}分
-- 出生地：${birthPlace}（經度${cityLng}°, 緯度${cityLat}°）
-- 真太陽時：${tst.trueSolarTimeStr}（${tst.shichen}時）${tst.nearBoundary ? `\n- ⚠️ ${tst.nearBoundary.message}` : ""}${tst.isEarlyZi ? "\n- ⚠️ 早子時，日柱用當日" : ""}${twinInfoBlock}
+- 出生地：${birthPlace}
 - 關注方向：${goalTextZh}${loveSubTextZh ? `（${loveSubTextZh}）` : ""}
 
-## 任務
-請綜合以上三套排盤資料，直接產出一份統一的命理報告。
-你需要自己解讀排盤資料、找出格局和重點，然後整合成報告。
-
-## 三系統權重
-以紫微斗數為主軸（佔50%），八字為輔證（佔30%），西洋占星為補充（佔20%）。
-具體做法：先從紫微斗數的命盤格局、四化飛化、大限流年建立核心結論，再用八字的四柱十神大運來驗證和補充紫微的判斷，最後用占星的行星相位宮位提供額外維度。
-三套排盤的結論必須交叉驗證：共鳴點重點強調，矛盾處以紫微為準、八字為輔判。這是我們的核心分析方法。
-
-## 疊宮分析（已由程式預先計算完成）
-排盤資料中包含「疊宮分析結果」區塊，裡面有程式精確計算好的：大限四化飛入宮位、流年四化飛入宮位、12個月的流月四化、以及重要疊宮效果（雙祿、雙忌、祿忌沖等）。
-你的任務是：直接根據這些已計算好的疊宮結果來撰寫分析，用自然語言表達，不暴露術語。
-禁止忽略疊宮結果而給出空泛的「會有好運」結論。每個時間段的判斷都必須對應到疊宮結果中的具體四化和宮位。
-
-⚠️ 嚴格遵守系統規則：不提任何命理系統名稱和專有術語，用自然語言表達所有洞見。
-⚠️ 按照指定的輸出格式（天賦特質 → 主題深度解析 → 年運勢 → 建議 → 近期提醒）組織內容。
-⚠️ 重點針對用戶關注的「${goalTextZh}${loveSubTextZh ? `（${loveSubTextZh}）` : ""}」方向深入分析。${(() => {
-        const age = parseInt(birthYear) ? (_today.getFullYear() - parseInt(birthYear) + 1) : null;
-        if (!age || age >= 15) return "";
-        return `\n⚠️ **年齡安全規則 (必守)**: 用戶虛歲 ${age}, 未滿 15 歲. 整份報告**禁止**給感情/戀愛/婚姻/桃花/伴侶/夫妻等分析, 不可預測未來感情對象或婚姻. 若關注方向是「愛情」, 改為「同學/同儕關係、友情經營、被喜歡與喜歡他人的情緒辨識、如何表達情感、家人相處」方向. 若飛化或排盤涉及夫妻宮, 解讀為「未來人際相處模式的養成期」, 聚焦在當下性格/學習/興趣發展. 絕對不要出現「你適合的對象」「未來的伴侶」「婚姻走向」這類內容.`;
-      })()}
-⚠️ 絕對不可假設或猜測用戶的職業、行業、家庭狀況、生活背景。你只知道用戶提供的出生資料，不知道其他任何事。描述特質和建議時要保持中立通用，例如說「你適合需要統籌協調的領域」而不是「你適合供應鏈管理」。${twinTaskBlock}
-⚠️ 你必須用「${LANG_AI[currentLang] || '繁體中文'}」撰寫整份報告。所有標題、內容、建議都必須使用「${LANG_AI[currentLang] || '繁體中文'}」。`;
+請用${LANG_AI[currentLang] || '繁體中文'}回覆，內容要具體、可執行。`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: wizardSP, prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", notify_email: wizardUser?.email || "", goal, job_type: "analysis", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace } }),
+        body: JSON.stringify({ images: [], system_key: "analysis", prompt: oneCallPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", notify_email: wizardUser?.email || "", goal, job_type: "analysis", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hour: birthHour, minute: birthMinute, place: birthPlace } }),
       });
       if (!submitRes.ok) throw new Error(t('result.analysisError'));
       const { job_id } = await submitRes.json();
@@ -2165,7 +2125,6 @@ ${transitOverlay?.summary || ''}
     setChatLoading(true);
     try {
       const kbEntries = loadKB();
-      const wizardSP = buildWizardPrompt(kbEntries, goal);
       // [LAB] Only last 3 turns — use snapshot, not stale closure
       const recentChat = chatBefore.slice(-6).map(m => `${m.role === "user" ? "問" : "答"}：${m.text}`).join("\n");
 
@@ -2232,24 +2191,21 @@ ${transitOverlay?.summary || ''}
 
       // 問題路由：判斷該看哪些宮位
       const focusRule = getFollowUpFocus(question);
-      const focusBlock = focusRule
-        ? `\n\n===== 分析指引 =====\n問題類型：${focusRule.focus}\n重點宮位：${focusRule.palaces.join("、")}\n分析方法：${focusRule.guide}\n\n你必須從排盤資料中找到上述宮位的本命主星、四化，然後查疊宮對照表中該宮位在大限和流年的疊宮位置，再查疊宮分析結果中對應的四化飛入情況，據此推論。如果排盤中找不到足夠依據，就明確說「排盤中沒有明確跡象」。`
-        : "";
+      const focusBlock = "";
 
       const hasTimeQ = /月|年|季|時|何時|when|最近|今年|明年|上半|下半|幾月|什麼時候|進財|財運|感情運|健康運|事業運|運勢/i.test(question);
-      const transitBlock = hasTimeQ ? `\n\n⚠️ 時間相關問題 — 排盤資料中有「疊宮分析結果」區塊，裡面有程式精確計算好的大限/流年/流月四化和疊宮效果。你必須直接根據這些已計算好的結果回答，不可忽略。每個時間判斷都要對應到具體的四化和宮位。如果疊宮結果中找不到依據，就明確說「排盤中沒有明確的跡象」。` : "";
+      const transitBlock = "";
 
       // Time anchor: smoke-test job#43 drifted "國曆 4-6 月" to 2027. Force
       // the model to interpret bare months as the current year unless the
       // user explicitly names a future year.
       const _chatToday = new Date();
       const _chatTodayStr = `${_chatToday.getFullYear()}/${_chatToday.getMonth()+1}/${_chatToday.getDate()}`;
-      const timeAnchor = `## 時間基準 (強制遵守)\n今天是 ${_chatTodayStr}. 使用者問「4-6 月」「X 月」「下個月」「近期」等一律解讀為 ${_chatToday.getFullYear()} 年該月份, 絕不可自行飄到 ${_chatToday.getFullYear()+1} 年或之後. 只有使用者明確寫「${_chatToday.getFullYear()+1} 年」「明年」才能用該年.\n\n`;
+      const timeAnchor = "";
 
-      const prompt = `${timeAnchor}${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 之前的分析摘要 =====\n${finalResult.slice(0, 1500)}\n\n` : ""}${hebanBlock}${dayOverlayBlock}${focusBlock}${recentChat ? `\n對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n直接回答上述問題，聚焦問題本身，不要發散到其他主題。你必須用「${LANG_AI[currentLang] || '繁體中文'}」回覆。`;
+      const prompt = `${timeAnchor}${chartBlock ? `===== 原始排盤資料（精確數據，以此為準）=====\n${chartBlock}\n\n` : ""}${finalResult ? `===== 之前的分析摘要 =====\n${finalResult.slice(0, 1500)}\n\n` : ""}${hebanBlock}${dayOverlayBlock}${focusBlock}${recentChat ? `\n對話紀錄：\n${recentChat}\n\n` : ""}用戶追問：${question}${transitBlock}\n\n請直接回答問題，內容精簡且可執行。`;
 
-      // 追問用 FOLLOWUP_SYSTEM_PROMPT，不用主分析的 [SECTION] 格式
-      const followUpSP = FOLLOWUP_SYSTEM_PROMPT + (wizardSP.includes("知識庫") ? wizardSP.slice(wizardSP.indexOf("## 內部知識庫")) : "");
+      // 追問由後端 system_key 控制，不在前端暴露 system prompt
 
       // Route to DEEP model when the question is temporal and therefore
       // benefits from the bigger context window / better instruction-following.
@@ -2262,7 +2218,7 @@ ${transitOverlay?.summary || ''}
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: followUpSP, prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", goal, job_type: "chat", chart_id: activeReadingId || "" }),
+        body: JSON.stringify({ images: [], system_key: "chat", prompt, analysis_type: isDeep ? "deep" : "general", visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", goal, job_type: "chat", chart_id: activeReadingId || "" }),
       });
       if (!submitRes.ok) throw new Error(t('result.chatError'));
       const { job_id } = await submitRes.json();
@@ -2450,16 +2406,12 @@ ${hebanRelation === "relations.twin" ? `
 ⚠️ 按照指定輸出格式。
 ⚠️ 你必須用「${LANG_AI[currentLang] || '繁體中文'}」撰寫整份報告。`;
 
-      let sp = HEBAN_SYSTEM_PROMPT_ZH;
-      if (kbEntries.length > 0) {
-        sp += "\n\n## 內部知識庫（推理用，不可對外提及）\n";
-        kbEntries.forEach(e => { sp += `- ${e.title}: ${e.content.slice(0, 200)}\n`; });
-      }
+      const hebanPromptSafe = `請針對以下兩人資料做合盤分析，回覆重點：互動優勢、衝突點、可執行建議。\n\nA資料：${ziweiChart}\n${baziChart}\n${astroChart}\n\nB資料：${partnerZiwei}\n${partnerBazi}\n${partnerAstro}\n\n關係：${t(hebanRelation) || hebanRelation}`;
 
       const submitRes = await fetch(API_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: [], system: sp, prompt: hebanPrompt, visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", goal: "goal.love", job_type: "heban", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hebanYear, hebanMonth, hebanDay, hebanRelation } }),
+        body: JSON.stringify({ images: [], system_key: "heban", prompt: hebanPromptSafe, visitor_id: getVisitorId(), user: wizardUser?.email || null, user_name: wizardUser?.name || "", goal: "goal.love", job_type: "heban", birth_data: { year: birthYear, month: birthMonth, day: birthDay, hebanYear, hebanMonth, hebanDay, hebanRelation } }),
       });
       if (!submitRes.ok) throw new Error(t('result.hebanError'));
       const { job_id } = await submitRes.json();
@@ -2675,9 +2627,9 @@ ${hebanRelation === "relations.twin" ? `
                     {owned ? (
                       <div className="wizard-account-plan-owned">{t('account.unlocked')}</div>
                     ) : (
-                      <button className="wizard-account-plan-btn" disabled={loadingPayment}
-                        onClick={() => handleCheckout(id)}>
-                        {loadingPayment ? t('account.processing') : t('account.buy')}
+                      <button className="wizard-account-plan-btn"
+                        onClick={() => { setShowAccount(false); setShowPayment(true); }}>
+                        {t('account.buy')}
                       </button>
                     )}
                   </div>
@@ -4542,6 +4494,22 @@ ${hebanRelation === "relations.twin" ? `
                 {t('common.delete', { defaultValue: '刪除' })}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showPayment && (
+        <div className="wizard-auth-overlay" onClick={() => setShowPayment(false)}>
+          <div className="wizard-auth-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 720, padding: 0, maxHeight: '90vh', overflowY: 'auto' }}>
+            <PaymentFlow
+              user={wizardUser}
+              onClose={() => {
+                setShowPayment(false);
+                // Refresh user entitlement after the modal closes so newly
+                // paid features show up in 帳號 / dashboard immediately.
+                if (wizardUser?.email) fetchUserStatus(wizardUser.email);
+              }}
+            />
           </div>
         </div>
       )}
